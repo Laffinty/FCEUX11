@@ -108,10 +108,20 @@ void X6502_Power(void);
 void TriggerNMI(void);
 void TriggerNMI2(void);
 
+// D1 S2.5 (G5, design A): register the NMI line's hardware assert instant
+// (absolute CPU cycle, e1_cpu_abs 口径).  Bit set immediately; poll-point /
+// BRK-hijack visibility is gated by the stamp.
+void TriggerNMIAt(uint64 when);
+
+// Absolute CPU-cycle timestamp (e1_cpu_abs 同口径) -- lets the PPU side
+// anchor the NMI assert instant to the VBL flag-set dot.
+uint64 fceu11_cpu_abs_ts(void);
+
 uint8 X6502_DMR(uint32 A);
 void X6502_DMW(uint32 A, uint8 V);
 
 void X6502_IRQBegin(int w);
+void X6502_IRQBeginAt(int w, uint64 when);  // S2.5: exact event-cycle injector
 void X6502_IRQEnd(int w);
 
 int X6502_GetOpcodeCycles( int op );

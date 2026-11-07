@@ -1677,6 +1677,14 @@ int FCEUX_PPU_Loop(int skip) {
 		// with zero PPU advance, keeping the frame at a true 6820-dot VBL.
 		if (VBlankON) {
 			const int nd = e1_nmi_delay();
+			// D1 S2.5 (G5): the design-A registration (TriggerNMIAt with the
+			// flag-dot anchor, BEFORE the grant) was tried and REVERTED in
+			// the same session: at integer-cycle delta the old-05 X-table
+			// shifted a uniform 2 rows early (transition spacing exact, canary
+			// kgmqa-122 red) and 037's rows traded 2-for-2 -- the correction
+			// needs DOT-granular assert instants (the count-slack phase, the
+			// 02-vbl_set_time 1-dot bias conflated).  Charter for the next RE
+			// round: survey §12.8.  The legacy post-grant assert stays.
 			if (nd > 0) X6502_Run(nd);
 			if (e1_trace_on()) {
 				fprintf(stderr, "E1 VBL_AFTER_NMIDELAY abs=%llu sl=%d cycle=%d delay=%d\n",
@@ -1684,14 +1692,14 @@ int FCEUX_PPU_Loop(int skip) {
 				 ppur.status.sl, ppur.status.cycle, nd);
 			}
 			// E-1 Track-B probe (v1.17 R5 task, 2026-08-08): NMI_LATCH
-			// recorder. Fires immediately BEFORE TriggerNMI() (vs the
-			// existing E1 NMI_SET inside x6502.cpp::TriggerNMI which fires
-			// AFTER _IRQlow|=FCEU_IQNMI). Captures the dispatch site's
-			// PPU status + count + lastpc so vbl_05 / vbl_07 / vbl_08 NMI
-			// dispatch latency can be measured from the CALLER's frame
-			// of reference, not the callee's. Distinct probe name
-			// (E1B NMI_LATCH vs E1 NMI_SET) so dispatcher/callee sites
-			// are both recorded.
+			// recorder. S2.5: the NMI line is now REGISTERED before the
+			// X6502_Run(nd) grant (TriggerNMIAt, stamp = flag dot + delta),
+			// so this print fires after the registration -- it keeps
+			// capturing the dispatch site's PPU status + count + lastpc
+			// for the vbl_05 / vbl_07 / vbl_08 latency analysis. Distinct
+			// probe name (E1B NMI_LATCH vs E1 NMI_SET_AT inside
+			// x6502.cpp::TriggerNMIAt) so dispatcher/callee sites are both
+			// recorded.
 			if (!vbl_set_suppressed && e1_trace_on()) {
 				fprintf(stderr, "E1B NMI_LATCH abs=%llu sl=%d cycle=%d count=%d lastpc=%04X PPU_status=0x%02X VBlankON=%d\n",
 				 (unsigned long long)(g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref()),

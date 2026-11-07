@@ -516,6 +516,11 @@ static void FrameSoundEvent(bool quarter, bool half)
 // Frame IRQ flag visibility ($4015 bit 6) vs CPU IRQ line are separate:
 // the flag is set unconditionally at the IRQ step; the line is asserted
 // only when not inhibited (RustyNES Session-26 iter 5, Mesen2 semantics).
+// D1 S2.5 (G5): the exact event-cycle stamping (X6502_IRQBeginAt with the
+// fhcnt-derived position) was tried and REVERTED in the same session -- the
+// int_4 head rows shifted non-uniformly (the APU sequencer phase vs the
+// test's sync_apu alignment needs its own round; infra stays, injectors
+// stay, locks T-D1-5 keep the semantics pinned).  Charter: survey §12.8.
 static void FrameIRQSet(void)
 {
  // E-3 Track-B probe (v1.17 R6 task, 2026-08-08): IRQ_BEGIN recorder at

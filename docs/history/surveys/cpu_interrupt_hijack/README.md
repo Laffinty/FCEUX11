@@ -292,5 +292,29 @@ tests.json 的 kgmqa-040：legacy_id=`blargg_vbl_05_nmi_timing`、mirror_path=`b
 
 处置选项（**涉及 tests.json 期望值治理，业主裁决**）：(i) kgmqa-040 换回旧 05-nmi_timing（恢复门禁原意）；(ii) gate id 改名为 nmi_suppression 并**新增**一个 kgmqa 项挂旧 05（门禁+1）；(iii) 维持现状 + 文档声明 + G-2 作为 S2.5 的人工验收门。三路调查的约束 agent 建议至少做到 (iii)，(ii) 最完整。
 
+## 12.8 S2.5 第一轮实施记录（2026-11-07，数据节）
+
+**落地**：per-line 断言时刻表 + 可见性门控（poll point / BRK 劫持，严格 <）+ 精确注入器（`TriggerNMIAt` / `X6502_IRQBeginAt` / `fceu11_cpu_abs_ts`，x6502.h）+ legacy 注入器 `intl_stamp_legacy`（now−1，可见性与 S2 逐字节同）。锁测试 **T-D1-5 组 11 条**；cpu_test **861/861**；FTP 1红/10绿不变。**零生产行为变化实证**：037 `B1222C16`、int_3 `BBA6CEF0`、int_4 `FB7832D0`、int_5 `EF4967C7` 与 S2 轮逐字节一致；金标三件套零漂移。
+
+**尝试 (a)：VBL 时刻化——回退**。`TriggerNMIAt(flag点 + δ)` 于预算授予前登记（δ=`FCEUX11_NMI_ASSERT_DELTA`，整数 CPU 周期）。δ 扫参（旧 05，600 帧）：
+
+| δ | X 表 | 判定 |
+|---|---|---|
+| 0/1 | [3,2,2,2,2,2,1,1,1,1] | ✗ |
+| 2/3 | **[4,3,3,3,3,3,3,2,2,2]** | ✗ 转变间距 6 行＝期望一致，**整体早 2 行** |
+| 4 | [5,4,4,4,4,4,4,3,3,3] | ✗ |
+
+期望 [4,4,4,3,3,3,3,3,3,2]。**结论：无整数 δ 可复现**——2 行早 = **2-dot 点级相位差**，整数周期粒度的 assert_at 表达不了；与 02-vbl_set_time 的已知 1-dot C₀ 偏差合流。037 在 δ=1 下行级交易（7/10→4/10：行 6-7 得 `36 00 00` 劫持、行 2-5 位移）——同一 2-dot 问题的另一面。**kgmqa-122 当轮转红咬中**（金丝雀首次实战）⇒ 回退。**下一轮章程**：点级时刻——`now` 的点粒度可从 count 残量导出（`3*timestamp + count/16`，grant 流位置），但须先厘清 grant 位相 vs 执行位相的 slack 语义（e1_vbl closure_assessment §3 的「残量抵消」），并与 02-vbl_set_time 的 C₀ 修正合议。
+
+**尝试 (b)：APU FCOUNT 精确戳——回退**。`X6502_IRQBeginAt(FCOUNT, fsu_event_abs())`（fhcnt 派生事件周期：`win_end − cycles + (fhcnt_event − fhcnt_entry)`）。054 保持 PASS；int_4 头部行**非均匀位移**（`1+0/2+1/2+2/4+3/4+4/7+5...` vs S2 的统一早一条）——整体晚一条 + DMA 区异常 = APU 时序器相位 vs 测试 sync_apu 对齐的独立问题。⇒ 回退。**下一轮章程**：INTLEDGER 对照 dly=0 档的 assert-abs 与 landing 边界的距离，判定对齐差 1 周期的方向与归属（本仓 $4017 写同步 vs sync_apu 的偶周期假设）。
+
+**变异验证**（apply→target 构建→红→revert→绿）：
+
+| 变异 | 施加点 | 红面 |
+|---|---|---|
+| ms25a | `intl_nmi_live` 的时刻门控短路 | 1 红：T-D1-5a-5（门控消失 ⇒ 派发早一边界、压栈 PC=$201 ≠ $202） |
+| ms25b | EXT 门控严格 < → ≤ | 1 红：T-D1-5b-3（边界恰落事件改记本条指令 ⇒ 压栈 PC=$201 ≠ $202） |
+| ms25d | `X6502_IRQBeginAt` 戳折叠到 now（pre-S2.5 行为） | 1 红：T-D1-5b-3（登记时刻提前为调用时刻）。⚠ 5c 对该变异不敏感：精确戳与折叠戳都先于首次 poll 生效、派发点相同——已如实记录 |
+
 ---
 *调查页完（S0+S1+S2+S2.5-RE）。S3 起的实施记录记 v2.0.2 计划 §十 变更记录，本页只补数据节。*

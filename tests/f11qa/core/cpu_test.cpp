@@ -587,6 +587,52 @@ void test_poll_target_branch_delay(TestContext& ctx) {
         "T-D1-4d: single sequence pushed after the branch (S5)");
 }
 
+// T-D1-5（S2.5 基线）：线携带断言时刻（方案 A）——可见性按时刻门控。
+// 两条核心语义：① 未来时刻登记的线，对未到期的指令不可见（电平位立即
+// 置位、派发等过了时刻）；② 恰落指令结束边界的事件归属**下一条**指令的
+// 窗口（严格 <；int_4 头部行的 (a) 修复语义，调查页 §12.3）。
+void test_poll_assert_timestamp(TestContext& ctx) {
+    // 5a：未来时刻登记（VBL 语义——TriggerNMIAt 在预算前登记）
+    poll_setup_boundary(true);
+    TriggerNMIAt(poll_abs() + 2);            // 2 CPU 周期后的未来时刻
+    FCEU11_EXPECT(ctx, (X.IRQlow & FCEU_IQNMI) != 0,
+                  "T-D1-5a-1: level bit set immediately at registration");
+    poll_run_exact(2);                        // 这条 NOP 恰在时刻处结束：不可见
+    FCEU11_EXPECT(ctx, (X.P & I_FLAG) == 0,
+                  "T-D1-5a-2: line not visible to the instruction ending at the instant");
+    poll_run_exact(9);                        // 过了时刻：NOP 的 poll 采样 → 本切片内边界派发
+    FCEU11_EXPECT(ctx, X.S == (uint8_t)(0xFD - refint::kSeqSDelta),
+                  "T-D1-5a-3: dispatch once the instant has passed");
+    FCEU11_EXPECT(ctx, RAM[0x100 + 0xFD] == 0x02 && RAM[0x100 + 0xFC] == 0x02,
+                  "T-D1-5a-5: pushed PC = $202 (dispatch after the stamp-exceeding instruction)");
+    FCEU11_EXPECT(ctx, (X.IRQlow & FCEU_IQNMI) == 0,
+                  "T-D1-5a-4: line consumed by the dispatch");
+
+    // 5b：恰落边界的事件（IRQ 通道——X6502_IRQBeginAt 的 int_4 语义）
+    poll_setup_boundary(true);
+    X6502_IRQBeginAt(FCEU_IQEXT, poll_abs() + 2);  // 事件 = 本条 NOP 的结束边界
+    poll_run_exact(2);
+    FCEU11_EXPECT(ctx, (X.P & I_FLAG) == 0,
+                  "T-D1-5b-1: boundary-exact event invisible to the ending instruction");
+    poll_run_exact(9);                        // 下一条 NOP 的 poll 可见 → 边界派发
+    FCEU11_EXPECT(ctx, (X.P & I_FLAG) != 0,
+                  "T-D1-5b-2: dispatched at the boundary after the next instruction");
+    FCEU11_EXPECT(ctx, RAM[0x100 + 0xFD] == 0x02 && RAM[0x100 + 0xFC] == 0x02,
+                  "T-D1-5b-3: pushed PC = $202 (the instruction after the boundary event)");
+
+    // 5c：窗口内事件（严格早于边界）——覆盖它的指令可见、该边界派发
+    poll_setup_boundary(true);
+    X6502_IRQBeginAt(FCEU_IQEXT, poll_abs() + 1);  // 事件在本条 NOP 中间
+    poll_run_exact(2);                        // 采样（pending=2）但预算内不派发
+    FCEU11_EXPECT(ctx, (X.P & I_FLAG) == 0,
+                  "T-D1-5c-1: mid-window event sampled but not dispatched in-slice");
+    poll_run_exact(7);                        // 下一边界立即派发（压 PC=$201）
+    FCEU11_EXPECT(ctx, (X.P & I_FLAG) != 0,
+                  "T-D1-5c-2: dispatched at the very next boundary");
+    FCEU11_EXPECT(ctx, RAM[0x100 + 0xFD] == 0x02 && RAM[0x100 + 0xFC] == 0x01,
+                  "T-D1-5c-3: pushed PC = $201 (dispatch one instruction earlier than 5b)");
+}
+
 int main() {
     std::setvbuf(stdout, nullptr, _IONBF, 0);
 
@@ -644,6 +690,7 @@ int main() {
     test_poll_target_hijack_single_sequence(ctx);
     test_poll_target_two_phase_irq(ctx);
     test_poll_target_branch_delay(ctx);
+    test_poll_assert_timestamp(ctx);
 
     fceu11::CloseGame();
     core_shutdown();

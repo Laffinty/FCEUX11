@@ -403,6 +403,94 @@ static uint8 g_intl_pending = 0;
 // ops_table.inc) calls it when the NMI line hijacks the BRK sequence.
 static void X6502_NmiHijacked();
 
+// Interrupt-line kind indices (shared with the INTLEDGER probe below; the
+// enum is defined here -- hoisted above ops_table.inc -- so the S2.5
+// visibility helpers can index the stamp table).
+enum IntLedgerKind : uint8_t {
+	INTL_NMI    = 0,  // FCEU_IQNMI   (TriggerNMI / fceu11::NMI / X6502_IRQBegin)
+	INTL_NMI2   = 1,  // FCEU_IQNMI2  (TriggerNMI2)
+	INTL_EXT    = 2,  // FCEU_IQEXT   (mapper / FDS)
+	INTL_EXT2   = 3,  // FCEU_IQEXT2
+	INTL_DPCM   = 4,  // FCEU_IQDPCM  (APU DMC)
+	INTL_FCOUNT = 5,  // FCEU_IQFCOUNT (APU frame counter)
+	INTL_TEMP   = 6,  // FCEU_IQTEMP  (fceu11::IRQ one-shot)
+	INTL_RESET  = 7,  // FCEU_IQRESET (lifecycle; consumed raw at the boundary)
+	INTL_BOUND  = 15  // loop-top boundary snapshot (probe-only kind)
+};
+
+// ----------------------------------------------------------------------------
+// D1 S2.5 (G5, r20 design A): per-line assertion timestamps -- "the line
+// carries its assert instant".
+//
+// Hardware asserts an interrupt line at a precise CPU cycle (VBL flag dot
+// + ~1 cycle for NMI; the APU frame counter's exact table position for
+// FCOUNT).  Two host structures quantized that instant away: the VBL block
+// asserted the line only after its X6502_Run(nd) budget (instruction-
+// boundary quantization -- the r5 "no fixed D" dead end), and the per-
+// instruction hooks folded the intra-window phase to the window end
+// (boundary-exact events were credited one instruction early -- the
+// cpu_int_4 head-row signature, survey §12.3).
+//
+// The _IRQlow bits keep their level semantics (assert/release, probes,
+// INTLEDGER).  The consumers gate on the registered instant: a line is
+// VISIBLE once the current instruction's accounting end is strictly past
+// it (hardware samples at the last cycle's phi2; an event stamped exactly
+// at the boundary belongs to the NEXT instruction's window).
+//
+// NOT part of the savestate (gate #1, same class as g_intl_pending): on
+// restore, previously asserted lines carry stale (older) stamps and are
+// immediately visible -- the pre-S2.5 behavior.
+static uint64 g_intl_assert_at[8];  // indexed by IntLedgerKind
+
+static inline uint64_t intl_now_abs(void) {
+	return g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref();
+}
+
+// Stamp every kind carried in the mask.
+static inline void intl_stamp_mask(int w, uint64_t when) {
+	if (w & FCEU_IQNMI)    g_intl_assert_at[INTL_NMI] = when;
+	if (w & FCEU_IQNMI2)   g_intl_assert_at[INTL_NMI2] = when;
+	if (w & FCEU_IQEXT)    g_intl_assert_at[INTL_EXT] = when;
+	if (w & FCEU_IQEXT2)   g_intl_assert_at[INTL_EXT2] = when;
+	if (w & FCEU_IQDPCM)   g_intl_assert_at[INTL_DPCM] = when;
+	if (w & FCEU_IQFCOUNT) g_intl_assert_at[INTL_FCOUNT] = when;
+	if (w & FCEU_IQTEMP)   g_intl_assert_at[INTL_TEMP] = when;
+}
+
+// Legacy injectors (mapper hooks, write handlers, ppudead NMI, debug API):
+// the call lands after ADDCYC, so "now" is the current instruction's end
+// boundary; stamping one cycle earlier keeps the line visible at THIS
+// instruction's poll -- the exact pre-S2.5 dispatch instant for every
+// legacy caller (survey §12.2 formulas; the mapper-phase loss is a
+// documented residual).
+static inline void intl_stamp_legacy(int w) {
+	uint64_t t = intl_now_abs();
+	intl_stamp_mask(w, t > 0 ? t - 1 : 0);
+}
+
+// The BRK hijack check (ops.inc case 0x00): the NMI line hijacks the
+// sequence when it is live at the vector fetch.  "now" there is the BRK's
+// accounting end (ADDCYC pre-credited the whole sequence), which matches
+// the hardware hijack window: blargg 2-nmi_and_brk rows 4-8 (asserted
+// inside the sequence) hijack, rows 9-10 (asserted after) do not.
+static inline bool intl_nmi_live(void) {
+	return (_IRQlow & FCEU_IQNMI) && g_intl_assert_at[INTL_NMI] < intl_now_abs();
+}
+
+// IRQ-channel lines visible at the poll point (I flag / jammed are the
+// caller's concern).  TEMP rides the IRQ channel (baseline B7).
+static inline uint32 intl_live_irq_mask(void) {
+	const uint32 m = _IRQlow & INTL_IRQ_MASK;
+	const uint64_t now = intl_now_abs();
+	uint32 live = 0;
+	if ((m & FCEU_IQEXT)    && g_intl_assert_at[INTL_EXT]    < now) live |= FCEU_IQEXT;
+	if ((m & FCEU_IQEXT2)   && g_intl_assert_at[INTL_EXT2]   < now) live |= FCEU_IQEXT2;
+	if ((m & FCEU_IQDPCM)   && g_intl_assert_at[INTL_DPCM]   < now) live |= FCEU_IQDPCM;
+	if ((m & FCEU_IQFCOUNT) && g_intl_assert_at[INTL_FCOUNT] < now) live |= FCEU_IQFCOUNT;
+	if ((m & FCEU_IQTEMP)   && g_intl_assert_at[INTL_TEMP]   < now) live |= FCEU_IQTEMP;
+	return live;
+}
+
 #include "ops_table.inc"
 
 FCEUX11_CACHE_ALIGN static uint8 CycTable[256] =
@@ -463,17 +551,9 @@ struct IntLedgerRec {
 };
 static_assert(sizeof(IntLedgerRec) == 24, "keep the on-disk ledger record layout fixed");
 
-enum IntLedgerKind : uint8_t {
-	INTL_NMI    = 0,  // FCEU_IQNMI   (TriggerNMI / fceu11::NMI / X6502_IRQBegin)
-	INTL_NMI2   = 1,  // FCEU_IQNMI2  (TriggerNMI2)
-	INTL_EXT    = 2,  // FCEU_IQEXT   (mapper / FDS)
-	INTL_EXT2   = 3,  // FCEU_IQEXT2
-	INTL_DPCM   = 4,  // FCEU_IQDPCM  (APU DMC)
-	INTL_FCOUNT = 5,  // FCEU_IQFCOUNT (APU frame counter)
-	INTL_TEMP   = 6,  // FCEU_IQTEMP  (fceu11::IRQ one-shot)
-	INTL_RESET  = 7,  // FCEU_IQRESET
-	INTL_BOUND  = 15, // loop-top boundary snapshot
-};
+// IntLedgerKind now lives above ops_table.inc (hoisted for the S2.5
+// visibility helpers); its values are unchanged -- INTL_BOUND = 15 is the
+// only extra kind the probe defines beyond the hoisted range.
 
 static bool intledger_on() {
 	static const bool on = []() {
@@ -649,6 +729,19 @@ static inline void intledger_emit_boundary(uint32_t pre_irqlow, uint8_t decision
 void X6502_IRQBegin(int w)
 {
  _IRQlow|=w;
+ intl_stamp_legacy(w);  // S2.5: legacy injector (hook/write path), pre-S2.5 visibility
+ intledger_decode_mask((uint32_t)w, 1);
+}
+
+// D1 S2.5 (G5, design A): precision injector for line sources that know
+// their exact event cycle (APU frame counter via SoundCPUHook).  `when` =
+// absolute CPU cycle (e1_cpu_abs 口径); an event stamped exactly at the
+// current instruction's end boundary becomes visible to the NEXT
+// instruction's poll (the cpu_int_4 head-row fix).
+void X6502_IRQBeginAt(int w, uint64 when)
+{
+ _IRQlow|=w;
+ intl_stamp_mask(w, when);
  intledger_decode_mask((uint32_t)w, 1);
 }
 
@@ -693,6 +786,12 @@ static bool d5_fetch_probe_on() {
 
 static uint64 e1_cpu_abs() {
  return g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref();
+}
+
+// D1 S2.5: exported absolute CPU-cycle timestamp (x6502.h) -- the PPU side
+// anchors the NMI assert instant to the VBL flag-set dot with this.
+uint64 fceu11_cpu_abs_ts(void) {
+ return e1_cpu_abs();
 }
 
 // E-1 probe (Phase 1 Step 1.3, 2026-08-02): NMI-latch freshness flag.
@@ -740,6 +839,23 @@ void TriggerNMI(void)
  if (e1_cpu_trace_on())
   fprintf(stderr, "E1 NMI_SET abs=%llu (path=VBL)\n", (unsigned long long)e1_cpu_abs());
  _IRQlow|=FCEU_IQNMI;
+ intl_stamp_legacy(FCEU_IQNMI);  // S2.5: legacy injector, visible this boundary onward
+ intledger_emit_line(INTL_NMI, 1);
+}
+
+// D1 S2.5 (G5, design A): register the NMI line's hardware assert instant
+// (absolute CPU cycle, e1_cpu_abs 口径).  The bit is set immediately
+// (level semantics); visibility at the poll point / BRK hijack check is
+// gated by the stamp.  Used by the VBL block, which registers the line
+// BEFORE its CPU budget grant so the polls inside X6502_Run(nd) sample the
+// line exactly when hardware does.
+void TriggerNMIAt(uint64 when)
+{
+ if (e1_cpu_trace_on())
+  fprintf(stderr, "E1 NMI_SET_AT abs=%llu at=%llu (path=VBL)\n",
+   (unsigned long long)e1_cpu_abs(), (unsigned long long)when);
+ _IRQlow|=FCEU_IQNMI;
+ g_intl_assert_at[INTL_NMI] = when;
  intledger_emit_line(INTL_NMI, 1);
 }
 
@@ -893,6 +1009,7 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
      {
      _IRQlow&=~FCEU_IQNMI2;
      _IRQlow|=FCEU_IQNMI;
+     g_intl_assert_at[INTL_NMI] = intl_now_abs();  // S2.5: converted level visible from the next poll
      intledger_decision = 2;
     }
     intledger_emit_boundary(intledger_pre_irqlow, intledger_decision);
@@ -948,12 +1065,14 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
    if(_IRQlow) [[unlikely]]
    {
     // NMI wins over IRQ; a pending IRQ is never downgraded by a later
-    // sample, and an NMI sample replaces anything pending.
-    if(_IRQlow&FCEU_IQNMI)
+    // sample, and an NMI sample replaces anything pending.  S2.5: a line
+    // is only sampleable once its registered assert instant has passed
+    // (strictly before this instruction's accounting end).
+    if(intl_nmi_live())
     {
      if(!_jammed) g_intl_pending = 1;
     }
-    else if((_IRQlow&INTL_IRQ_MASK) && !(_PI&I_FLAG) && !_jammed)
+    else if(intl_live_irq_mask() && !(_PI&I_FLAG) && !_jammed)
     {
      if(!g_intl_pending) g_intl_pending = 2;
     }
@@ -971,12 +1090,14 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
 void fceu11::NMI()
 {
  _IRQlow|=FCEU_IQNMI;
+ intl_stamp_legacy(FCEU_IQNMI);  // S2.5: legacy injector
  intledger_emit_line(INTL_NMI, 1);
 }
 
 void fceu11::IRQ()
 {
  _IRQlow|=FCEU_IQTEMP;
+ intl_stamp_legacy(FCEU_IQTEMP);  // S2.5: legacy injector
  intledger_emit_line(INTL_TEMP, 1);
 }
 

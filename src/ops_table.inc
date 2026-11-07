@@ -29,7 +29,7 @@ static void x6502_op_00(X6502* xp)
                 PUSH(_P|U_FLAG|B_FLAG);
                 _P|=I_FLAG;
                 _PI|=I_FLAG;
-                if(_IRQlow&FCEU_IQNMI)
+                if(intl_nmi_live())
                 {
                  _PC=RdMem(0xFFFA);
                  _PC|=RdMem(0xFFFB)<<8;
