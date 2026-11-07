@@ -20,13 +20,34 @@
 
 case 0x00:  /* BRK */
             _PC++;
+            /* D1 S2 (kgmqa-037): BRK hijack.  The interrupt sequence goes
+               through the opcode channel, so a BRK in flight can be
+               hijacked: when the NMI line is asserted the BRK's OWN push
+               sequence stays (P pushed with B=1 -- blargg cpu_interrupts_v2
+               2-nmi_and_brk: "NMI interrupting BRK, with B bit set on
+               stack", expected row `36 00 00`), only the vector fetch is
+               diverted to $FFFA and the NMI line is consumed.  The $FFFE
+               handler never runs (single 3-push sequence, return address
+               still the BRK opcode-slot PC+2).
+               Ground truth: cpu_interrupts_v2/source/2-nmi_and_brk.s
+               (nmi_flag = pla of the hijacked sequence's pushed P).
+               Lock tests: T-D1-3a/3b/3c/3d. */
             PUSH(_PC>>8);
             PUSH(_PC);
             PUSH(_P|U_FLAG|B_FLAG);
-	    _P|=I_FLAG;
-	    _PI|=I_FLAG;
-            _PC=RdMem(0xFFFE);
-            _PC|=RdMem(0xFFFF)<<8;
+            _P|=I_FLAG;
+            _PI|=I_FLAG;
+            if(_IRQlow&FCEU_IQNMI)
+            {
+             _PC=RdMem(0xFFFA);
+             _PC|=RdMem(0xFFFB)<<8;
+             X6502_NmiHijacked();
+            }
+            else
+            {
+             _PC=RdMem(0xFFFE);
+             _PC|=RdMem(0xFFFF)<<8;
+            }
             break;
 
 case 0x40:  /* RTI */

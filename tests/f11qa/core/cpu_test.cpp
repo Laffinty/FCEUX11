@@ -383,14 +383,27 @@ void test_poll_irq_ext_first_boundary(TestContext& ctx) {
     const uint64_t t0 = poll_abs();
     poll_run_exact(2);
     const uint64_t t1 = poll_abs();
-    FCEU11_EXPECT(ctx, (X.P & I_FLAG) != 0,
-                  "I2a-1: EXT dispatch at the first loop-top (stale boundary)");
-    FCEU11_EXPECT(ctx, t1 - t0 == (uint64_t)refint::kSeqCycles,
-                  "I2a-2: dispatch slice charged the 7-cycle sequence");
-    FCEU11_EXPECT(ctx, X.S == (uint8_t)(0xFD - refint::kSeqSDelta),
-                  "I2a-3: exactly one 3-push sequence on the stack");
+    // S2 rewrite (paired with T-D1-2): the pre-S2 model dispatched at the
+    // stale boundary; the two-phase model samples the line at the poll
+    // point of the instruction being polled, so the dispatch lands at the
+    // boundary AFTER that instruction.
+    FCEU11_EXPECT(ctx, (X.P & I_FLAG) == 0,
+                  "I2a-1: no dispatch inside the polled instruction's slice");
+    FCEU11_EXPECT(ctx, t1 - t0 == (uint64_t)refint::kMinInstrCycles,
+                  "I2a-2: the polled slice charged only the 2-cycle NOP");
+    FCEU11_EXPECT(ctx, X.S == 0xFD,
+                  "I2a-3: no sequence pushed inside the polled instruction");
     FCEU11_EXPECT(ctx, (X.IRQlow & FCEU_IQEXT) != 0,
                   "I2a-4: EXT line stays asserted (mapper owns release)");
+    // The dispatch slice: 7-cycle sequence at the next boundary.
+    poll_run_exact(9);
+    const uint64_t t2 = poll_abs();
+    FCEU11_EXPECT(ctx, (X.P & I_FLAG) != 0,
+                  "I2a-5: EXT dispatch at the boundary after the poll point");
+    FCEU11_EXPECT(ctx, t2 - t1 == (uint64_t)refint::kSeqCycles,
+                  "I2a-6: dispatch slice charged the 7-cycle sequence");
+    FCEU11_EXPECT(ctx, X.S == (uint8_t)(0xFD - refint::kSeqSDelta),
+                  "I2a-7: exactly one 3-push sequence on the stack");
     // I2b: I 置位 → EXT 挂起不派发（线保持、栈不动）
     poll_setup_boundary(false);
     poll_run_exact(2);
@@ -409,10 +422,15 @@ void test_poll_irq_ext_first_boundary(TestContext& ctx) {
     FCEU11_EXPECT(ctx, (X.IRQlow & FCEU_IQTEMP) != 0,
                   "B7-0: fceu11::IRQ latches TEMP line");
     poll_run_exact(2);
-    FCEU11_EXPECT(ctx, (X.P & I_FLAG) != 0,
-                  "B7-1: TEMP dispatches through the IRQ channel (I clear)");
+    // S2 rewrite: the one-shot TEMP line is consumed by the poll point,
+    // and the dispatch lands at the next boundary.
+    FCEU11_EXPECT(ctx, (X.P & I_FLAG) == 0,
+                  "B7-1: no dispatch inside the polled instruction's slice");
     FCEU11_EXPECT(ctx, (X.IRQlow & FCEU_IQTEMP) == 0,
-                  "B7-2: TEMP is one-shot (cleared at the boundary)");
+                  "B7-2: TEMP is one-shot (consumed by the poll point)");
+    poll_run_exact(9);
+    FCEU11_EXPECT(ctx, (X.P & I_FLAG) != 0,
+                  "B7-3: TEMP dispatches through the IRQ channel (I clear)");
 }
 
 // C-baseline：NMI2（TriggerNMI2，$2000 边沿路径）→ 一级转换 → 下一边界派
@@ -449,49 +467,65 @@ void test_poll_nmi_ignores_iflag(TestContext& ctx) {
                   "B6-2: sequence pushed");
 }
 
-// ③-baseline（B2/B3/B4）：hijack 缺失的现行为——NMI 在 BRK 在飞时置位 ⇒
-// BRK **完整执行**（压 B=1、读 IRQ 向量）**然后** NMI 派发（压 B=0、读
-// NMI 向量）= 两次序列、栈 6 字节。这正是 037 的差 1 根源（调查页 §2）。
+// ③-baseline（B2/B3/B4）：S2 后的 hijack 单序列形态——NMI 线在 BRK 执行时
+// 置位 ⇒ BRK 序列被劫持（BRK 自身压栈保留 B=1、只改读 NMI 向量、栈 3
+// 字节）。037 差 1 的
+// 根源（调查页 §2）在 S2 后不再是「两次序列」。
 void test_poll_hijack_brk_then_nmi_two_sequences(TestContext& ctx) {
     poll_setup_boundary(true);
     poll_run_exact(2);                       // NOP@200 → PC=201，_PI 刷新
     RAM[0x201] = 0x00;                  // BRK @ $201（压 PC+2=$203、读 $FFFE）
-    TriggerNMI();                       // 边界注入：fresh 置位
-    poll_run_exact(30);                      // DEFER + BRK(7) + NMI 派发(7)
-    FCEU11_EXPECT(ctx, X.S == (uint8_t)(0xFD - refint::kTwoSeqPushes),
-                  "B2: BRK(3 pushes) then NMI(3 pushes) = 6 total");
+    TriggerNMI();                       // 边界注入：线置位（hijack 判据 = BRK 执行时 NMI 线置位）
+    // 预算 = 7：边界持有（0）+ BRK 劫持序列（7）= 序列终点。处理器尚未
+    // 运行 ⇒ PC/S/栈是 hijack 的架构精确态（预算再长，nestest 的 NMI
+    // 处理器会 RTI 弹栈、PC 离开向量，断言面就不成立了）。
+    poll_run_exact(7);
+    // S2 rewrite (paired with T-D1-3): the hijack collapses BRK + NMI into
+    // ONE 3-push sequence — the BRK opcode slot is reused, the BRK's own
+    // push (B=1) stays on the stack and only the vector fetch is diverted.
+    // blargg 2-nmi_and_brk expected row `36 00 00` = "NMI interrupting BRK,
+    // with B bit set on stack" (source 2-nmi_and_brk.s: nmi_flag = pla).
+    FCEU11_EXPECT(ctx, X.S == (uint8_t)(0xFD - refint::kSeqSDelta),
+                  "B2: hijack collapses BRK+NMI into one 3-push sequence");
     FCEU11_EXPECT(ctx, (RAM[0x100 + 0xFD - 2] & B_FLAG) != 0,
-                  "B3: BRK sequence pushed P with B=1");
-    FCEU11_EXPECT(ctx, (RAM[0x100 + 0xFD - 5] & B_FLAG) == 0,
-                  "B4: NMI sequence pushed P with B=0");
+                  "B3: the hijacked sequence keeps the BRK's push (B=1)");
+    // The BRK handler address (IRQ vector) is no longer pushed: the second
+    // sequence is gone.  nestest's IRQ vector ($C5F4) can not collide with
+    // the BRK slot PC ($0203), so this really pins "no second sequence".
+    const uint16_t irq_v = poll_irq_vector();
+    FCEU11_EXPECT(ctx,
+        !(RAM[0x100 + 0xFD - 3] == (uint8_t)(irq_v >> 8) &&
+          RAM[0x100 + 0xFD - 4] == (uint8_t)(irq_v & 0xFF)),
+        "B4: the BRK handler address is not on the stack (single sequence)");
     FCEU11_EXPECT(ctx, (X.IRQlow & FCEU_IQNMI) == 0,
-                  "B2b: NMI consumed after both sequences");
+                  "B2b: NMI consumed by the hijacking sequence");
     // BRK 的 opcode 槽形状：压 PC+2 = $203（opcode $201 取指 +2）
     FCEU11_EXPECT(ctx, RAM[0x100 + 0xFD] == 0x02 && RAM[0x100 + 0xFC] == 0x03,
                   "B3b: BRK pushed PC+2 = $203 (opcode slot shape)");
-    // NMI 序列压的是 BRK 处理器地址 = IRQ 向量 ⇒ BRK 先完整执行
-    const uint16_t irq_v = poll_irq_vector();
-    FCEU11_EXPECT(ctx,
-        RAM[0x100 + 0xFD - 3] == (uint8_t)(irq_v >> 8) &&
-        RAM[0x100 + 0xFD - 4] == (uint8_t)(irq_v & 0xFF),
-        "B4b: NMI pushed the BRK handler PC (IRQ vector) — BRK ran first");
+    // 向量取 NMI（$FFFA）—— hijack 把 BRK 序列变成 NMI 服务
+    FCEU11_EXPECT(ctx, X.PC == poll_nmi_vector(),
+                  "B4b: the hijacked sequence took the NMI vector");
 }
 
 // ③-target（// S2+ fail-to-pass）：hijack 落地后同一场景应为**单序列**：
-// BRK 槽被劫持（opcode 槽 dummy 读 = 压 PC+2 不变）、B=0、向量 $FFFA、
+// BRK 槽被劫持（opcode 槽 dummy 读 = 压 PC+2 不变、BRK 的 B=1 压栈保留）、
+// 向量 $FFFA、
 // 栈 3 字节。本步显式红（现行为是两次序列）；S2 落地转绿。
 void test_poll_target_hijack_single_sequence(TestContext& ctx) {
     poll_setup_boundary(true);
     poll_run_exact(2);
     RAM[0x201] = 0x00;                  // BRK @ $201
     TriggerNMI();
-    poll_run_exact(30);
+    // 预算 = 7（与 B2 基线同口径）：边界持有 + BRK 劫持序列 = 序列终点，
+    // 处理器未及运行 ⇒ PC/S 为架构精确态。
+    poll_run_exact(7);
     // S2+ fail-to-pass：单序列（栈 3 字节）
     FCEU11_EXPECT_FTP(ctx, X.S == (uint8_t)(0xFD - refint::kSeqSDelta),
         "T-D1-3a: hijack collapses BRK+NMI into one 3-push sequence (S2)");
-    // S2+ fail-to-pass：唯一压栈的 P 带 B=0（BRK 的 B=1 序列不再存在）
-    FCEU11_EXPECT_FTP(ctx, (RAM[0x100 + 0xFD - 2] & B_FLAG) == 0,
-        "T-D1-3b: hijacked sequence pushes B=0 (S2)");
+    // S2+ fail-to-pass：唯一压栈的 P 保留 BRK 的 B=1（blargg 行 `36 00 00`
+    // = "with B bit set on stack"；向量级劫持不重压 P）
+    FCEU11_EXPECT_FTP(ctx, (RAM[0x100 + 0xFD - 2] & B_FLAG) != 0,
+        "T-D1-3b: hijacked sequence keeps the BRK's B=1 push (S2)");
     // opcode 槽形状不变：压 PC+2 = $203（hijack 复用 BRK 的槽；现行为下
     // BRK 也压 $203，此断言两态皆绿——pin 形状，防 hijack 丢槽）
     FCEU11_EXPECT_FTP(ctx,

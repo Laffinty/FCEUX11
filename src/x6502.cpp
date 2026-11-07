@@ -374,6 +374,35 @@ static uint8 ZNTable[256];
 #define ST_IX(r)  {unsigned int A; GetIX(A); WrMem(A,r);  }
 #define ST_IY(r)  {unsigned int A; GetIYWR(A); WrMem(A,r);  }
 
+// ----------------------------------------------------------------------------
+// D1 S2 (kgmqa-037): interrupt sampling / dispatch split.
+//
+// Hardware samples the interrupt lines at the end of the second-to-last cycle
+// of every instruction, and a line seen there starts the interrupt sequence
+// only AFTER that instruction has finished.  This core used to sample at the
+// instruction boundary (the `if(_IRQlow)` block further down), which
+// dispatches one instruction too early -- the structural root of the
+// kgmqa-037 "NMI BRK" off-by-one.
+//
+// g_intl_pending holds the interrupt sampled at the previous instruction's
+// poll point, waiting to be dispatched at the next boundary:
+//   0 = none, 1 = NMI, 2 = IRQ.
+//
+// NOT part of the savestate (gate #1: model state stays out of the SFCPU /
+// SFCPUC SFORMAT tables => golden_savestate does not drift).  It is an
+// intra-instruction transient, consumed as soon as the instruction that
+// sampled it completes -- the same class as g_power_on_reset_pending.
+// The interrupt lines that reach the IRQ channel (everything except the
+// RESET / NMI2 / NMI lines, which have their own handling).
+static constexpr uint32_t INTL_IRQ_MASK =
+      FCEU_IQEXT | FCEU_IQEXT2 | FCEU_IQDPCM | FCEU_IQFCOUNT | FCEU_IQTEMP;
+
+static uint8 g_intl_pending = 0;
+
+// Forward declaration: the BRK handler in ops.inc (included below as
+// ops_table.inc) calls it when the NMI line hijacks the BRK sequence.
+static void X6502_NmiHijacked();
+
 #include "ops_table.inc"
 
 FCEUX11_CACHE_ALIGN static uint8 CycTable[256] =
@@ -675,7 +704,21 @@ static uint64 e1_cpu_abs() {
 // B must be observed at the NEXT boundary. TriggerNMI2 already defers via
 // the NMI2->NMI conversion on the same check; give TriggerNMI the same
 // one-boundary deferral (04-nmi_control #11 "after NEXT instruction").
-static bool g_e1_nmi_fresh = false;
+// D1 S2 (kgmqa-037): g_e1_nmi_fresh is retired.  The one-boundary
+// deferral it forced for the VBL NMI path is now produced by the poll
+// point itself (the line is sampled at the end of the instruction and
+// dispatched at the next boundary -- the same instant the flag forced).
+// Keeping both would delay the VBL NMI by one extra instruction.
+
+// D1 S2 (kgmqa-037): the NMI line was consumed by the hijacking BRK
+// sequence -- clear the line and any pending dispatch, so the next boundary
+// does not dispatch the NMI twice.
+static void X6502_NmiHijacked()
+{
+	_IRQlow&=~FCEU_IQNMI;
+	g_intl_pending = 0;
+}
+
 
 void TriggerNMI(void)
 {
@@ -697,7 +740,6 @@ void TriggerNMI(void)
  if (e1_cpu_trace_on())
   fprintf(stderr, "E1 NMI_SET abs=%llu (path=VBL)\n", (unsigned long long)e1_cpu_abs());
  _IRQlow|=FCEU_IQNMI;
- g_e1_nmi_fresh = true;
  intledger_emit_line(INTL_NMI, 1);
 }
 
@@ -775,14 +817,13 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
    int32 temp;
    uint8 b1;
 
-   if(_IRQlow) [[unlikely]]
+   if(_IRQlow || g_intl_pending) [[unlikely]]
    {
     // D1 INTLEDGER: capture the line value this boundary determination
     // sees (pre-decision), then record the actual decision branch taken.
     // Default = 6 ("held": nothing dispatchable this boundary — I flag
     // set / jammed / conversion only); dispatch branches overwrite 1-5.
-    // Emitted at the block tail, after the branch chain and before the
-    // per-boundary TEMP clear.
+    // Emitted at the block tail, after the branch chain.
     const uint32 intledger_pre_irqlow = _IRQlow;
     uint8 intledger_decision = 6;
     if(_IRQlow&FCEU_IQRESET)
@@ -811,25 +852,14 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
      _IRQlow&=~FCEU_IQRESET;
      intledger_decision = 1;
     }
-    else if(_IRQlow&FCEU_IQNMI2)
-     {
-     _IRQlow&=~FCEU_IQNMI2;
-     _IRQlow|=FCEU_IQNMI;
-     intledger_decision = 2;
-    }
-    else if(_IRQlow&FCEU_IQNMI)
+    else if(g_intl_pending) [[unlikely]]
     {
-     if (g_e1_nmi_fresh)
-     {
-      // Latch was asserted at/after this boundary; observe it at the NEXT
-      // instruction boundary (6502 samples the line at instruction end).
-      if (e1_cpu_trace_on())
-       fprintf(stderr, "E1 NMI_DEFER abs=%llu pc=%04X\n",
-        (unsigned long long)e1_cpu_abs(), (unsigned)_PC);
-      g_e1_nmi_fresh = false;
-      intledger_decision = 3;
-     }
-     else if(!_jammed)
+     // D1 S2 (kgmqa-037): dispatch the interrupt that was sampled at the
+     // poll point of the instruction which has just finished.  Hardware
+     // samples the lines inside the instruction and starts the sequence
+     // once that instruction is done, so the dispatch lands here and not
+     // one instruction earlier.
+     if(g_intl_pending==1)
      {
       if (e1_cpu_trace_on())
        fprintf(stderr, "E1 NMI_DISPATCH abs=%llu pc=%04X\n",
@@ -839,30 +869,33 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
       PUSH(_PC);
       PUSH((_P&~B_FLAG)|(U_FLAG));
       _P|=I_FLAG;
-	  DEBUG( if(debug_loggingCD) LogCDVectors(0xFFFA) );
+	  DEBUG( if(debug_loggingCD) LogCDVectors(0xFFFA); )
       _PC=RdMem(0xFFFA);
       _PC|=RdMem(0xFFFB)<<8;
       _IRQlow&=~FCEU_IQNMI;
       intledger_decision = 4;
      }
-    }
-    else
-    {
-     if(!(_PI&I_FLAG) && !_jammed)
+     else
      {
       ADDCYC(7);
       PUSH(_PC>>8);
       PUSH(_PC);
       PUSH((_P&~B_FLAG)|(U_FLAG));
       _P|=I_FLAG;
-	  DEBUG( if(debug_loggingCD) LogCDVectors(0xFFFE) );
+	  DEBUG( if(debug_loggingCD) LogCDVectors(0xFFFE); )
       _PC=RdMem(0xFFFE);
       _PC|=RdMem(0xFFFF)<<8;
       intledger_decision = 5;
      }
+     g_intl_pending = 0;
+    }
+    else if(_IRQlow&FCEU_IQNMI2)
+     {
+     _IRQlow&=~FCEU_IQNMI2;
+     _IRQlow|=FCEU_IQNMI;
+     intledger_decision = 2;
     }
     intledger_emit_boundary(intledger_pre_irqlow, intledger_decision);
-    _IRQlow&=~(FCEU_IQTEMP);
     if(_count<=0)
     {
      _PI=_P;
@@ -903,6 +936,30 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
    #endif
    _PC++;
    x6502_dispatch[b1](&cpu.native_layout());
+
+   // D1 S2 (kgmqa-037): poll point.  Hardware samples the interrupt lines
+   // inside the instruction and the sequence starts once that instruction
+   // has finished.  Sampling at the end of the instruction and dispatching
+   // at the next boundary reproduces that, and it keeps the dispatch
+   // instant of every existing line source (mapper IRQ, APU frame IRQ, VBL
+   // NMI, RTI) exactly where it was: only a line that was already asserted
+   // at the instruction boundary now waits one more instruction, which is
+   // the case kgmqa-037 exercises.
+   if(_IRQlow) [[unlikely]]
+   {
+    // NMI wins over IRQ; a pending IRQ is never downgraded by a later
+    // sample, and an NMI sample replaces anything pending.
+    if(_IRQlow&FCEU_IQNMI)
+    {
+     if(!_jammed) g_intl_pending = 1;
+    }
+    else if((_IRQlow&INTL_IRQ_MASK) && !(_PI&I_FLAG) && !_jammed)
+    {
+     if(!g_intl_pending) g_intl_pending = 2;
+    }
+    // TEMP is a one-shot line: this poll point consumes it.
+    _IRQlow&=~(FCEU_IQTEMP);
+   }
   }
 }
 
