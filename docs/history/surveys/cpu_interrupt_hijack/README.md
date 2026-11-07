@@ -209,5 +209,88 @@ test_jmp 10 行中 4 个对齐行提前一条指令（T+00/02/05/07：CK 各少 
 - S3 模型工作（NMI 劫持 IRQ 序列）预估把 int_3 提到 ~9/12，仍不能 PASS。
 - **建议：G5 RE 先立项**（首步取证＝int_4 机理判定；S0 基线方法已留档本节）；S3 模型工作随后或并行设计。
 
+## 12. G5 RE 三路调查（S2.5，2026-11-07，数据节）
+
+> 三个并行 agent（架构/取证/约束）只读调查的收口记录；全程零构建。完整叙述见计划 §十 r20。
+
+### 12.1 逐线量化清单（架构路）
+
+| 线 | 硬件断言时刻 | 本仓断言时刻 | 粒度 | 偏差来源 |
+|---|---|---|---|---|
+| NMI（VBL） | sl241 dot1 flag set 后 ~1 CPU 周期 | VBL 块 `X6502_Run(8)` 预算内整数条指令跑完之后（ppu_rendering.cpp:1678-1701） | 指令边界，随 count 残量逐帧漂 | 8/3 周期预算实际消耗 = Σ(整条指令)∈[2.67,~7] 周期（过冲 E∈[0,4.3]）；断言与指令流耦合 |
+| NMI2（$2000 边沿） | 写后下一周期 | store 指令体内（ppu.cpp:1304）+ loop-top 转换 | 指令边界 | 含 NMI2→NMI 转换（非 G5 缺口） |
+| EXT 经 GameHBIRQHook（MMC3 系） | A12 上升沿（dot 精确） | PPU 点流中点级精确（ppu_rendering.cpp:2064-2078） | **点精确** | 观测侧等下一指令 poll |
+| EXT 经 MapIRQHook（VRC/FDS 等） | mapper 计数器到 0 的任意周期 | 指令边界（x6502.cpp:930；hook 内部逐周期、对外折叠窗口起点） | 指令边界 | 窗口内相位存在但被丢弃 |
+| DPCM | 样本耗尽的精确周期 | 同上（sound.cpp:747/846） | 指令边界 | 同 MapIRQHook |
+| FCOUNT | fhcnt==29828/29829 精确周期 | 同上（sound.cpp:620-622） | 指令边界 | 事件落指令末 1-2 周期时**提前一条指令**派发（int_4 头部根因） |
+
+### 12.2 延迟公式（S2 两拍模型）
+
+- NMI（VBL）：总延迟 = 8/3 + E + L(I₁)，E=过冲 ∈[0,4.3] 逐帧漂移——cpu_int_5 对齐行提前的来源。
+- IRQ（hook 侧）：事件窗口相位 p∈[0,L(W))，断言折叠为窗口起点 B；总延迟 = L(W)−p+L(I₁)。p≥L(W)−1 时硬件晚一条而本仓不会 ⇒ 统一提前一条（int_4 全表形态）。
+- NMI（BRK 劫持特例）：VBL 线在 BRK 跑完后才断言 ⇒ 永远赶不上劫持在飞 BRK（int_2 行 6-8 / int_3 行 7-9 的直接机制）。
+
+### 12.3 int_4 机理判定（取证路）
+
+**首列语义**（4-irq_and_dma.s 解码）：handler 前 `tsx/dex/sta $100,x` 在栈上预写标记，IRQ 压栈的 **PCL 恰落标记位** ⇒ 首列 = 返回 PC 相对 `landing` 的偏移 = IRQ 在哪条指令后被取。IRQ 源 = APU frame counter（mode 0，`$4017` 写 0 启用）。+N = delay 参数（`delay 532-(dly)`）。
+
+**判定：(a)+(b) 组合、(c) 排除**：
+
+| 项 | 机理 | 证据 |
+|---|---|---|
+| (a) 线断言相位 | hook 窗口半开 (B_k, B_k+temp]：恰落指令结束边界的事件记入本指令、本指令尾 poll 可见 ⇒ 提前一条派发 | 头部奇偶档模式逐档吻合；18 档唯一拟合 T_ours=T_hw=−1（frame counter 绝对常数无错） |
+| (b) DMA 周计入 | 本仓 B4014（ppu.cpp:1484-1516）恒 512 周期、无 dummy/对齐、无写周期奇偶（硬件 513/514） | INTLEDGER delta=519=512+7 实测钉死；尾部 +524..527 偏差 |
+| (c) 派发记账 | —排除 | 压栈 PC 与 poll 所见逐档一致；assert→dispatch 同边界（delta=7） |
+
+**交叉预测**：只修 (a)=16/18、只修 (b)=14/18、双修=**18/18**——实施后行级验收用。(b) 修复（ppu.cpp 补 513/514 **按写周期奇偶**，恒 514 会让 +527 反着错）会平移全部 sprite-DMA 时序敏感测试 ⇒ 独立立项、全量 ctest 复跑；DMC 仲裁（sprdma_and_dmc_dma）另立。(a) 修复归入方案 A 的线可见性门控（`X6502_IRQBegin`/`fceu11::IRQ`/`fceu11::NMI`/map_irq_hook 调用点打触发时刻戳，poll 点只采样「触发时刻严格早于本指令结束边界」的线）；注意不得推迟 `FrameSoundEvent` 的 APU 内部时钟（否则 kgmqa-121 与 APU golden 会动）。
+
+### 12.4 候选设计对比（架构路）
+
+| 方案 | 要点 | 改动面 | r12 合规 | 威胁面 | 量级 |
+|---|---|---|---|---|---|
+| **A. 线携带断言时刻（推荐）** | `_IRQlow` 电平语义不变，旁设 per-line `assert_at`（CPU 绝对周期）；VBL 块/hook 侧登记时刻；poll point/边界/BRK 劫持统一 `assert_at < now` 门控（now=指令记账末尾，timestamp 已预支；窗口 [起始,结束) 半开） | x6502.cpp（判定块/poll/TriggerNMI/IRQBegin 伴生表）+ ops.inc（劫持判定）+ ppu_rendering.cpp（VBL 块传时刻）+ 可选 sound/fds/boards hook 传相位 | ✓ 判定仍每指令一次 | 断言时刻改写后 NMI 派发相位整体移动 ⇒ 040/037/04-nmi 全套复跑（INTLEDGER 已就位可对账）；NMIDELAY 退化为断言时刻偏移旋钮 | ~150-250 行核心 |
+| B. VBL 块重排 | 删 `X6502_Run(nd)`，NMI 断言登记为纯 PPU 时刻事件 | 同 A + VBL 块结构 | ✓ | 最大：r5 调参资产（X 表）全重采 | 中-大 |
+| C. 指令内分段采样 | 长指令插到期检查点 | dispatch 结构 + ops_table.inc | ✗ 擦边（指令内第二观测点，与两拍模型精神冲突，需单独裁定） | 现有全绿面回归风险高；cpu_int_4 修复不保证 | 中 |
+
+Mesen2 参照（NesCpu.cpp `EndCpuCycle`，每访问周期采样）只读对照：其断言精确性来自 PPU 被推到精确 master clock；本仓 PPU 已点级推进，量化只来自宿主结构 ⇒ 方案 A 在指令边界上近似其不动点，理论充分。
+
+### 12.5 G5 验收门（约束路；实施 S2.5 时逐门复跑）
+
+| 门 | 判据 | 验证命令（cwd=仓库根，PATH 前缀 vcpkg） | 当前值 | 允许方向 |
+|---|---|---|---|---|
+| G-1（硬） | 040（5.nmi_suppression）PASS | `f11qa-rom-runner --kgmqa-id kgmqa-040-vbl-05-nmi-timing-blargg --tests-json tests/tests.json --frames 600` | PASS 0x00；对 D 全扫不敏感 | 一字节不动 |
+| **G-2（硬，须显式加回）** | **旧 05-nmi_timing PASS 且 X 表逐值不变** | `FCEUX11_E1_TRACE=1 f11qa_blargg_runner --rom tests/fixtures/blargg/ppu/vbl_05_nmi_timing.nes --frames 3000`（看 `E1 NMI_DISPATCH pc` 分布） | X=[4,4,4,3,3,3,3,3,3,2]（pc E356×3/E354×6/E352×1）；D=7/9 翻红 | X 表逐值不许变；⚠ **该 ROM 目前无任何门禁覆盖（见 12.7）** |
+| G-3（硬） | ctest -LE perf 全绿 | `ctest -LE perf -j 4` | 36/36 | 计数可增不许红 |
+| G-4（硬） | 金标三件套零漂移 | `f11qa_rom_regression_runner` / `fceux11_golden_savestate_test` | 780/0；8/8 | 漂移 ⇒ 停+记录+业主裁决（闸门 #3） |
+| G-5（硬） | cpu_test 850/850 + FTP RED≤1 | `cd tests && ../build/tests/fceux11_cpu_test.exe` | GREEN=10/RED=1（4c=S5） | 10 绿不许翻红 |
+| G-6（硬） | T2 哨兵 5 项（048/032/057/053/054） | 逐个 rom-runner | 全 PASS | 原样保留 |
+| G-7（硬） | vbl_nmi_timing 7 ROM + 旧 ppu 套件 5 PASS | 逐个 blargg_runner | 全 PASS；旧套件 02/06/07/08/10 为有据 FAIL 基线 | PASS 项不许翻红；FAIL 项只许变好 |
+| G-8（方向） | 037 行 6-8：`27 36 00`→`36 00 00` | rom-runner 看 diag 十行 | 7/10 | 只许向 `36 00 00` 收敛；行 0-5 不许回退；终判 = `check_crc $B0D44BB7` |
+| G-9（方向） | int_3/4/5 G5 残差行收敛 | blargg_runner 直跑 | int_3 7/12、int_4 全表 −1、int_5 4 行 −1 | 只许匹配数增加；int_3 行 5-6 归 S3 模型工作，不许再恶化 |
+| G-10（结构） | 新状态不入 savestate；探针 env-gated 默认静默；decoupling 白名单不新增 | 不设 env 跑 G-3/G-4 | 零成本 | 静默性是探针生命线 |
+
+### 12.6 历史陷阱（改断言时刻最先看的 12 条，约束路）
+
+1. **旧 05-nmi_timing 是最灵敏金丝雀（±1 dot 翻红）且当前无门禁**——改断言时刻后第一个跑它。
+2. 派发 PC 与转变行被同一 D 同时移动——别再用 D 扫参闭合（r5 已证伪）。
+3. **置位点不许动**（Step 1.1 证伪）：`PPU_status|=0x80` 挪 dot1 ⇒ set→clear=6819≠6820，01/03/09 全翻红。不变量是 set→clear=6820，非块总长。
+4. **帧长不许动**：VBL 块内推 PPU ⇒ NMI-on 帧 6823/+3 漂移；症状 = `VBL_ENTER cycle` 不再恒 0（E1 trace 30 秒可验）。
+5. **ppudead 路径（ppu_rendering.cpp:1570-1598）别顺手改**——有独立 P4-bridge 修复，Super Donkey Kong 依赖。
+6. 抑制 marker 交互：`vbl_set_suppressed` 帧级消费；`X6502_Run(nd)` 抑制帧照常执行（帧长一致性）；NMI 取消类逻辑必须与读落点精度一起落地（vbl_04/05 误伤先例）。
+7. **fresh-latch 已退休（r18）**——新方案再叠加任何「fresh 推迟一边界」= VBL NMI 多延迟一条（04-nmi_control #11 二次计数）。
+8. **(241,0) 坐标失真**：`X6502_Run` 窗口内 PPU cycle 停驻，按 PPU 坐标判定的新代码都在失真坐标上工作——优先用 CPU 侧时间/相位。
+9. 读侧与派发侧互不当证据（NMIDELAY 扫参对 vbl_02/06 零影响；07/08 转变行对 D 不敏感）。
+10. 增量构建陷阱：动时序前确认 exe 与源码同步（E-1 会话一整张基线表作废的教训）。
+11. 变异验证纪律：验收同时看**码值与形状**（X 表/十行 diag）——码值 PASS 而形状漂走 = 下一个「测试与实现同错」候选。
+12. 探针名已换代（NMI_DEFER 已随 r18 消失；E1 delta 与 INTLEDGER 恒差 +7）——复用旧文档探针名 grep 会落空。
+
+### 12.7 ⚠ kgmqa-040 门禁挂载漂移（治理发现，待业主裁决）
+
+tests.json 的 kgmqa-040：legacy_id=`blargg_vbl_05_nmi_timing`、mirror_path=`blargg/vbl_nmi_timing/5.nmi_suppression.nes`、**blocking**。runner 按 mirror_path basename 派发 ⇒ **实跑 5.nmi_suppression.nes**（md5 `ef34f799`），与名字所示 ROM 不同。原始定义（370a3af，2026-08-06）确是旧 `vbl_05_nmi_timing.nes`（provenance 写明「Phase 1 commit 5581769 fixed vbl_05 to PASS…added as PASS monitor」）；9-24 镜像重整（6fa6b2f）换挂到 vbl_nmi_timing 套件 5 号 ROM，legacy 名未改，此后 r18/r19 里「040 调参不可动」的表述沿用了旧名（**对一半**：真正被 D=8 钉死的旧 05 已离开门禁）。
+
+影响：① NMIDELAY 校准的唯一直接可观测量（旧 05 X 表）**无门禁覆盖**——S2.5 实施若替换 VBL 块结构，可以绿灯通过所有现行门禁同时静默丢掉 vbl_05 PASS；② 040 现跑的 5.nmi_suppression 对 NMIDELAY 不敏感（D∈{0,6,7,9,12} 全 PASS），它监控的是 VBL 块宏观形状，本身仍是有效门禁。
+
+处置选项（**涉及 tests.json 期望值治理，业主裁决**）：(i) kgmqa-040 换回旧 05-nmi_timing（恢复门禁原意）；(ii) gate id 改名为 nmi_suppression 并**新增**一个 kgmqa 项挂旧 05（门禁+1）；(iii) 维持现状 + 文档声明 + G-2 作为 S2.5 的人工验收门。三路调查的约束 agent 建议至少做到 (iii)，(ii) 最完整。
+
 ---
-*调查页完（S0+S1+S2）。S3 起的实施记录记 v2.0.2 计划 §十 变更记录，本页只补数据节。*
+*调查页完（S0+S1+S2+S2.5-RE）。S3 起的实施记录记 v2.0.2 计划 §十 变更记录，本页只补数据节。*
