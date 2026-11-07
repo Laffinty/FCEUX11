@@ -532,15 +532,19 @@ jobs:
           }
 
           # v1.8 vendor_state 通道：runner 必须 emit summary.vendor_state 三态计数
-          # （vendored / advisory / pending_vendor），且总数等于 78 项 rom-suite。
+          # （vendored / advisory / pending_vendor），且总数等于 tests.json 的
+          # rom-suite 用例数（r21：由硬编码 78 改为从 manifest 推导——
+          # 严格相等判据保留，常数不再随门禁增减漂移，81ca5b9 同族教训）。
           # advisory / pending-vendor 不能 fail_to_pass；vendored 失败 = blocking。
+          $manifest = Get-Content tests/tests.json -Raw | ConvertFrom-Json
           if (-not $m.summary.vendor_state) {
             $failures += "summary.vendor_state missing (runner must emit vendored/advisory/pending_vendor 三态计数；v1.8 vendor_state 通道未启用)"
           } else {
             $vs = $m.summary.vendor_state
             $vsSum = ([int]$vs.vendored) + ([int]$vs.advisory) + ([int]$vs.pending_vendor)
-            if ($vsSum -ne 78) {
-              $failures += "vendor_state 三态总和 is $vsSum (vendored=$($vs.vendored) advisory=$($vs.advisory) pending-vendor=$($vs.pending_vendor))，expected == 78 (rom-suite 用例总数)"
+            $romSuiteCount = @($manifest.cases | Where-Object { $_.kind -contains 'rom-suite' }).Count
+            if ($vsSum -ne $romSuiteCount) {
+              $failures += "vendor_state 三态总和 is $vsSum (vendored=$($vs.vendored) advisory=$($vs.advisory) pending-vendor=$($vs.pending_vendor))，expected == $romSuiteCount (tests.json rom-suite 用例数)"
             }
           }
 

@@ -122,7 +122,8 @@
     "kgmqa-117-mirror-snapshot-check": true,
     "kgmqa-118-config-store-rust": true,
     "kgmqa-119-pixbuf-pool-rust": true,
-    "kgmqa-120-state-facade-rust": true
+    "kgmqa-120-state-facade-rust": true,
+    "kgmqa-122-vbl-05-nmi-timing-canary-blargg": true
   },
   "rom_suite_vendor_state": {
     "kgmqa-031-blargg-smoke": "vendored",

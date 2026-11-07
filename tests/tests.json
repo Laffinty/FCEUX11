@@ -1188,6 +1188,47 @@
       "protocol": "$6000"
     },
     {
+      "kgmqa_id": "kgmqa-122-vbl-05-nmi-timing-canary-blargg",
+      "legacy_id": "blargg_vbl_05_nmi_timing_canary",
+      "title": "vbl_05_nmi_timing real ROM (NMIDELAY canary, PASS monitor)",
+      "kind": [
+        "rom-suite",
+        "harness-rust"
+      ],
+      "layer": "core",
+      "spec_source": "nesdev.org/wiki/Emulator_tests#vbl_nmi_timing",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "f11qa-rom-runner",
+        "working_dir": ".",
+        "args": [
+          "--kgmqa-id",
+          "kgmqa-122-vbl-05-nmi-timing-canary-blargg",
+          "--tests-json",
+          "tests/tests.json",
+          "--frames",
+          "600"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 60,
+      "tags": [
+        "blargg",
+        "vbl",
+        "nmi",
+        "timing",
+        "canary"
+      ],
+      "failure_means": "blocking",
+      "provenance": "S2.5 gate G-2 (r20): mounts the ROM that kgmqa-040 legacy name claims; survey cpu_interrupt_hijack 12.7",
+      "mirror_ref": "v1.8.0-mirror",
+      "mirror_path": "blargg/ppu/vbl_05_nmi_timing.nes",
+      "vendor_state": "vendored",
+      "protocol": "$6000"
+    },
+    {
       "kgmqa_id": "kgmqa-041-ppu-read-buffer-blargg",
       "legacy_id": "blargg_ppu_read_buffer",
       "title": "ppu_read_buffer (PASS monitor)",
