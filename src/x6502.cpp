@@ -31,7 +31,10 @@
 #include "x6502abbrev.h"
 
 #include <array>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <type_traits>
 
 // v1.3 Legion Phase 1: X, timestamp, soundtimestamp and MapIRQHook are now
@@ -398,14 +401,232 @@ int X6502_GetOpcodeCycles( int op )
 	return CycTable[op];
 }
 
+// ----------------------------------------------------------------------------
+// D1 取证探针 — 中断线时刻账本（INTLEDGER，kgmqa-037 轮询下沉/hijack 专线
+// S1，2026-11-07）。只观测、不修复：D1 的设计裁定是「线时刻账本」（v2.0.2
+// 计划 r12——本仓无每访问周期步进，Mesen2 两拍不可照抄），本探针把账本本体
+// 落到磁盘，供 S2 起的模型改造前后对账与锁测试标定：
+//
+//   1) intledger.bin：每条中断线（NMI/NMI2/EXT/EXT2/DPCM/FCOUNT/TEMP/
+//      RESET）的 assert/release 记录 + 循环顶边界判定快照。abs 用
+//      g_cpu.timestamp_base()+timestamp_ref()（= e1_cpu_abs 同口径，CPU
+//      周期）；count 为边界处 _count 残量（1/48 CPU 周期单位，架构精确态，
+//      纪律 11：判定/退出条件不绑 PC）。
+//   2) 快照只在 `_IRQlow != 0` 的边界记录（线全零的边界是空轮询，每帧
+//      数万条、零信息）；decision 字段记录该边界实际走到的判定分支。
+//   3) FCEUX11_INTLEDGER=<dir> 指定输出目录；未设或空 = 探针完全不激活
+//      （零运行成本，e1_cpu_trace_on 惯例的一次性 static bool 读 env）。
+//      六个注入点全部在 x6502.cpp 内（TriggerNMI / TriggerNMI2 /
+//      X6502_IRQBegin / X6502_IRQEnd / fceu11::NMI / fceu11::IRQ）+ 循环
+//      顶判定处，不新增编译单元。文件打开失败时探针自禁用并报一句。
+//
+// 记录格式（24 字节定长，intledger.bin 以 8 字节头 "INTL1"+24 起始）：
+struct IntLedgerRec {
+	uint64_t abs;      // e1_cpu_abs() 同口径绝对 CPU 周期
+	int32_t  count;    // 事件/快照时刻 _count 残量
+	uint32_t irqlow;   // assert/release: 事件后的线值；快照: 判定前线值
+	uint16_t pc;       // 辅助字段（不作为任何判据）
+	uint8_t  kind;     // 0..7 = 行号（见下表），0xF = 边界快照
+	uint8_t  edge;     // 0 = release, 1 = assert, 2 = boundary snapshot
+	uint8_t  decision; // 快照专用：0=无, 1=reset, 2=nmi2->nmi, 3=nmi-defer,
+	                   // 4=nmi-dispatch, 5=irq-dispatch, 6=held(I旗标/jammed)
+	uint8_t  pad;
+};
+static_assert(sizeof(IntLedgerRec) == 24, "keep the on-disk ledger record layout fixed");
+
+enum IntLedgerKind : uint8_t {
+	INTL_NMI    = 0,  // FCEU_IQNMI   (TriggerNMI / fceu11::NMI / X6502_IRQBegin)
+	INTL_NMI2   = 1,  // FCEU_IQNMI2  (TriggerNMI2)
+	INTL_EXT    = 2,  // FCEU_IQEXT   (mapper / FDS)
+	INTL_EXT2   = 3,  // FCEU_IQEXT2
+	INTL_DPCM   = 4,  // FCEU_IQDPCM  (APU DMC)
+	INTL_FCOUNT = 5,  // FCEU_IQFCOUNT (APU frame counter)
+	INTL_TEMP   = 6,  // FCEU_IQTEMP  (fceu11::IRQ one-shot)
+	INTL_RESET  = 7,  // FCEU_IQRESET
+	INTL_BOUND  = 15, // loop-top boundary snapshot
+};
+
+static bool intledger_on() {
+	static const bool on = []() {
+		const char* e = std::getenv("FCEUX11_INTLEDGER");
+		return e && e[0] != '\0';
+	}();
+	return on;
+}
+
+static const char* intledger_dir() {
+	static const char* dir = []() {
+		const char* e = std::getenv("FCEUX11_INTLEDGER");
+		return (e && e[0] != '\0') ? e : (const char*)nullptr;
+	}();
+	return dir;
+}
+
+// 边界快照可能在「线被 I 旗标/jammed 长期挂起」时每指令重复一条，给
+// 64 MiB 上限防失控（与 OAMBUS 同思路、更紧——账本事件本身是低频的）。
+static constexpr uint64_t INTLEDGER_CAP_BYTES = 64ull * 1024 * 1024;
+
+static FILE*   s_intl_fp = nullptr;
+static bool    s_intl_files_ready = false;
+static bool    s_intl_active = false;
+static bool    s_intl_capped = false;
+static uint64_t s_intl_bytes = 0;
+static uint32_t s_intl_asserts[8] = {0};
+static uint32_t s_intl_releases[8] = {0};
+static uint32_t s_intl_snapshots[7] = {0};   // decision 0..6
+static uint64_t s_intl_held_suppressed = 0;  // 折叠掉的连续 held 快照数
+static uint64_t s_intl_first_abs = 0;
+static uint64_t s_intl_last_abs = 0;
+
+static void intledger_atexit();
+
+static void intledger_init_files() {
+	if (s_intl_files_ready) return;
+	s_intl_files_ready = true;
+	const char* dir = intledger_dir();
+	if (!dir) return;
+	std::error_code ec;
+	std::filesystem::create_directories(dir, ec);
+	char path[1024];
+	std::snprintf(path, sizeof(path), "%s/intledger.bin", dir);
+	s_intl_fp = std::fopen(path, "wb");
+	if (!s_intl_fp) {
+		std::fprintf(stderr,
+			"INTLEDGER ERROR: cannot open intledger.bin under '%s' — probe disabled\n",
+			dir);
+		return;
+	}
+	const uint8_t hdr[8] = { 'I', 'N', 'T', 'L', '1', 24, 0, 0 };
+	s_intl_bytes += std::fwrite(hdr, 1, sizeof(hdr), s_intl_fp);
+	s_intl_active = true;
+	std::atexit(intledger_atexit);
+}
+
+static void intledger_atexit() {
+	if (!s_intl_fp) return;
+	static const char* kind_names[8] = {
+		"NMI", "NMI2", "EXT", "EXT2", "DPCM", "FCOUNT", "TEMP", "RESET" };
+	static const char* dec_names[7] = {
+		"none", "reset", "nmi2_conv", "nmi_defer", "nmi_dispatch",
+		"irq_dispatch", "held" };
+	char path[1024];
+	std::snprintf(path, sizeof(path), "%s/summary.log", intledger_dir());
+	FILE* s = std::fopen(path, "w");
+	if (s) {
+		std::fprintf(s, "INTLEDGER summary cap=%llu bytes bytes=%llu capped=%d\n",
+			(unsigned long long)INTLEDGER_CAP_BYTES,
+			(unsigned long long)s_intl_bytes, s_intl_capped ? 1 : 0);
+		std::fprintf(s, "abs_range %llu .. %llu\n",
+			(unsigned long long)s_intl_first_abs,
+			(unsigned long long)s_intl_last_abs);
+		for (int k = 0; k < 8; ++k)
+			std::fprintf(s, "line %-7s assert=%u release=%u\n",
+				kind_names[k], s_intl_asserts[k], s_intl_releases[k]);
+		for (int d = 0; d < 7; ++d)
+			std::fprintf(s, "boundary %-12s %u\n", dec_names[d], s_intl_snapshots[d]);
+		std::fprintf(s, "held_suppressed %llu\n",
+			(unsigned long long)s_intl_held_suppressed);
+		std::fclose(s);
+	}
+	std::fflush(s_intl_fp);
+	std::fclose(s_intl_fp);
+	s_intl_fp = nullptr;
+}
+
+static inline uint64_t intledger_now_abs() {
+	return g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref();
+}
+
+static void intledger_write(const IntLedgerRec& r) {
+	if (!s_intl_active) return;
+	if (!s_intl_fp || s_intl_capped) return;
+	if (s_intl_bytes >= INTLEDGER_CAP_BYTES) {
+		s_intl_capped = true;
+		std::fprintf(stderr,
+			"INTLEDGER: intledger.bin hit %llu-byte cap — further records dropped (summary.log continues)\n",
+			(unsigned long long)INTLEDGER_CAP_BYTES);
+		return;
+	}
+	s_intl_bytes += std::fwrite(&r, 1, sizeof(r), s_intl_fp);
+}
+
+static inline void intledger_emit_line(uint8_t kind, uint8_t edge) {
+	if (!intledger_on()) return;
+	intledger_init_files();
+	if (!s_intl_active) return;
+	IntLedgerRec r;
+	r.abs = intledger_now_abs();
+	r.count = _count;
+	r.irqlow = _IRQlow;
+	r.pc = _PC;
+	r.kind = kind;
+	r.edge = edge;
+	r.decision = 0;
+	r.pad = 0;
+	if (edge == 1) ++s_intl_asserts[kind & 7];
+	else           ++s_intl_releases[kind & 7];
+	if (!s_intl_first_abs || r.abs < s_intl_first_abs) s_intl_first_abs = r.abs;
+	s_intl_last_abs = r.abs;
+	intledger_write(r);
+}
+
+// 把一个 IRQ 掩码拆成逐线的 assert/release 记录（X6502_IRQBegin/End 的
+// 调用方传单线常量，但接口语义允许组合掩码，逐位展开不丢事件）。
+static inline void intledger_decode_mask(uint32_t w, uint8_t edge) {
+	if (!intledger_on()) return;
+	static const struct { uint32_t bit; uint8_t kind; } map[8] = {
+		{FCEU_IQEXT,    INTL_EXT},    {FCEU_IQEXT2,   INTL_EXT2},
+		{FCEU_IQRESET,  INTL_RESET},  {FCEU_IQNMI2,   INTL_NMI2},
+		{FCEU_IQNMI,    INTL_NMI},    {FCEU_IQDPCM,   INTL_DPCM},
+		{FCEU_IQFCOUNT, INTL_FCOUNT}, {FCEU_IQTEMP,   INTL_TEMP},
+	};
+	for (const auto& m : map)
+		if (w & m.bit) intledger_emit_line(m.kind, edge);
+}
+
+// 循环顶边界快照：在 `if(_IRQlow)` 块尾调用（所有判定分支之后、TEMP
+// 清除之前）。decision 由各判定分支写 pre_decision 局部变量传入。
+// 「held」快照（decision=6，线被 I 旗标/jammed 长期挂起）会逐指令重复
+// 同一线值——连续相同（同 decision 同 irqlow）的 held 快照折叠为一条，
+// 被折叠的重复数记入 summary（held_suppressed）；其余 decision 逐边界
+// 全记。折叠只影响探针产物，不影响任何仿真状态。
+static inline void intledger_emit_boundary(uint32_t pre_irqlow, uint8_t decision) {
+	if (!intledger_on()) return;
+	intledger_init_files();
+	if (!s_intl_active) return;
+	static uint32_t s_intl_prev_held_irqlow = 0;
+	static bool     s_intl_prev_was_held = false;
+	if (decision == 6 && s_intl_prev_was_held && s_intl_prev_held_irqlow == pre_irqlow) {
+		++s_intl_held_suppressed;
+		return;
+	}
+	s_intl_prev_was_held = (decision == 6);
+	s_intl_prev_held_irqlow = pre_irqlow;
+	IntLedgerRec r;
+	r.abs = intledger_now_abs();
+	r.count = _count;
+	r.irqlow = pre_irqlow;
+	r.pc = _PC;
+	r.kind = INTL_BOUND;
+	r.edge = 2;
+	r.decision = decision;
+	r.pad = 0;
+	++s_intl_snapshots[decision & 7];
+	if (!s_intl_first_abs || r.abs < s_intl_first_abs) s_intl_first_abs = r.abs;
+	s_intl_last_abs = r.abs;
+	intledger_write(r);
+}
+
 void X6502_IRQBegin(int w)
 {
  _IRQlow|=w;
+ intledger_decode_mask((uint32_t)w, 1);
 }
 
 void X6502_IRQEnd(int w)
 {
  _IRQlow&=~w;
+ intledger_decode_mask((uint32_t)w, 0);
 }
 
 // E-1 probe (Phase 1 Step 1.3, 2026-08-02): env-gated absolute-cycle trace
@@ -477,6 +698,7 @@ void TriggerNMI(void)
   fprintf(stderr, "E1 NMI_SET abs=%llu (path=VBL)\n", (unsigned long long)e1_cpu_abs());
  _IRQlow|=FCEU_IQNMI;
  g_e1_nmi_fresh = true;
+ intledger_emit_line(INTL_NMI, 1);
 }
 
 void TriggerNMI2(void)
@@ -484,6 +706,7 @@ void TriggerNMI2(void)
  if (e1_cpu_trace_on())
   fprintf(stderr, "E1 NMI_SET2 abs=%llu (path=W2000-edge)\n", (unsigned long long)e1_cpu_abs());
  _IRQlow|=FCEU_IQNMI2;
+ intledger_emit_line(INTL_NMI2, 1);
 }
 
 void X6502_Reset(void)
@@ -554,6 +777,14 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
 
    if(_IRQlow) [[unlikely]]
    {
+    // D1 INTLEDGER: capture the line value this boundary determination
+    // sees (pre-decision), then record the actual decision branch taken.
+    // Default = 6 ("held": nothing dispatchable this boundary — I flag
+    // set / jammed / conversion only); dispatch branches overwrite 1-5.
+    // Emitted at the block tail, after the branch chain and before the
+    // per-boundary TEMP clear.
+    const uint32 intledger_pre_irqlow = _IRQlow;
+    uint8 intledger_decision = 6;
     if(_IRQlow&FCEU_IQRESET)
     {
 	 DEBUG( if(debug_loggingCD) LogCDVectors(0xFFFC); )
@@ -578,11 +809,13 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
      }
      _PI = _P;
      _IRQlow&=~FCEU_IQRESET;
+     intledger_decision = 1;
     }
     else if(_IRQlow&FCEU_IQNMI2)
      {
      _IRQlow&=~FCEU_IQNMI2;
      _IRQlow|=FCEU_IQNMI;
+     intledger_decision = 2;
     }
     else if(_IRQlow&FCEU_IQNMI)
     {
@@ -594,6 +827,7 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
        fprintf(stderr, "E1 NMI_DEFER abs=%llu pc=%04X\n",
         (unsigned long long)e1_cpu_abs(), (unsigned)_PC);
       g_e1_nmi_fresh = false;
+      intledger_decision = 3;
      }
      else if(!_jammed)
      {
@@ -609,6 +843,7 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
       _PC=RdMem(0xFFFA);
       _PC|=RdMem(0xFFFB)<<8;
       _IRQlow&=~FCEU_IQNMI;
+      intledger_decision = 4;
      }
     }
     else
@@ -623,8 +858,10 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
 	  DEBUG( if(debug_loggingCD) LogCDVectors(0xFFFE) );
       _PC=RdMem(0xFFFE);
       _PC|=RdMem(0xFFFF)<<8;
+      intledger_decision = 5;
      }
     }
+    intledger_emit_boundary(intledger_pre_irqlow, intledger_decision);
     _IRQlow&=~(FCEU_IQTEMP);
     if(_count<=0)
     {
@@ -677,11 +914,13 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
 void fceu11::NMI()
 {
  _IRQlow|=FCEU_IQNMI;
+ intledger_emit_line(INTL_NMI, 1);
 }
 
 void fceu11::IRQ()
 {
  _IRQlow|=FCEU_IQTEMP;
+ intledger_emit_line(INTL_TEMP, 1);
 }
 
 void FCEUI_GetIVectors(uint16 *reset, uint16 *irq, uint16 *nmi)

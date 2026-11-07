@@ -17,6 +17,10 @@
 #include <cstdio>
 #include <cstdint>
 
+#include "cpu.h"       // fceu11::cpu_instance()（timestamp_base/ref —— poll_abs 口径）
+#include "bus.h"       // fceu11::g_bus.read —— NMI/IRQ 向量期望值（ROM 常量读）
+#include "core_api.h"  // fceu11::IRQ —— TEMP 线注入点（fceu11 命名空间面）
+
 using namespace fceu11_test;
 
 // nestest.nes boots at $C004 and writes a structured log to $02 / $03 +
@@ -222,6 +226,333 @@ void test_opcode_cycle_count(TestContext& ctx) {
                   "NOP addressing mode tag is 0 (implied)");
 }
 
+// ---------------------------------------------------------------------------
+// D1 专线 S1：cpu_interrupt_poll_test 用例集（2026-11-07）
+//
+// 对象：x6502.cpp 的 `if(_IRQlow)` 循环顶边界判定块（中断轮询）与六个线注
+// 入点（TriggerNMI / TriggerNMI2 / X6502_IRQBegin / X6502_IRQEnd /
+// fceu11::NMI / fceu11::IRQ）。kgmqa-037（中断轮询下沉 + hijack）的锁测试。
+//
+// **独立参照模型**（纪律 5/12：判定逻辑是共享路径，期望值不得来自被测代
+// 码）：本节期望值全部按字段拼装自两个来源——
+//   (1) S0 标定表 docs/history/surveys/cpu_interrupt_hijack/README.md §4/§5
+//       （E-1 双通道实测：set→dispatch = 在飞指令长度 + 派发序列 7 周期；
+//       VBL 路径 fresh 一边界推迟；NMI2→NMI 一级转换）；
+//   (2) nesdev「CPU interrupts」服务序列结构：一次派发压栈 3 字节
+//       （PCH, PCL, P；PUSH 写 $0100+S 后 S--，故 P 位于序列末字节）。
+// X6502_Run(c) 预算口径：_count += c*16；每 CPU 周期扣 48 单位 ⇒ Run(2)
+// 恰好容纳一条 2 周期指令，Run(7) 恰好容纳一次派发序列。
+//
+// **双组断言**：
+//   (a) 基线断言（FCEU11_EXPECT，本步全绿）：保护当前「指令边界轮询」
+//       行为 + 供变异验证证牙（M-D1-0 / M-D1-1）。
+//   (b) 目标模型断言（FCEU11_EXPECT_FTP，本步**显式 RED**，注释标
+//       // S2+/S5 fail-to-pass）：D1 落地后的两拍行为。test_helpers.h 的
+//       FCEU11_EXPECT 无预期失败模式（失败直接进 ctx.failed → 进程退出
+//       码 1 → ctest 红，违反 36 项全绿硬约束），故本文件自建计数器：
+//       预期红不进 ctx.failed，单独计数并在套件报告打印。S2/S5 落地时
+//       这些断言逐条转绿（设计预期红数见 main 里的打印与下方各断言注释）。
+//   S1 实测状态（2026-11-07）：FTP 11 条 = RED 9（T-② 三条、T-③ 两条、
+//   T-④ 四条）+ GREEN 2（T-D1-3c/3d：两态皆绿的形状 pin——BRK 槽压
+//   PC+2 与向量取 $FFFA 在现行为下也成立， hijack 不得破坏它们）。
+//   T-D1-4d 现红的机理：现行为在 stale 边界先派发 → CPU 进 ROM IRQ
+//   处理器执行 RTI 弹栈 ⇒ S 回到 $FD ≠ $FA；S2/S5 后首切片不派发才成立。
+// ---------------------------------------------------------------------------
+
+namespace refint {
+    // 一次中断派发序列压栈 3 字节（PCH, PCL, P）
+    constexpr int kSeqPushes      = 3;
+    // 派发序列计 7 周期（ADDCYC(7)，硬件 7 周期序列）
+    constexpr int kSeqCycles      = 7;
+    // 6502 无 1 周期指令：NOP sled 的 2 周期是最小步长
+    constexpr int kMinInstrCycles = 2;
+    // BRK(3 push) + NMI(3 push) = 现行为 hijack 缺失下的两次序列
+    constexpr int kTwoSeqPushes   = 2 * kSeqPushes;
+    // 一次序列对 S 的位移（负方向）
+    constexpr int kSeqSDelta      = kSeqPushes;
+}
+
+// S2+ fail-to-pass 记账（见上方双组断言说明）
+static int g_intl_ftp_red   = 0;
+static int g_intl_ftp_green = 0;
+static void check_ftp_true(TestContext& ctx, bool cond, const char* label) {
+    if (cond) {
+        std::printf("  ok(ftp-green) %s\n", label);
+        ++ctx.passed;
+        ++g_intl_ftp_green;
+    } else {
+        std::printf("  RED(fail-to-pass, expected until D1 S2/S5) %s\n", label);
+        ++g_intl_ftp_red;
+    }
+}
+#define FCEU11_EXPECT_FTP(ctx, cond, label)                                  \
+    do {                                                                     \
+        check_ftp_true((ctx), (cond), (label));                              \
+    } while (0)
+
+extern uint8* RAM;  // fceu.h（与 test_nestest_log_path 同一来源）
+
+// 每个 Run 切片前清预算残量：_count 是跨 X6502_Run 调用**累积**的
+// （X6502_RunDebug 开头 _count += cycles*16，而上一切片常以负残量退出）
+// ——不清则本切片可能一条指令都不跑，「恰好 N 条指令/一次派发」的切片
+// 语义就变成「至多」。只动运行预算（运行期变量），不动任何架构状态。
+static void poll_run_exact(int cpu_cycles) {
+    X.count = 0;
+    X6502_Run(cpu_cycles);
+}
+
+// 场景基座：PowerNES → 消费 RESET（poll_run_exact(7)，RESET 分支无
+// ADDCYC）→ PC 指向 RAM $200 起的 NOP sled（2 周期 = kMinInstrCycles）→
+// S=$FD、PC=$200，I 旗标按 clear_i 设置。RESET 后 _IRQlow 已清。
+// 注意：Run(7) 会从 ROM 复位向量跑 1-2 条 nestest 序言指令，随后
+// 本函数覆盖 PC/S/P —— 状态完全确定。
+static void poll_setup_boundary(bool clear_i) {
+    PowerNES();
+    poll_run_exact(7);
+    RAM[0x200] = 0xEA;
+    RAM[0x201] = 0xEA;
+    RAM[0x202] = 0xEA;
+    RAM[0x203] = 0xEA;
+    RAM[0x204] = 0xEA;
+    RAM[0x205] = 0xEA;
+    X.PC = 0x200;
+    X.S  = 0xFD;
+    X.P  = clear_i ? (uint8_t)(X.P & ~I_FLAG) : (uint8_t)(X.P | I_FLAG);
+}
+
+// 绝对 CPU 周期（与 x6502.cpp e1_cpu_abs 同口径；测试内独立重算）
+static uint64_t poll_abs() {
+    return (uint64_t)fceu11::cpu_instance().timestamp_base()
+         + (uint64_t)fceu11::cpu_instance().timestamp_ref();
+}
+
+// nestest 的向量是 ROM 常量：NMI=$C5AF、IRQ=$C5F4（本函数读总线取期望值，
+// 不硬编码——按字段拼装）。
+static uint16_t poll_nmi_vector() {
+    return (uint16_t)(fceu11::g_bus.read(0xFFFA)
+                    | (fceu11::g_bus.read(0xFFFB) << 8));
+}
+static uint16_t poll_irq_vector() {
+    return (uint16_t)(fceu11::g_bus.read(0xFFFE)
+                    | (fceu11::g_bus.read(0xFFFF) << 8));
+}
+
+// ①-baseline（B1/B5）：VBL 路径 NMI（TriggerNMI）→ fresh 一边界推迟 →
+// 派发序列 7 周期。S0 标定：set→dispatch = 在飞指令长度（此处 2）+ 7。
+// 变异映射：M-D1-0（g_e1_nmi_fresh 置位处短路）⇒ B1/B1a/B5a/B5b 四项红。
+void test_poll_nmi_vbl_fresh_deferral(TestContext& ctx) {
+    poll_setup_boundary(true);
+    TriggerNMI();
+    FCEU11_EXPECT(ctx, (X.IRQlow & FCEU_IQNMI) != 0,
+                  "B0: TriggerNMI latches NMI line immediately");
+    const uint64_t t0 = poll_abs();
+    poll_run_exact(2);   // 边界 1 = fresh DEFER（零周期）+ 一条 2 周期 sled NOP
+    const uint64_t t1 = poll_abs();
+    FCEU11_EXPECT(ctx, (X.IRQlow & FCEU_IQNMI) != 0,
+                  "B1: NMI still pending after first slice (fresh deferral)");
+    FCEU11_EXPECT(ctx, (X.P & I_FLAG) == 0,
+                  "B1a: no dispatch inside first slice (I flag untouched)");
+    FCEU11_EXPECT(ctx, t1 - t0 == (uint64_t)refint::kMinInstrCycles,
+                  "B5a: first slice charged exactly the 2-cycle NOP (defer is free)");
+    poll_run_exact(7);   // 边界 2 = NMI 派发（7 周期，扣完即退出）
+    const uint64_t t2 = poll_abs();
+    FCEU11_EXPECT(ctx, (X.IRQlow & FCEU_IQNMI) == 0,
+                  "B1b: NMI line cleared by the dispatch boundary");
+    FCEU11_EXPECT(ctx, (X.P & I_FLAG) != 0,
+                  "B1c: dispatch set I flag");
+    FCEU11_EXPECT(ctx, t2 - t1 == (uint64_t)refint::kSeqCycles,
+                  "B5b: dispatch slice charged exactly the 7-cycle sequence");
+    FCEU11_EXPECT(ctx, X.S == (uint8_t)(0xFD - refint::kSeqSDelta),
+                  "B5c: exactly one 3-push sequence on the stack");
+    FCEU11_EXPECT(ctx, X.PC == poll_nmi_vector(),
+                  "B5d: dispatch took the NMI vector");
+}
+
+// ②-baseline（I2a/I2b）+ fceu11::IRQ TEMP 线：IRQ 注入后**第一个 loop-top
+// 即派发**（stale 边界、无 fresh 推迟——现行为；S2 轮询下沉后由
+// test_poll_target_two_phase_irq 的 FTP 断言接管）。I 旗标置位时挂起。
+// ⚠ 配对说明：I2a 的两个断言编码的是 S2 将要翻转的行为，S2 落地时随
+// T-D1-2 一起改写（基线与目标是一对）。
+void test_poll_irq_ext_first_boundary(TestContext& ctx) {
+    // I2a: I 清 → 跑一条 NOP 刷新 _PI → 注入 EXT → 首个 loop-top 派发
+    poll_setup_boundary(true);
+    poll_run_exact(2);                       // NOP：把 _PI 刷成 I 清（派发看 _PI）
+    X6502_IRQBegin(FCEU_IQEXT);
+    FCEU11_EXPECT(ctx, (X.IRQlow & FCEU_IQEXT) != 0,
+                  "I2a-0: X6502_IRQBegin latches EXT line immediately");
+    const uint64_t t0 = poll_abs();
+    poll_run_exact(2);
+    const uint64_t t1 = poll_abs();
+    FCEU11_EXPECT(ctx, (X.P & I_FLAG) != 0,
+                  "I2a-1: EXT dispatch at the first loop-top (stale boundary)");
+    FCEU11_EXPECT(ctx, t1 - t0 == (uint64_t)refint::kSeqCycles,
+                  "I2a-2: dispatch slice charged the 7-cycle sequence");
+    FCEU11_EXPECT(ctx, X.S == (uint8_t)(0xFD - refint::kSeqSDelta),
+                  "I2a-3: exactly one 3-push sequence on the stack");
+    FCEU11_EXPECT(ctx, (X.IRQlow & FCEU_IQEXT) != 0,
+                  "I2a-4: EXT line stays asserted (mapper owns release)");
+    // I2b: I 置位 → EXT 挂起不派发（线保持、栈不动）
+    poll_setup_boundary(false);
+    poll_run_exact(2);
+    X6502_IRQBegin(FCEU_IQEXT);
+    poll_run_exact(10);
+    FCEU11_EXPECT(ctx, (X.IRQlow & FCEU_IQEXT) != 0,
+                  "I2b-1: EXT line held while I flag set");
+    FCEU11_EXPECT(ctx, X.S == 0xFD,
+                  "I2b-2: no sequence pushed while I flag set");
+    FCEU11_EXPECT(ctx, (X.P & I_FLAG) != 0,
+                  "I2b-3: I flag remains set (blocked, not serviced)");
+    // B7: TEMP 线（fceu11::IRQ 注入点）同走 IRQ 通道、每边界清一次
+    poll_setup_boundary(true);
+    poll_run_exact(2);
+    fceu11::IRQ();
+    FCEU11_EXPECT(ctx, (X.IRQlow & FCEU_IQTEMP) != 0,
+                  "B7-0: fceu11::IRQ latches TEMP line");
+    poll_run_exact(2);
+    FCEU11_EXPECT(ctx, (X.P & I_FLAG) != 0,
+                  "B7-1: TEMP dispatches through the IRQ channel (I clear)");
+    FCEU11_EXPECT(ctx, (X.IRQlow & FCEU_IQTEMP) == 0,
+                  "B7-2: TEMP is one-shot (cleared at the boundary)");
+}
+
+// C-baseline：NMI2（TriggerNMI2，$2000 边沿路径）→ 一级转换 → 下一边界派
+// 发（else-if 链的两级结构：转换边界不派发、派发边界不再转换）。
+void test_poll_nmi2_conversion_two_boundaries(TestContext& ctx) {
+    poll_setup_boundary(true);
+    poll_run_exact(2);                       // _PI 刷新
+    TriggerNMI2();
+    FCEU11_EXPECT(ctx, (X.IRQlow & FCEU_IQNMI2) != 0,
+                  "C0: TriggerNMI2 latches NMI2 line");
+    poll_run_exact(2);                       // 边界 1 = NMI2→NMI 转换 + 2 周期 NOP
+    FCEU11_EXPECT(ctx, (X.IRQlow & FCEU_IQNMI2) == 0,
+                  "C1: NMI2 consumed by the conversion boundary");
+    FCEU11_EXPECT(ctx, (X.IRQlow & FCEU_IQNMI) != 0,
+                  "C2: conversion produced a pending NMI");
+    FCEU11_EXPECT(ctx, (X.P & I_FLAG) == 0,
+                  "C3: conversion boundary does not dispatch");
+    poll_run_exact(7);                       // 边界 2 = NMI 派发
+    FCEU11_EXPECT(ctx, (X.IRQlow & (FCEU_IQNMI | FCEU_IQNMI2)) == 0,
+                  "C4: converted NMI dispatched at the next boundary");
+    FCEU11_EXPECT(ctx, X.S == (uint8_t)(0xFD - refint::kSeqSDelta),
+                  "C5: one 3-push sequence total");
+}
+
+// B6-baseline：NMI 无视 I 旗标（I 置位下照样派发）。
+void test_poll_nmi_ignores_iflag(TestContext& ctx) {
+    poll_setup_boundary(false);
+    TriggerNMI();
+    poll_run_exact(2);                       // fresh defer
+    poll_run_exact(7);                       // dispatch
+    FCEU11_EXPECT(ctx, (X.IRQlow & FCEU_IQNMI) == 0,
+                  "B6-1: NMI dispatched despite I flag set");
+    FCEU11_EXPECT(ctx, X.S == (uint8_t)(0xFD - refint::kSeqSDelta),
+                  "B6-2: sequence pushed");
+}
+
+// ③-baseline（B2/B3/B4）：hijack 缺失的现行为——NMI 在 BRK 在飞时置位 ⇒
+// BRK **完整执行**（压 B=1、读 IRQ 向量）**然后** NMI 派发（压 B=0、读
+// NMI 向量）= 两次序列、栈 6 字节。这正是 037 的差 1 根源（调查页 §2）。
+void test_poll_hijack_brk_then_nmi_two_sequences(TestContext& ctx) {
+    poll_setup_boundary(true);
+    poll_run_exact(2);                       // NOP@200 → PC=201，_PI 刷新
+    RAM[0x201] = 0x00;                  // BRK @ $201（压 PC+2=$203、读 $FFFE）
+    TriggerNMI();                       // 边界注入：fresh 置位
+    poll_run_exact(30);                      // DEFER + BRK(7) + NMI 派发(7)
+    FCEU11_EXPECT(ctx, X.S == (uint8_t)(0xFD - refint::kTwoSeqPushes),
+                  "B2: BRK(3 pushes) then NMI(3 pushes) = 6 total");
+    FCEU11_EXPECT(ctx, (RAM[0x100 + 0xFD - 2] & B_FLAG) != 0,
+                  "B3: BRK sequence pushed P with B=1");
+    FCEU11_EXPECT(ctx, (RAM[0x100 + 0xFD - 5] & B_FLAG) == 0,
+                  "B4: NMI sequence pushed P with B=0");
+    FCEU11_EXPECT(ctx, (X.IRQlow & FCEU_IQNMI) == 0,
+                  "B2b: NMI consumed after both sequences");
+    // BRK 的 opcode 槽形状：压 PC+2 = $203（opcode $201 取指 +2）
+    FCEU11_EXPECT(ctx, RAM[0x100 + 0xFD] == 0x02 && RAM[0x100 + 0xFC] == 0x03,
+                  "B3b: BRK pushed PC+2 = $203 (opcode slot shape)");
+    // NMI 序列压的是 BRK 处理器地址 = IRQ 向量 ⇒ BRK 先完整执行
+    const uint16_t irq_v = poll_irq_vector();
+    FCEU11_EXPECT(ctx,
+        RAM[0x100 + 0xFD - 3] == (uint8_t)(irq_v >> 8) &&
+        RAM[0x100 + 0xFD - 4] == (uint8_t)(irq_v & 0xFF),
+        "B4b: NMI pushed the BRK handler PC (IRQ vector) — BRK ran first");
+}
+
+// ③-target（// S2+ fail-to-pass）：hijack 落地后同一场景应为**单序列**：
+// BRK 槽被劫持（opcode 槽 dummy 读 = 压 PC+2 不变）、B=0、向量 $FFFA、
+// 栈 3 字节。本步显式红（现行为是两次序列）；S2 落地转绿。
+void test_poll_target_hijack_single_sequence(TestContext& ctx) {
+    poll_setup_boundary(true);
+    poll_run_exact(2);
+    RAM[0x201] = 0x00;                  // BRK @ $201
+    TriggerNMI();
+    poll_run_exact(30);
+    // S2+ fail-to-pass：单序列（栈 3 字节）
+    FCEU11_EXPECT_FTP(ctx, X.S == (uint8_t)(0xFD - refint::kSeqSDelta),
+        "T-D1-3a: hijack collapses BRK+NMI into one 3-push sequence (S2)");
+    // S2+ fail-to-pass：唯一压栈的 P 带 B=0（BRK 的 B=1 序列不再存在）
+    FCEU11_EXPECT_FTP(ctx, (RAM[0x100 + 0xFD - 2] & B_FLAG) == 0,
+        "T-D1-3b: hijacked sequence pushes B=0 (S2)");
+    // opcode 槽形状不变：压 PC+2 = $203（hijack 复用 BRK 的槽；现行为下
+    // BRK 也压 $203，此断言两态皆绿——pin 形状，防 hijack 丢槽）
+    FCEU11_EXPECT_FTP(ctx,
+        RAM[0x100 + 0xFD] == 0x02 && RAM[0x100 + 0xFC] == 0x03,
+        "T-D1-3c: hijack keeps the BRK opcode-slot PC+2 shape");
+    // S2+ fail-to-pass：向量取 $FFFA（hijack 把 BRK 序列变成 NMI 服务）
+    FCEU11_EXPECT_FTP(ctx, X.PC == poll_nmi_vector(),
+        "T-D1-3d: hijacked sequence takes the NMI vector (S2)");
+}
+
+// ②-target（// S2+ fail-to-pass）：两拍模型——边界注入的 EXT 线在**下一条
+// 指令的倒数第二周期末**轮询点生效 ⇒ 派发不早于注入 + len(next)。
+// 现行为：首个 loop-top（stale 边界）立即派发（I2a）⇒ 本步显式红；S2 转绿。
+void test_poll_target_two_phase_irq(TestContext& ctx) {
+    poll_setup_boundary(true);
+    poll_run_exact(2);                       // _PI 刷新
+    X6502_IRQBegin(FCEU_IQEXT);
+    const uint64_t t0 = poll_abs();
+    poll_run_exact(2);                       // 两拍模型：这条 2 周期 NOP 是被轮询指令
+    const uint64_t t1 = poll_abs();
+    // S2+ fail-to-pass：首切片只跑被轮询指令（2 周期），不派发
+    FCEU11_EXPECT_FTP(ctx, t1 - t0 == (uint64_t)refint::kMinInstrCycles,
+        "T-D1-2a: no dispatch inside the polled instruction's slice (S2)");
+    // S2+ fail-to-pass：派发不发生在首切片（I 旗标未动）
+    FCEU11_EXPECT_FTP(ctx, (X.P & I_FLAG) == 0,
+        "T-D1-2b: I flag untouched after the first slice (S2)");
+    poll_run_exact(9);                       // 派发切片（7 周期）
+    const uint64_t t2 = poll_abs();
+    // S2+ fail-to-pass：派发落在第二条边界（7 周期序列）
+    FCEU11_EXPECT_FTP(ctx, t2 - t1 == (uint64_t)refint::kSeqCycles,
+        "T-D1-2c: dispatch lands at the boundary after the poll point (S2)");
+}
+
+// ④-target（// S5+ fail-to-pass）：branch-delay——分支在飞 + 边界注入线：
+// 分支切片内不派发；派发压的是**分支目标 PC**（$204）。首个合取项在 S2
+// （轮询下沉）后即转绿；S5 补分支末周期采样形状（分支的轮询点是末周期）。
+// 变异映射：T-D1-2 的镜像——用分支指令（BNE taken，3 周期）替 NOP。
+void test_poll_target_branch_delay(TestContext& ctx) {
+    poll_setup_boundary(true);
+    poll_run_exact(2);                       // NOP@200 → PC=201，_PI 刷新
+    RAM[0x201] = 0xD0;                  // BNE（Z 清 ⇒ taken）→ 目标 $204
+    RAM[0x202] = 0x02;
+    X.P = (uint8_t)(X.P & ~Z_FLAG);     // Z 清：分支必 taken（3 周期，无跨页）
+    X6502_IRQBegin(FCEU_IQEXT);
+    const uint64_t t0 = poll_abs();
+    poll_run_exact(3);                       // 分支切片
+    const uint64_t t1 = poll_abs();
+    // S5+ fail-to-pass：分支切片内不派发（线在分支末周期窗口内采样）
+    FCEU11_EXPECT_FTP(ctx, (X.P & I_FLAG) == 0,
+        "T-D1-4a: no dispatch inside the taken-branch slice (S5)");
+    FCEU11_EXPECT_FTP(ctx, t1 - t0 == (uint64_t)3,
+        "T-D1-4b: branch slice charged exactly the 3-cycle taken branch (S5)");
+    poll_run_exact(16);                      // 派发切片
+    // S5+ fail-to-pass：派发压分支目标 PC = $204
+    FCEU11_EXPECT_FTP(ctx,
+        RAM[0x100 + 0xFD] == 0x02 && RAM[0x100 + 0xFC] == 0x04,
+        "T-D1-4c: dispatched PC is the branch target $204 (S5)");
+    FCEU11_EXPECT_FTP(ctx, X.S == (uint8_t)(0xFD - refint::kSeqSDelta),
+        "T-D1-4d: single sequence pushed after the branch (S5)");
+}
+
 int main() {
     std::setvbuf(stdout, nullptr, _IONBF, 0);
 
@@ -269,8 +600,22 @@ int main() {
     test_opcode_size_table(ctx);
     test_opcode_cycle_count(ctx);
 
+    // D1 专线 S1：中断轮询锁测试（基线绿 + 目标红 fail-to-pass）。
+    // 每个场景自带 PowerNES 基座，放全部既有用例之后跑。
+    test_poll_nmi_vbl_fresh_deferral(ctx);
+    test_poll_irq_ext_first_boundary(ctx);
+    test_poll_nmi2_conversion_two_boundaries(ctx);
+    test_poll_nmi_ignores_iflag(ctx);
+    test_poll_hijack_brk_then_nmi_two_sequences(ctx);
+    test_poll_target_hijack_single_sequence(ctx);
+    test_poll_target_two_phase_irq(ctx);
+    test_poll_target_branch_delay(ctx);
+
     fceu11::CloseGame();
     core_shutdown();
+
+    std::printf("\nfail-to-pass (D1 target model): RED=%d GREEN=%d (designed RED at S1 = 9)\n",
+                g_intl_ftp_red, g_intl_ftp_green);
 
     return report_and_exit(ctx, "CPU test suite");
 }
