@@ -90,6 +90,7 @@ baseline 更新需与代码变更同等级 review**）。177 ROM：PASS 144 / FA
 | `r5r6_v1.17/` | v1.17 R5/R6 迁移核查与仪器数据 | §2 黄金回归现状 |
 | `p2_instrument/` | P2 精度收敛交接档案（8 份 survey 汇总） | §3/§4 禁忌与纪律的出处 |
 | `oam_dma_dummy_write/` | **kgmqa-050 OAM DMA dummy write 取证调查页（D4，2026-11-06）**：探针 `FCEUX11_OAMBUS_PROBE` 的产物格式、**四个触发面**（含 armed 条件）、复现步骤、已有阴性结论、下一轮 RE 切入点 | §1 已知失败面中 050 的取证入口 |
+| `cpu_interrupt_hijack/` | **kgmqa-037 中断轮询下沉 + hijack 取证调查页（D1 专线 S0+S1，2026-11-07）**：hijack 状态机**四交互矩阵**、G1–G5 差距面、E-1 与 INTLEDGER **双通道交叉验证**（set→dispatch delta = 在飞指令长度，恒差 +7 即口径证据）、探针 `FCEUX11_INTLEDGER` 的产物格式、锁测试期望值来源（§4/§5 标定表，不取自被测代码） | §1 已知失败面中 037 的取证入口；T2 卡的 S0/S1 依据 |
 
 ## 6. 相关文档
 
