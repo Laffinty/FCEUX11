@@ -521,6 +521,14 @@ static void FrameSoundEvent(bool quarter, bool half)
 // int_4 head rows shifted non-uniformly (the APU sequencer phase vs the
 // test's sync_apu alignment needs its own round; infra stays, injectors
 // stay, locks T-D1-5 keep the semantics pinned).  Charter: survey §12.8.
+// D1 S2.5 stage 2 (r25 charter APU): the SoundCPUHook window context for the
+// exact event stamping.  The old X6502_IRQBegin folded the event to the
+// instruction boundary -- an event landing exactly on the boundary was
+// credited one instruction early (cpu_int_4 head rows, survey §12.3).
+static uint64 s_fsu_win_end_abs = 0;   // abs at hook entry = window end B_{k+1}
+static int s_fsu_cycles = 0;           // the hook's instruction length
+static uint64 s_fsu_event_abs = 0;     // the landing cycle's completion boundary
+
 static void FrameIRQSet(void)
 {
  // E-3 Track-B probe (v1.17 R6 task, 2026-08-08): IRQ_BEGIN recorder at
@@ -540,7 +548,7 @@ static void FrameIRQSet(void)
  }
  SIRQStat|=0x40;
  if (!(IRQFrameMode&0x1))
-  X6502_IRQBegin(FCEU_IQFCOUNT);
+  X6502_IRQBeginAt(FCEU_IQFCOUNT, s_fsu_event_abs, /*restamp=*/false);  // S2.5 stage 2
 }
 
 static void FrameIRQEnd(void)
@@ -565,7 +573,7 @@ static void FrameIRQEnd(void)
  else
  {
   SIRQStat|=0x40;
-  X6502_IRQBegin(FCEU_IQFCOUNT);
+  X6502_IRQBeginAt(FCEU_IQFCOUNT, s_fsu_event_abs, /*restamp=*/false);  // S2.5 stage 2
  }
 }
 
@@ -775,6 +783,13 @@ void FCEU_SoundCPUHook(int cycles)
  // 22371/29828/29829/29830), and mature any pending $4017 write reset
  // (3 cycles on an even CPU cycle, 4 on odd - the clock jitter).
  const int32_t fhcnt_at_entry = fhcnt;
+ // D1 S2.5 stage 2 (r25 charter APU): the window's absolute CPU span for the
+ // exact event stamping.  The hook runs at the instruction's end boundary
+ // (after ADDCYC), so win_end_abs = B_{k+1}; a frame-IRQ event landing at
+ // sequencer position P has its hardware assert cycle at
+ // win_end_abs - rem_at_that_point (see the batch loop below).
+ s_fsu_win_end_abs = g_cpu.timestamp_base() + (uint64)g_cpu.timestamp_ref();
+ s_fsu_cycles = cycles;
  bool fired_quarter = false;
  int32_t rem = cycles;
  // A2 (2026-11-06): batch stepping. Behavior is identical to the previous
@@ -818,6 +833,9 @@ void FCEU_SoundCPUHook(int cycles)
    // that landing consumes exactly one more cycle of rem.
    fhcnt += gap - 1;
    rem -= gap;
+   // S2.5 stage 2: the landing cycle's completion boundary = the event's
+   // hardware assert cycle (win_end_abs - rem, rem already net of the gap).
+   s_fsu_event_abs = s_fsu_win_end_abs - (uint64)rem;
    FrameCounterTick();
   }
  }

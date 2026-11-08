@@ -121,7 +121,7 @@ uint8 X6502_DMR(uint32 A);
 void X6502_DMW(uint32 A, uint8 V);
 
 void X6502_IRQBegin(int w);
-void X6502_IRQBeginAt(int w, uint64 when);  // S2.5: exact event-cycle injector
+void X6502_IRQBeginAt(int w, uint64 when, bool restamp = true);  // S2.5: exact event-cycle injector (restamp=false = rising-edge-only stamp, mode-0 re-assert poison guard)
 void X6502_IRQEnd(int w);
 
 int X6502_GetOpcodeCycles( int op );

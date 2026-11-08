@@ -738,10 +738,16 @@ void X6502_IRQBegin(int w)
 // absolute CPU cycle (e1_cpu_abs 口径); an event stamped exactly at the
 // current instruction's end boundary becomes visible to the NEXT
 // instruction's poll (the cpu_int_4 head-row fix).
-void X6502_IRQBeginAt(int w, uint64 when)
+void X6502_IRQBeginAt(int w, uint64 when, bool restamp)
 {
+ const bool rising = !(_IRQlow & w);
  _IRQlow|=w;
- intl_stamp_mask(w, when);
+ // S2.5 stage 2: restamp=false + non-rising = the mode-0 re-assert poison
+ // guard -- 29829/29830 re-fires must NOT lift the event stamp (the last-
+ // wins overwrite pushed assert_at +1/+2 and chased it across poll
+ // boundaries; the cpu_int_4 head-row regression mechanism).
+ if (restamp || rising)
+  intl_stamp_mask(w, when);
  intledger_decode_mask((uint32_t)w, 1);
 }
 
