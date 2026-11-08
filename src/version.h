@@ -56,11 +56,14 @@
 #define FCEU_COMPILER_DETAIL ""
 #endif
 
-// v2.0.1 — GBAEUX11 v2.0（GBA 作为第二台机）发布线之上的精度补丁；
-// NES 侧基线 F11QA 108P/12F 不变。GBA 侧成果见 CHANGELOG 2.0.1（AGS 30/33）。
+// v2.0.2 — 以 DEBUG（调试能力/排查效率）与性能优化为主的一次迭代：
+// A 线（调试门控/批量步进/逐字节对拍/HQ 渲染器 SIMD 化）、B 线（无头 trace、
+// profiler 开关、lua memory 导出）、C 线（GBA 帧导出与 savestate 编码加速），
+// 外加 D1 专线的中断模型基础设施与两轮 S2.5。NES 侧基线 F11QA 矩阵
+// 122 项 / grade B 不变。成果逐条见 CHANGELOG 2.0.2 与计划 §十 r1–r26。
 inline constexpr int FCEU_VERSION_MAJOR = 2;
 inline constexpr int FCEU_VERSION_MINOR = 0;
-inline constexpr int FCEU_VERSION_PATCH = 1;
+inline constexpr int FCEU_VERSION_PATCH = 2;
 inline constexpr int FCEU_VERSION_TWEAK = 0;
 
 inline constexpr int FCEU_VERSION_NUMERIC = (FCEU_VERSION_MAJOR * 10000) + (FCEU_VERSION_MINOR * 100) + FCEU_VERSION_PATCH;
@@ -68,11 +71,11 @@ inline constexpr int FCEU_VERSION_MAJOR_DECODE(int x) { return x / 10000; }
 inline constexpr int FCEU_VERSION_MINOR_DECODE(int x) { return (x / 100) % 100; }
 inline constexpr int FCEU_VERSION_PATCH_DECODE(int x) { return x % 100; }
 
-// v2.0.1 release — no hotfix tag.
+// v2.0.2 release — no hotfix tag.
 #define FCEU_HOTFIX_TAG ""
 
-#define FCEU_VERSION_STRING "2.0.1 " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
-#define FCEU_DISPLAY_VERSION "v2.0.1"
+#define FCEU_VERSION_STRING "2.0.2 " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
+#define FCEU_DISPLAY_VERSION "v2.0.2"
 #define FCEU_NAME_AND_VERSION FCEU_NAME " " FCEU_DISPLAY_VERSION
 
 // FCEUX11 Contributors — Derivative work based on FCEUX

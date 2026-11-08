@@ -146,6 +146,39 @@ v2.0 GBA 计划建设期已收口归档（r57 用户裁决）。剩余长尾全�
 5. **§9.1 八条开放限制**（L1/L2/L4/L6/L7/L10/L13/L15）：r42/r54 裁决 Alpha
    阶段长期开放，无需工作；全文见归档计划 §9.1。
 
+## v2.0.2 线（NES 侧）的收口状态（2026-11-08，r26）
+
+> 发版主线文档：`docs/plans/FCEUX11-v2.0.2_DEBUG与性能优化计划.md`（§十 变更记录
+> 是该线的事实源，止于 **r26**）。本节只记**下一任接手的人会踩到的**东西。
+
+1. **A6/D5-S3-S5 已关闭（业主裁决 r25）** —— bus 直读快路径**不再立项**。理由三条：
+   探针三连稳定但收益 3–8% 骑线；r12 排它后面的「D1 收口后再动」前提在方法论上
+   不成立（收益是性能问题，静默探针测不出）；两个更便宜替代（**PGO** 开关现成 /
+   **A7**）从未动。S0+S2 的 85 条护甲断言**转常驻**、零维持成本。
+   ⇒ 计划 §二 仍写着「A6 … 单独立项，排最后」，**那是旧文，别照着做**；
+   替代槽位是 PGO 或 A7。
+2. **F-2 已修（r26，`ce89bc7`）** —— 无头回落反汇编器
+   （`src/rust/crates/fceux11-debug/src/asm.rs`）的助记符表原按列书写，**整个 zp
+   列解码为 ORA**、0x8D/0x8E/0x8C/0x91/0x99/0x9D 落 `???`。现为按 opcode 升序的
+   官方 6502 全集（151）+ 6 条单字节 NOP，锁测试 `lock_disasm_mnemonics_256`
+   （256 项穷举、**扁平独立参照表**）。只污染 `FCEUX11_TRACE` 无头 trace 文本，
+   Qt 调试器走独立实现不受影响。
+   **⚠️ 它的端到端验证脚本在 `.zcode/d1s2/a1_checklist/verify_trace_f2.py`** ——
+   按 ROM 字节推导期望值逐行比对官方矩阵，比单元锁多走一段真实链路
+   （`trace_common.cpp:33` → `asm.cpp:24` → Rust → 文本）。
+3. **两个 crate 的 Rust 锁测试曾不在任何门禁里** —— `cargo test -p fceux11-rust`
+   **不跑依赖 crate 的测试**（`fceux11-debug` 93 项 / `fceux11-media` 52 项），
+   且 **CI 里没有任何 cargo 环节**。⇒ F-2 的锁与 A5 G3 的绝对金标准向量锁
+   （`lock_resample_interpolation_golden_vector`）**写了却一次都没跑过**。
+   本轮已把两条命令补进「门禁」节。**新增锁测试时必须确认它落在哪条命令的路径上。**
+4. **业主四项裁决（2026-11-08，收口前）**：D1 round-2 两项章程（(C) DMC 计费界定 /
+   VBL 锚 K 扫参）**转长尾**；F-1（Lua `emu.frameadvance()` abort）**转长尾**；
+   §八 出口判据的 107 条**改写**为「协议缺陷已修、端到端按 defer 记已知限制」；
+   **不打 tag**（版本口径与 CHANGELOG 对齐即可，push/tag 另需明示）。
+   ⇒ **int_4 / 037 / 050 / 107 在 `tests/tests.json` 里全是 `failure_means: advisory`
+   且基线为 `false`** ⇒ 修它们**不改 grade、不改 pass_to_fail**，判红体系上零收益。
+   这是「收益不大就不做」这条裁决的**硬依据**，下次评估精度项前先查这一列。
+
 ## S3-3 实施时踩到的三件事（给下一个接手的人）
 
 1. **`FCEUSS_Save` / `FCEUSS_Load` 是所有即时存档入口的唯一收敛点**：10 个槽位、
@@ -197,11 +230,17 @@ $vc = "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary
 
 # GBA 锁测试
 cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p fceux11-rust --no-default-features --features gba --lib"
-# vendor 核心自己的单元测试（227 项）。**这一条以前不存在**：vendoring 丢了
-# [dev-dependencies]，pretty_assertions 缺失使 `cargo test -p gba-core` 根本编不过，
-# 而门禁只跑根 crate，于是这 227 项一直「不存在」而不是「失败」。bus.rs 的时序测试
-# 全在这里，P2 之后要在时序模型上动手，先把它跑起来。
+# vendor 核心自己的单元测试（**242** 项 = 244 − 2 ignored）。**这一条以前不存在**：
+# vendoring 丢了 [dev-dependencies]，pretty_assertions 缺失使 `cargo test -p gba-core`
+# 根本编不过，而门禁只跑根 crate，于是这 242 项一直「不存在」而不是「失败」。
+# bus.rs 的时序测试全在这里，P2 之后要在时序模型上动手，先把它跑起来。
 cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p gba-core --lib"
+# **NES 侧两个 crate 的 Rust 锁测试（r26 补录）**：`cargo test -p fceux11-rust` **不跑
+# 依赖 crate 的测试**（`fceux11-debug` / `fceux11-media` 是 path dependency，其
+# `#[cfg(test)]` 模块在该命令下不参与编译）⇒ 这两条命令缺了，那 93 + 52 项
+# **一次都不会跑**，且没有任何一层报警（A5 G3 的绝对金标准向量锁就在 media 里）。
+cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p fceux11-debug --lib"
+cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p fceux11-media"
 
 # 两态 feature 检查（第二态同时复核不变式 8：关 feature 时 vendor 树退出编译图）
 cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo check --workspace --no-default-features"
@@ -295,12 +334,19 @@ $env:PATH="D:\Project\FCEUX11\vcpkg_installed\x64-windows\bin;$env:PATH"
    后来又发现它**太松的另一半**：`sdlGbaTexture` 匹配不上任何判据，**一个 GBA 专属
    成员可以完全躲开守卫**。判据要**大小写敏感 + 前缀锚定**，匹配前**先剥掉注释与
    字符串字面量**，并且**宁可漏也不要误报**。
-10. **编不过的测试等于不存在，「全绿」也可能是从没跑过。** `gba-core` 的 227 项单元
+10. **编不过的测试等于不存在，「全绿」也可能是从没跑过。** `gba-core` 的 242 项单元
    测试因为 vendor 时丢了 `[dev-dependencies]`（`pretty_assertions`）而**根本编不过**，
    而门禁只跑根 crate，于是它们「不存在」而不是「失败」，没有任何一层报警。**加一条
    门禁命令不等于它会跑** —— 新增门禁后要**当场看到它的测试计数**，计数为 0 或「跑不
    起来」都算没加。这一条与第 9 条同族：守卫失效的两种方式是**误报**与**根本不执行**，
    后者更隐蔽，因为它连红都不红。
+   **⚠️ r26 补录的反向实例（2026-11-08）**：`cargo test -p fceux11-rust` **不跑依赖
+   crate 的测试**（`fceux11-debug` / `fceux11-media` 是 path dependency，测试模块在
+   该命令下不参与编译）⇒ F-2 的 `lock_disasm_mnemonics_256` 与 A5 G3 的
+   `lock_resample_interpolation_golden_vector`（各在其 crate 内）**都写好了却一次都
+   没被执行过**，且 CI 侧**完全没有 cargo 环节**（`f11qa.yml` 注释自陈「there is no a
+   `cargo test` step」）。**「测试写了」与「测试会跑」是两件事** —— 新增锁测试后要确认
+   它**落在哪条门禁命令的路径上**；若不在，登记到 AGENTS.md 门禁节（本轮已补两条）。
 11. **测量窗口禁止绑 PC / 取指指针（推测态），必须绑架构精确态，并加 armed 标志。**
    2026-10-06 的 v2.0.1 调查里这一条**被同一个坑咬了三次**：AGBA / ROM 探针与单元测试
    都用「PC 到达循环之后那条指令」当退出条件，而 ARM7TDMI 的**取指指针会越过 `BNE`

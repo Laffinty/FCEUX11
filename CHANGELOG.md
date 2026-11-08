@@ -5,6 +5,434 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.2] - 2026-11-08
+
+本版以 **DEBUG 与性能优化** 为主线：NES 侧把调试门控、APU 帧计数器、PPU 扫描线与
+HQ 音频渲染四条热路径的开销整体下移，六档基准累计 cpu −27% / ppu −37% /
+full −34% / hq −48%；GBA 侧修掉帧导出与 savestate 编码两处热路径。精度侧修好一处
+真实缺陷、纠正三处「预算不足」的伪 FAIL，并新开一条 D1 中断专线（探针 + 两拍模型
++ BRK 向量级劫持）。CI 与门禁侧把「绿」与「有牙」分开处理。
+
+### Performance — NES 四条热路径整体下移（cpu −27% / ppu −37% / full −34% / hq −48%）
+
+- **调试门控三合一**：`bench_cpu_frame` 46.356 ms。调试路径的门散在三处 ——
+  `breakpoint()` 的 9 路 OR、`debug_loggingCD`、`trace_logging` 各自判断，
+  `DebugCycle` 入口没有早退，零断点时也走完整条判定链。修法 = 三合一为单一门 +
+  入口早退；`e1_last_pc` 写入并入 `e1_cpu_trace_on()` 门；`map_irq_hook` 热路径的
+  load 由 acquire 改 relaxed（保单线程可见性、去编译器屏障负担）。读数 46.356 →
+  37.8 / 38.2 / 38.5 ms（≈−18%，目标 ≥5%）。归属：提交 55d82d0。
+- ⚠️ 两条实施修正如实留档：① `IncrementInstructionsCounters` **不门控** ——
+  `lua getTotalInstructions` 与 TraceLogger 的 `instrCount` 在零调试特征时也消费它，
+  门控等于读数停滞；② viewer 的门条件是**窗口状态**而非调试器状态（新增
+  `nt_view_open` / `ppu_view_open` / `trace_logging` 三个状态位），照「同门」实现会
+  开窗黑屏。
+- **APU 帧计数器批量步进**：`FcNextEventPos` 落位表 + `FrameCounterTick` 保持为唯一
+  点火权威 + 倒计时一次跳。锁测试 kgmqa-121（59 断言，独立参照模型、字段按字段拼装、
+  S1–S5 场景），变异 M-A…M-E 五向全红（27/4/12/11/14）→ 还原绿。读数
+  `bench_apu_frame` 39.9 → 33.2–35.1 ms（−15%）、`full_frame` 40.9 → 33.4–33.6 ms
+  （−18%），远超 3% 止损线。归属：提交 062ce84。
+- **逐扫描线后处理合并**：`bench_ppu_frame` 46.554 → 40.8–41.0 ms（−12%）。等价性证据
+  不靠读码断言 —— XDUMP 全帧 0/840 diff + WAVEDUMP 0/180 diff；变异 M1（023 5/5 红）/
+  M2′（仅 XDBuf 红 418、xbuf 盲 —— 探针存在性实证）/ M3′（仅 xbuf 红 418）/ V2（删
+  memset 复刻 D-4，180/180 红）全红→绿。⚠️ 哨兵修正：kgmqa-024 只跑低质量路径，到不了
+  HQ 分支的 memset（调查设计漏洞），故 A4-2 的等价证据以 WAVEDUMP 为准；A4-1 主方案
+  （消费计数门控）被盘点否决（savestate chunk-8 任意帧异步消费 ⇒ 金标漂移、谓词恒真）。
+- **HQ 音频渲染器 SIMD 化**（G0–G3）：G0 把 `apu_wav_hq_diff_test` 进门禁
+  （`SetSoundQuality(1)` 走 HQ 分支，nrom/mmc1/vrc6 三 ROM，int16 WAV + int32 pcm32
+  裸 dump 双锁，golden 由改动前构建采出、VERIFY 缺 golden 即红）；G1 标量无损重构
+  （复用 acc2，逐项 >>6 语义保留）；G2 AVX2（`#[target_feature]` + 运行时探测，绕开
+  MSVC `__AVX2__` 宏陷阱；偏置系数 c'=c+2^16 使 `vpmuludq` 精确、低 6 位不变，收口
+  (T>>6)−1024·Σs 逐位等于标量；标量路径零改动＝天然回退）；G3 变异验证。读数
+  `bench_full_frame_hq` 78.588 → 44.9 / 45.0 / 45.1 ms（−43%）。归属：提交
+  0da9ad4 / 726e872。
+- **基准基线首次六档全有门禁**：`bench_apu_frame` / `bench_bus_dispatch` 此前报
+  「no baseline entry」＝**没有门禁在跑**（被优化的正是 APU）。补两档 ⇒ 六档全有基线；
+  照 ps1 流程重采（best-of-5）＝ cpu 34.049 / ppu 29.174 / full 32.135 / hq 41.006 ms
+  （tolerance 10.0 不变，对照全 PASS）。顺手修 `generate_bench_baseline.ps1` 的路径 bug
+  （相对路径由 .NET `GetFullPath` 解析、不随 `Set-Location` 走 ⇒ 写到仓库根而失败）。
+  ⚠️ 基准读数不跨机可比：本版实测 `bench_bus_dispatch` 与 `cpu_frame` 同步上漂 11–20%
+  （整机时钟漂移类），绝对读数只用来追大幅持续回退。
+
+### Performance — GBA 帧导出 252 → 20.6 µs/帧（−92%）与 savestate 编码 2× → 1×
+
+- 帧导出现象：全链 252 µs/帧（min 234）= 59.7275 Hz 帧预算的 1.51%，其中标量
+  BGR555→RGBA 转换 ~213 µs（~85%）—— 成本与像素内容无关。
+- 帧导出修法与读数：`write_frame_bytes` 直写 dst + 32768 项 const fn 全字 LUT；全帧
+  写 3→1、分配 2→0（消费方 g_frame 恰为 FRAME_BYTES 持久缓冲，无需给 Machine 加
+  字段）。252 → 20.6 µs/帧（−92%），转换 213 → 19.9 µs，预算占比 1.51% → 0.12%；
+  穷举等价测试（32768 字 vs 标量参照）即变异验证；GBA 锁测试 249 全绿（+1）。归属：
+  提交 672bcf3。
+- savestate：每存一次白付 2.22 ms 编码 —— 路径把同一状态编码了两次。修法 = C++ 侧宽
+  buffer（2 MB）+ `GBA_ERR_CAPACITY` 重试一次，**推翻 `gba_load.cpp:263-269` 当年的记录
+  决策**；指纹（全 ROM FNV-1a）入 `Machine` 字段、装载时算一次，encode/apply_state 读
+  缓存，失效随机器整体换弃自动成立；载荷格式零变化。读数：状态 1,047,878 B、单次编码
+  2.22 ms（save 路径 2×→1×）。归属：提交 6d88c56。
+
+### Fixed — NES 精度：kgmqa-050 转绿、三处帧预算伪 FAIL、SNES 鼠标协议
+
+- **kgmqa-050 转绿**（0x06 → 0x00，矩阵 108P/12F → 109P/11F）：`FCEUX_PPU_Loop` 的
+  VBL 入口**无条件清 OAMADDR**；硬件语义是仅在渲染开启的 dots 257–320 清 ⇒ 渲染关闭的
+  帧会毁掉 CPU 刚程控的 OAMADDR（=0xEA），050 的 oam_read_test 恰有一读在 sl 240→241
+  边界前 4 周期被吞。修法 = 以 `PPU[1] & 0x18` 门控。锁测试（ppu_test 扩展，planted
+  SPRAM + 真 $2003/$2004 路径）+ 变异 M-D4 双红（050 复现 0x06 + 三断言红）→ 还原双绿；
+  哨兵 110 PASS、ctest 36/36、金标零漂移。归属：提交 b0a016a。
+- **OAM DMA 取证探针** `FCEUX11_OAMBUS_PROBE`（默认静默）落地：050 复跑复现
+  `value=0x06 status=FAIL` 且 `armed=1` ⇒「0 次 SPRAM 改写」不是「从未 armed」的平凡
+  真值、是有效阴性证据；另跑 kgmqa-110 作阳性对照（`dma_bursts=75164` /
+  `dma_bytes=19241984` / `armed=1` / `status=PASS`）⇒ 探针在真实 DMA 场景下确实在记录。
+  落点因此从 SPRAM 改向 **$2004 读路径**（newppu `spr_read` 合成读）。留证：
+  `docs/history/surveys/oam_dma_dummy_write/`（651 行 + 复跑产物）。
+- **三处帧预算伪 FAIL**（049 / 050 / 051）：kgmqa-049 在 HEAD 判红，但实跑两连 1300+
+  帧 `$6000 = 0x00`（PASS，完成窗口 1200–1300）⇒ 不是精度 FAIL，是 **harness 伪
+  FAIL**：门禁帧预算小于真实完成窗口（tests.json `--frames 600` 时 `$6000 = 0x80`，
+  仍在跑）。修法 = 049 预算 600→2000、051 预算 300→400（同型伪 FAIL，实测 ~316 帧
+  完成）、050 预算 300→400，三处均记 provenance。哨兵留证 —— 049 600 帧红 0x80 /
+  2000 帧绿 0x00；051 300 红 / 400 绿；050 400/600/2000 帧直跑全 PASS 0x00；发版收口
+  复跑时这三条全部转入 `fail_to_pass` 桶（049 / 050 / 051）。附带：
+  $2007 读缓冲状态机文档 `docs/tech/ppu_2007_read_buffer_state_machine.md`（R1–R16
+  迁移表；如实记录渲染期隐式填充 VRAMBuffer 实测零赋值点、per-bit 衰减 defer）。
+  归属：提交 1eaf8cc / 7864b17（049 / 051 部分）。
+- **SNES 鼠标协议四处缺陷** + 可注入的测试面：① byte0 签名 0xFF/0x00 交替规则未实现；
+  ② dy 灵敏度补齐写成不对称；③ 倍率只有一档（补 ×1/×2/×4）；④ 幅度 6 位与 bit6 溢出
+  处理缺失。另测试桥把输入硬编码为 `SI_NONE`、指针传 `nullptr`（每帧必崩）。修法 =
+  协议四处修正 + 测试桥 `kagami_bridge_set_input` / `sut_input` 注入面 + 指针改传持久
+  零缓冲。锁测试 `input_snesmouse_test`（向量按字段拼装），变异 M-A…M-D 四向红。⚠️
+  端到端如实记：mset 端到端 0xFC 需真实鼠标交互，未硬造 headless 注入 —— 协议缺陷
+  已修，端到端结论按已知限制处理。
+
+### Added — D1 中断专线 S0/S1：INTLEDGER 探针、首批锁测试与三项闸门
+
+- S0 调查页 `docs/history/surveys/cpu_interrupt_hijack/README.md`（146 行）——
+  hijack 状态机四交互矩阵、G1–G5 差距面、E-1 双通道取证、NMIDELAY=8 的量化噪声面；
+  期望值来源是标定表与 nesdev 服务序列结构，**不取自被测代码**。探针
+  `FCEUX11_INTLEDGER=<dir>`：六个注入点 + 循环顶判定 + 二进制账本 `intledger.bin`
+  （8 字节头 `INTL1` + 24 字节定长记录，`static_assert` 锁布局）+ `summary.log`；
+  kind 0..7 = 八条中断线 + 0xF 边界快照，decision 0..6 = 实际走到的判定分支；64 MiB
+  上限；**未设 env 完全静默零成本**。
+- 双通道交叉验证（实测）：037 三百帧，E-1 与 INTLEDGER 的 assert/defer/dispatch 计数
+  10/10/10 一致；E-1 delta [2×8, 7×2] 与 INTLEDGER delta [9×8, 14×2] **恒差 +7** ——
+  差值本身即口径证据（两通道互为印证）。
+- 锁测试挂在既有 `cpu_test`（**不新增 ctest 项**），新增 34 条基线断言 + 12 条目标
+  （FTP）断言；FTP 组预期红不进 `ctx.failed` ⇒ ctest 全绿硬约束不受影响。实测 838
+  passed / 0 failed，FTP RED=9 / GREEN=2。变异验证（独立复做）：M-D1-0（抑制
+  `g_e1_nmi_fresh` 置位）⇒ 11 项红；M-D1-1（参照模型周期数 7→9，期望值污染）⇒ 2 项
+  红 ⇒ **锁测试有牙，不是「全绿即证据」**。
+- 三项闸门（业主点选拍板）：① **模型状态不入 savestate** —— S2 引入的 hijack 序列进行中
+  标志、branch-delay 采样窗口等是**指令内瞬态**，跨存档边界几乎不可观测；现状已有同类
+  先例（`g_e1_nmi_fresh`、`g_power_on_reset_pending` 两个 static bool 本就不在 savestate
+  面内）⇒ `golden_savestate` 保持零漂移，不触碰 precision.md §3 禁忌清单。② **S2 后
+  门禁逐组放行** —— S1 的 9 条 FTP 断言分三组，S2 只放行 T-D1-2（两拍，3 条）+ T-D1-3
+  （hijack，2 条 RED + 2 条两态绿 pin）转绿，T-D1-4（branch-delay，4 条 RED）保持红到
+  后续阶段；每步只允许该步该转的转，误放行会被立刻看见。③ **金标漂移预案 = 停 +
+  记录 + 提交业主裁决**，不引入任何「预设授权」或「默认同意」机制（后者实质是弱化的
+  预设授权）。三个闸门均未放宽任何出口判据：pass_to_fail = 0、grade ≥ B、advisory-FAIL
+  ≤ 15%、金标三件套零漂移、CPU 金标哨兵 048/032/057/053/054 不回退全部原样保留。
+
+### Fixed — D1 S2：两拍模型、BRK 的 NMI 向量级劫持，与一次模型纠错
+
+- 根因与建模：中断轮询此前在指令边界采样，线在指令边界前已置位时会晚一条指令才被看见。
+  修法 = 采样点从指令边界下沉到「指令 dispatch 之后」（poll point），派发在下一
+  loop-top；`g_intl_pending`（0 无 / 1 NMI / 2 IRQ）承载采样结果，**不入 savestate**；
+  线源时序（mapper IRQ / APU frame IRQ / VBL NMI / RTI 的派发时刻）全部不变，唯一变化
+  窗口＝「线在指令边界前已置位」晚一条指令。`g_e1_nmi_fresh` 随之退休。BRK 劫持：NMI 线
+  在 BRK 执行时置位 ⇒ BRK 自身压栈序列原样保留、仅向量读 $FFFE → $FFFA，
+  `X6502_NmiHijacked()` 消线防二次派发。
+- 变异验证与读数（全部转红 + 还原复绿，红面与预判一致）：M-D1-2 NMI 采样短路 → 9 红；
+  M-D1-2b IRQ 采样短路 → 7 红；M-D1-3 劫持向量 $FFFA→$FFFE → 2 红；M-D1-14 消线去除 →
+  1 红。cpu_test 850/850；哨兵 054/040/048/053/057/032 全 PASS 零回退；ctest 36/36；
+  金标三件套零漂移（hashes 780/0、savestate 8/8）。
+- **模型纠错（本次最值得记的一笔）**：S1 断言 B3 / T-D1-3b 与 ops.inc 首版 hijack 都按
+  「hijack 压栈时 B=0」实现，锁测试全绿。**交接文档与 S1 调查页 §2/§5 对 blargg README
+  误读** —— 原文该行注释为 "NMI interrupting BRK, **with B bit set on stack**"（期望行
+  `36 00 00`，bit4 置位即 B=1）；`2-nmi_and_brk.s` 的 nmi 处理器 `pla` 实证该字节是 NMI
+  序列压栈的 P ⇒ 正确模型是**向量级劫持**（push 不重压、只改向量）。**断言与实现同源于
+  同一处误读 ⇒ 锁测试全绿不证明该语义**，闭环自洽；靠外部参照（测试 ROM 自带源码 +
+  README，christopherpow/nes-test-roms 镜像）才暴露改正；nesdev.org 全程 Cloudflare 403
+  未取到（如实标注）。
+- harness 另暴露两处：a) 首版 hijack 压栈写 `_P|U_FLAG`，B 位随 _P 残留浮动（真机 ROM
+  恰好带 B ＝ 偶然正确；power-on P=$34 的 harness 立刻暴露）⇒ 改为显式
+  `_P|U_FLAG|B_FLAG`；b) B4b/T-D1-3d 断言活 PC == NMI 向量，但预算 30 会让 nestest 的
+  NMI 处理器 RTI 弹栈使 PC 离开向量 ⇒ 预算改 7（＝边界持有 0 + 劫持序列 7，处理器未及
+  运行，用架构精确态而非 PC 推测态）。
+- 读数：kgmqa-037 由 S0 的 5/10 → 7/10 行匹配（行 4-5 `36 00 00` 与 blargg 参照一致）。
+  剩余行 6-8 仍 `27 36 00`，根因是 `ppu_rendering.cpp` 的 VBL 块先 `X6502_Run(8)` 跑完
+  预算再 `TriggerNMI()` ⇒ 线断言永远量化在指令边界且落在 BRK 完成之后；NMIDELAY 扫参
+  已证明无固定 D 两全 ⇒ 周期级线断言精度属独立 RE 议题。
+
+### Added — D1 S2.5 第一轮：线携带断言时刻 + 判定点门控
+
+- 方案（业主拍板方案 A）：per-line 断言时刻表 `g_intl_assert_at[8]` + 可见性门控
+  （poll point 的 `intl_live_irq_mask()`、BRK 劫持的 `intl_nmi_live()`，严格 <）+ 精确
+  注入器 `TriggerNMIAt` / `X6502_IRQBeginAt` / `fceu11_cpu_abs_ts`（x6502.h 导出）+
+  legacy 注入器 `intl_stamp_legacy`（now−1 ⇒ 可见性与 S2 逐字节相同）。锁测试 T-D1-5
+  组 11 条（未来时刻登记×5 / 边界恰落×3 / 窗口内×3，含 PC 压栈形状断言）；cpu_test
+  861/861（850→861）。
+- ⚠️ 两轮 ROM 级精确化尝试被门禁当场咬住后回退（如实记录）：(a) **VBL 时刻化** ——
+  δ∈{0..4} 扫参无一复现旧 05 X 表；δ=2/3 与期望的转变间距一致但整体早 2 行 ＝ 2-dot
+  点级相位差，整数周期粒度的 assert_at 表达不了；kgmqa-122 转红 ⇒ 回退。(b) **APU
+  FCOUNT 精确戳** —— 054 保持 PASS，但 int_4 头部行非均匀位移 ⇒ APU 时序器相位与测试
+  sync_apu 对齐需要自己的轮次 ⇒ 回退 legacy。
+- 零生产行为变化实证 + G5 取证：037 / int_3 / int_4 / int_5 校验和与 S2 轮逐字节一致，
+  旧 05 / 122 / 040 / 054 / 048 / 032 / 053 / 057 全 PASS；ctest 36/36。变异验证：
+  ms25a 门控短路 → 1 红（派发早一边界 PC=$201）；ms25b 严格<→≤ → 1 红；ms25d 戳折叠 →
+  1 红（5c 对其不敏感 —— 两戳均先于首次 poll，如实记录）。
+- 摸底另得：int_4 与 int_5 的 S0/S2 diag 逐字节一致 ⇒ S2 对其零影响、缺口既有；int_3
+  行 5-6 回归机理＝边界派发 IRQ 前缺 NMI 向量级劫持检查。int_4 机理判定为 (a) 线断言
+  相位 + (b) DMA 周计入组合成立、(c) 派发记账排除；本仓 B4014 恒 512 周期、无 dummy/
+  对齐停机、无写周期奇偶（硬件 513/514 按 DMA 奇偶）⇒ 尾部偏差。
+
+### Fixed — D1 S2.5 第二轮：DMA 奇偶停机、APU 精确戳、采样点 override
+
+- 阶段 1（e35b748）DMA 513/514 奇偶停机：sprite DMA 停机段按硬件补 1 dummy + 0–1
+  对齐（奇偶校准位 `kOamDma514Parity=0`），512 → 513/514 ⇒ int_4 由 12/18 升到 13/18
+  （+526 判别行 9→8）；锁 T-D1-6（span {520,521}）变异 ms27a/b 双红。阶段 2（81f6631）
+  APU 精确戳：`g_fsu_event_abs` = 着陆周期完成边界 + `X6502_IRQBeginAt` restamp 参数
+  （mode-0 重火毒药守卫）⇒ int_4 = 17/18（头部 4 行修正，与章程预测精确一致）；**超预期
+  收敛**：int_3 行 6 = 20 00（此前记录的 S2 回归行修正）、int_5 test_jmp 10 行全对齐；
+  kgmqa-121 59/59 零影响。
+- 阶段 3（a720db9，修订版）(C) 采样点：第一版「post-hook 统一捕获」被实证排除过度 ——
+  $2004 的 X6502_DMR/DMW 计费被一并排除，int_5 pagecross T+04 回退 1 行；修订为
+  **override 形态**（B4014 经 `fceu11_intl_set_poll_override` 设 cycle_before、下一次
+  poll 一次性消费；其余指令 = 完整记账末）⇒ int_5 恢复 79064A81、int_4 = 16/18。⚠️ 两
+  形态取舍如实记：capture 形态 int_4 = 18/18（ROM PASS）但 int_5 少一行；override 形态
+  零回退但 int_4 差 2 行 —— 差异机理是 DMCDMA 的 X6502_DMR 计费被 capture 计入、被
+  override 排除，而 18/18 需要它 ⇒ 与「DMA 停摆不属于任何指令」的模型矛盾。
+  **DMC 计费范围界定**与 **VBL 锚 K 扫参**两项章程转长尾，不在本版完成。
+- 阶段 4 首切回退 + 增量构建陷阱：三章程 agent 的幂等补丁脚本落地后，**G-2 金丝雀当场
+  咬住** —— 派发 PC 落在同步例程（E86B）而非 marker 区（E34E–E356），K=13 在新登记结构
+  下过早约 3 周期（legacy 有效时刻 ≈ flag+4.7 周期）⇒ 回退；K 扫参章程（constexpr 改
+  env 旋钮 + K∈{13..25} 扫描 + X 表逐档判定）待后续。另：阶段 1 只重建 cpu_test target，
+  blargg_runner 旧二进制假绿一轮 ⇒ target 域构建后必须重建所有涉时序 runner。
+- 门禁总态：cpu_test 862/862、ctest 36/36、金标三件套零漂移、哨兵 110/069/122/040/054
+  全 PASS；int_2 = B1222C16（不变）、int_3 = ECD9F0D5（+1 行收敛）、int_5 = 79064A81
+  （不变）、int_4 = 16/18 FAIL 0x01（advisory）。
+
+### Changed — 取指通道（read_fetch 别名）与 A6 快路径的收口
+
+- S0+S1 护甲（零行为改动）：Genie 影子表 / DB 锁存 / fceuindbg 三件**存量零覆盖**，
+  补锁测试（bus_test 19→63 断言）+ 变异 M-A6-1/2/3 各自红→绿 + 取指探针
+  `FCEUX11_FETCH_PROBE`（静默）。S1 证据：051 的 IO 域取指 31 次 / 总 257 万（0.001%），
+  110/048 为 0 ⇒ read_fetch 通道的 IO 域命中面极小。三条实测事实留给后续：GetMem
+  ($4016/$4017) 走 debug.cpp 寄存器镜像短路不经 handler；A2002 的 fceuindbg 分支被
+  `#ifdef FCEUDEF_DEBUGGER` 编译掉；`vpage_g[]` 全仓从未填充。
+- S2 交付且前提再被证伪：重采 051 取指轨迹 5,541,363 条逐条解析 —— IO 域 31 次 + expo
+  224 次全部返回 0x40=RTI，与真机开放总线取指语义一致（DB 锁存模型天然正确）；051 的
+  FAIL@300 是帧预算伪 FAIL（实测 ~316 帧完成）+ PPU wait_vblank 相位竞争。交付 =
+  `read_fetch` 纯别名通道（委托 read() 共享锁存尾 / Genie / fceuindbg，分叉白名单留空＝
+  证据正确的形态，准入规则入注释）+ opcode fetch 改走 RdFetch + bus_test 63→85 断言 +
+  变异 M-D5-1'/2' 各自红→绿。
+- A6 快路径按业主裁决关闭：三轮探针读数稳定（IO 取指 31/355 万 = 0.00087%，且 31 为帧数
+  无关结构常数）⇒ D5 行为前提保持证伪、D5 本体无剩余行为工作（bus_test 85/85 绿）；
+  A6 快路径收益诚实评估 3–8%（中位 ~5%）骑线，且两个更便宜替代（PGO 开关、A7）从未动
+  ⇒ 关闭计划项，S0+S2 护甲 85 断言转常驻。原「D1 收口后再动」的排序条款随之退役
+  （S2 已把 x6502.cpp 移出残余范围，文件域冲突＝零）。
+
+### Added — 调试面：无头 trace、profiler、Lua memory、回归清单与探针 HOWTO
+
+- 无头 trace：TraceLogger 此前只能从 Qt 菜单开（`TraceLogger.cpp:1246` 的 static
+  `logging`），harness / 无头场景开不了，代码还留着性能注记 `//todo: really speed this
+  up`（:1363）。修法 = 加 `FCEUX11_TRACE` 环境变量入口（"1" ⇒ 默认文件名，其它非空值即
+  路径），与 Qt TraceLogger 同采集体同格式、仅当 Qt 未占槽才安装；trace_common 纯剪切
+  （452 行删除逐行迁移审计，Qt 行为不变）+ headless_trace 落地。治理三件：recBufEnabled
+  门 / 无头丢弃 + overrun 处理 / memo。验证：无头冒烟 6.25M 行完整；反汇编经钩子注入
+  （无头回落 core Disassemble）。
+- profiler：`FCEU_PROFILER_ENABLE` **从未被声明** ⇒ 永远 OFF 且打不开；而且 ON 分支预存
+  编译错误（profiler.cpp 裸指针 vs Rust u64 id ABI）⇒ 在 HEAD 上 ON 构建根本编不过
+  （「编不过 = 不存在」又一例）。修法 = 补 option 声明（它是**编译期开关**，设环境变量
+  开不了 —— 已在环境变量总表里与运行期 env 拆开）+ 探点 + 报告 + 修 ABI。Lua memory
+  导出此前只有 9 个，缺 range 系；修法 = 补 `readbyterange`（对齐上游语义：负长返回 nil
+  / 0 长返回空串 / 掩码回绕）与 `writebyterange`（上游无此函数，走 `writebyte` 的同一
+  BWrite 路径，零新增 FFI）。验证：test_memory.lua +13 用例；Rust 49/49、kgmqa-046
+  exit 0；用例翻转变异 0→1 红。归属：提交 34ce329。
+- 调试回归手工清单 `docs/tech/debug-regression-checklist.md`（643 行，22 个可勾选项，覆盖
+  A1 全部场景关键词 + 1 个反向项），每项给出可照做的步骤 + 绿/红判据 + 关联代码坐标；
+  口径更正后实际 21 行（自称 22，计数滑动），分类 H 3 / G 18 / C 0；业主 GUI 走查 18 项
+  另落 `docs/tech/a1_gui_walkthrough.md`。如实记录 7 处「入口不存在 / 命名不符」：如无
+  "Break on PC" 菜单项（实际入口是 Add+Execute 与 Run To Cursor 两个）；Lua 侧无
+  `getTotalInstructions` / `break_asap` 这两个名字，实际 API 是
+  `debugger.getinstructionscount()` / `debugger.hitbreakpoint()`。另写明这批项为何不可
+  自动化（ctest 注册的回调表全空 ⇒ viewer 回调恒 nullptr；`break_asap` 需真实指令流）。
+- 清单查出的两处实现偏差（独立复核确认）：① `ppu_view_open` 在 core 侧只写不读（写方
+  `ppuViewer.cpp:62`，core 侧零读点）⇒ 实际只剪掉了 NT viewer 那条链，PPU/Sprite
+  viewer 的 `FCEUD_UpdatePPUView`（`ppu_rendering.cpp:1319`、`:1778`）仍是每帧间接调用；
+  ② `vblankScanLines` / `vblankPixel` 的计算在门内（`debug.cpp:921-929`）⇒ 零断点时
+  调试器 PPU 页签的 vblank 读数停在旧值。环境变量总表重核为三张表（运行期 26 条 /
+  编译期 14 条 / 上游配置 4 条），查出 4 处坐标漂移 + 1 处完全失效
+  （`FCEUX11_BENCH_BASELINE` 旧记 `bench_tolerance_test.cpp:249`，实际 :270）、3 个整族
+  漏项（`FCEUX11_OAMBUS_PROBE` / `FCEUX11_A3_XDUMP` / `FCEUX11_A4_WAVEDUMP`）、5 处
+  描述过时（`E3_TRACE` 实际含帧计数器 + $4017 + $4015 + IRQ + 复位）。
+- GBA 探针 HOWTO 落档 `docs/tech/gba_probe_howto.md`；AGENTS.md 计数更正（`#[ignore]`
+  7→21、锁测试 248→249、cfg(test) 零开销注记）；顺带更正原写「`probe_trace_a_stuck_game`
+  用 `GBA_PROBE_TRACE`」与代码不符 —— 该探针实际读 `GBA_PROBE_WARMUP` /
+  `GBA_PROBE_TRACESTEPS`。
+
+### Fixed — 调试线两个新发现缺陷：F-2 已修，F-1 转长尾
+
+- **F-2（已修）无头回落反汇编助记符表整列错配**：无头回落反汇编器
+  （`src/rust/crates/fceux11-debug/src/asm.rs`）的助记符表按列书写，每组只保留首字节
+  正确 —— 整个 zp 列解码为 ORA（0x05/0x25/0x45/0x65/0x85/0xA5/0xC5/0xE5 全误判），
+  0x8D/0x8E/0x8C/0x91/0x99/0x9D 落 `???`。影响面：只污染 `FCEUX11_TRACE` 无头 trace
+  文本的反汇编列，Qt 调试器与 TraceLogger 走独立实现不受影响。
+- 修法与锁：整表重写为按 opcode 升序的官方 6502 全集（151 个官方操作码）+ 6 条单字节
+  非官方 NOP（0x1A/0x3A/0x5A/0x7A/0xDA/0xFA），多字节非官方操作码仍为 `???`（保持既有
+  范围）。新增锁测试 `lock_disasm_mnemonics_256`：256 个操作码逐一断言完整反汇编字符串
+  （含寻址格式），期望值写成**扁平独立参照表**（与被测的分组 match 结构上不共享）——
+  参照表写错与实现写错同样致命，故逐项对照官方矩阵核对后才钉值。
+- 变异验证（纪律 3，全绿不算证据）：M-F2-1 把实现整块换回修复前的旧表、保留新锁测试 ⇒
+  转红（92 passed / 1 failed，命中 op 09：期望 ORA 实得 ???）；M-F2-2 单字节翻转
+  0x85 STA → ORA ⇒ 转红（92/1，命中 op 81，同一 arm 内的首个操作码）；两次均已还原，
+  `cargo test -p fceux11-debug --lib` 复绿 93/93。端到端验证（新增
+  `.zcode/d1s2/a1_checklist/verify_trace_f2.py`）：按 ROM 字节推导期望值逐行比对官方
+  矩阵 —— nestest 与 M0 sled 各 8479 行，**助记符 / ROM 字节零不匹配、零格式错位**，
+  历史记的两条错行全部转正（`AD 02 20 ORA $2002` → `LDA $2002`；`8E 00 20 ??? $2000`
+  → `STX $2000`）。门禁：ctest -LE perf 36/36 全绿、金标三件套零漂移。归属：提交
+  ce89bc7。
+- **F-1（本版未修，转长尾）Lua `emu.frameadvance()` 触发 abort**：Lua 侧任何
+  `emu.frameadvance()` 调用 ⇒ `panic in a function that cannot unwind` ⇒ abort
+  `0xC0000409`。Rust 回调内跨 C 边界 yield，lua51 feature 结构性不支持；绑定自
+  2026-06-21 起未改，**不是本版的 A1 回归**。按业主裁决转长尾，本版不修 —— 它是 A1 的
+  `break_asap` 门腿与反向项「仍无任何一层验证」的直接原因。⚠️ ctest 盲区又一例：
+  `test_frameadvance.lua` / `test_callbacks.lua` 自引入从未接入门禁（git log -S 零命中）
+  ⇒ 「编不过 / 没接线的测试等于不存在」。
+
+### Fixed — CI 连续红的根因与闭环
+
+- 现象一：两个测试在 CI 上各挂满 1500 s 默认超时（其余 34 项秒级、进程零字节输出）。
+  根因：两测试不在 `tests/CMakeLists.txt` 的 `ENVIRONMENT_MODIFICATION` 名单（注册时
+  漏加；后加的 `apu_wav_hq_diff_test` 反而在）⇒ CI 上以裸 PATH 启动；本地从未复现，因
+  开发会话手动前置了 vcpkg bin。本地裸 PATH 复现 ＝ 秒败 `0xC0000135`（非慢），CI 的
+  1500 s 存活是该失败在无头 runner 会话（WER 不可见交互）下的表现形态。
+- 现象二：另一个 run 报「matrix not produced」。根因：kgmqa-122 的 mirror_path 写的是
+  本地文件名 `blargg/ppu/vbl_05_nmi_timing.nes`，镜像快照里的真名是
+  `blargg/ppu/05-nmi_timing.nes`（同一 ROM，SHA256SUMS 实证）⇒ fetch MISS ⇒ exit 4 ⇒
+  矩阵未产出 ⇒ R4 Gate 报「matrix not produced」（**二级症状，真凶在 fetch 步**）。
+- 修法：两测试补入名单 + 显式 `TIMEOUT 300s` 纵深防御；顺手修 filter.rs 四处
+  `_mm256_storeu` 的 E0133（edition-2024 `unsafe_op_in_unsafe_fn`）；mirror_path 改镜像
+  真名 + fixture 按派发口径（basename → `tests/fixtures/`）改名。
+- 验证：不带手动 PATH 的 ctest 36/36 全绿（CI 环境模拟）；本地全链复现通过（fetch
+  EXIT=0、copied 43→44、missing=0）、kgmqa-117 PASS、kgmqa-122 PASS 0x00、矩阵重跑
+  total=122 / passed=111 / grade=B / pass_to_fail=0、R4 gate passed。push 后三个 run
+  全绿 —— F11QA run 42352471017 success、CI run 42352471027 success、CodeQL run
+  42352470648 success；R4 Gate 专项失败注解从 run 69 的 1 条 → run 70 的 4 条 → run 71
+  的 **0 条**。⚠️ 盲区如实记：kgmqa-117 pre-flight 只查 mirror_ref/license 一致性、
+  **不查每个用例 mirror_path 在快照中的存在性**（纵深防御成立 —— fetch 脚本是真路径
+  闸）；教训：新增 mirror_path 前先对镜像 SHA256SUMS 核对路径存在性，本地 fixtures 树
+  的文件名 ≠ 镜像路径。
+- **发版收口时的门禁全链复跑**：`ctest -LE perf` 36/36 全绿；GBA 锁测试 249/249
+  （19 ignored）；vendor `gba-core` 242/242（2 ignored）；`fceux11-media` 52/52；
+  F11QA 迁移矩阵重跑 **122 total / 112 passed / 10 failed / grade B**，`pass_to_fail`
+  为空，`fail_to_pass` 3 项（049 / 050 / 051 三条预算伪 FAIL 全部转 PASS）。
+
+### Fixed — R4 Gate 判据、kgmqa-115 advisory 与旧 05-nmi_timing 金丝雀挂回
+
+- **R4 Gate `summary.total` 由严格相等改为下限**：`main` 的 F11QA workflow 连续 3 次
+  红（run 68/69/70），全部红在同一个 R4 Gate；同期 ci.yml 全绿。取证用 GitHub API 取
+  check-runs/{id}/annotations 拿 **CI 原始报错**，而非本地复现推断 —— A2 批次往
+  `tests/tests.json` 加了 `kgmqa-121` ⇒ 用例数 120→121，而冻结基线仍记 120 ⇒
+  `summary.total -ne 120` 确定性失败（与本机素材/负载无关，在 GitHub runner 上同样必红）。
+  修法：判据由 `-ne 120` 改为 `-lt 120`，文案改为 `expected >= 120`，并加长注释记录三条
+  理由 —— ① **与清单自身声明一致**（`tests.json` 的
+  `policy.r4_gate_thresholds."total_min": 120` 本就是下限语义，判据却写严格相等，两边
+  自相矛盾）；② **runner 已结构性承担防作弊**（`report/matrix.rs:244-266` 把基线外用例
+  归入 `new_test` 桶并排除出四个迁移桶，R4 Gate 再卡总数是重复把关且必然误伤）；③
+  **「少 1 个也失败」的原始意图仍保留**（`-lt` 判的正是用例被**静默跳过**）。未改动任何
+  期望值（冻结基线仍 120 项、kgmqa-121 仍走 `new_test` 桶），符合
+  `blargg_known_fail.json` 的「AI shall not modify expected values」约定。复验：Total
+  121 / Passed 110 / Failed 12，total 判据不再触发；blargg 素材补齐至 177/177，
+  kgmqa-043 由 FAIL 转 PASS。
+- **kgmqa-115 移出「精度回归」判定，改 advisory**：run 70 仍有两条红项同源于它 ——
+  kgmqa-115 是**墙钟类 bench**，PASS/FAIL 取决于跑它的机器快慢，**不具跨机可比性**：
+  基线路径优先级为 `FCEUX11_BENCH_BASELINE` env > `fixtures/bench_baseline.json`，而
+  f11qa.yml 未设该 env、用例 `working_dir` = `tests` ⇒ 迁移矩阵比对的正是开发机重采的
+  基线（六档收紧 5.5%–7.5%），CI runner 更慢 ⇒ 超 +10% 容差 ⇒ **无任何代码改动却被判成
+  「精度回归」**。既有 doctrine 早于本裁决即不一致（bench 用例带 `LABELS "perf"` ⇒
+  `ctest -LE perf` 排除出确定性门禁；ci.yml 的 bench 步 `continue-on-error: true`；
+  `bench_baseline.json` 的 `_comment` 自述 CI excludes wall-clock gates）⇒ **迁移矩阵是
+  唯一一条没有遵守该口径的通道**。修法：`tests/tests.json` 的 `failure_means` 由
+  `blocking` 改 `advisory` + 补 `known_limit` / `provenance`；冻结基线的 kgmqa-115 由
+  `true` 改 `false` ⇒ 落 `fail_to_fail` 桶（记录不判红），且不落入 `new_test` 桶（若删项
+  会落 new_test(FAIL) ⇒ grade 由 B 降 C，已避开）。边界：CI 上**仍然实际执行**该用例，
+  只是其结果不再参与「精度回归」判定，真实性能回退仍由 `ctest -LE perf` 与 ci.yml 的
+  bench 步（advisory）覆盖。
+- **kgmqa-115 改判后的验证**：矩阵复跑 Total 121 / Passed 110 / Failed 11 / Grade B
+  （修复前 D）；五桶 pass_to_fail=0 / fail_to_pass=2（049、051）/ pass_to_pass=107 /
+  fail_to_fail=11 / new_test=1；R4 Gate 六条判据逐条本地全绿（advisory-FAIL 11/121 =
+  9.1% ≤ 15% 上限）。判据仍有牙：把 115 基线改回 `true` ⇒ 重落 pass_to_fail ⇒ gate
+  转红；把**真实精度缺陷用例** kgmqa-050 的基线改 false→true ⇒ 同样转红 ⇒ 豁免只作用于
+  这一个墙钟用例，未削弱对真实精度回归的检出。
+- **旧 05-nmi_timing 金丝雀重新挂回门禁**：kgmqa-040 的 gate id 名为
+  `vbl-05-nmi-timing`，实跑却是 `5.nmi_suppression.nes`（9-24 镜像重整换挂、legacy 名
+  未改，派发日志与 md5 双重实证）⇒ 真正钉死 NMIDELAY=8 的旧 `05-nmi_timing.nes` **已不在
+  任何门禁**（实测 D∈{6,7,9,12} 翻红、=8 唯一 PASS；NMIDELAY=8 是标定甜点而非模型
+  精度）。修法：新增加载 `blargg/ppu/vbl_05_nmi_timing.nes` 的 blocking PASS monitor
+  （600 帧），baseline +1（121 项）；`f11qa.yml` 的 vendor_state 总数判据由硬编码 78 改为
+  从 `tests.json` rom-suite 用例数推导。验证：矩阵本地实跑 122 项（total=122 /
+  passed=111 / grade=B / pass_to_fail=0）；**金丝雀当轮即咬中本轮 VBL 回归**（VBL 时刻化
+  尝试使其转红 ⇒ 回退），验收门按设计工作。
+
+### Changed — 门禁可信度：三类「全绿不等于有牙」
+
+- **共因盲区（相对比较型锁对共享路径的语义结构性无感）**：A5 G3 变异验证中，插值权重
+  翻转 `65536−frac` → `frac`（`filter.rs:485`）下 media crate **51/51 全绿、0 项转红**；
+  探针实证该变异是活的（输入幅度 300/1000/4000 下输出哈希与逐样本值全变），非 no-op。
+  根因：插值位于 `resample` 内 `if simd_ok{AVX2}else{标量}` 分叉**之后**，标量与 SIMD 共用
+  同一条公式；三条锁全是**相对比较**（此路对彼路），共因变异时两边同步漂移 ⇒ 断言恒成立。
+  连带：`filter.rs` 原 doc comment 声称 2b 能抓 M-D —— **实测不准确**（写于实测之前），
+  已改为如实写明其只覆盖非对称变异与 mrindex 记账、**不覆盖插值权重方向**。
+- 修法与验证：新增 `lock_resample_interpolation_golden_vector`（360 行纯新增、0 删除，
+  既有锁测试一字未改）—— **绝对金标准向量**：期望值由测试模块内**独立参考实现**从线性
+  插值定义 `f(base+t) = f(base) + (f(base+1) − f(base))·t` 推导，**不调用被测代码、不比较
+  两个实现**；另含 frac=0 / frac=65535 / 单调滑动三个方向锚点。未变异 52/52 全绿；M-D 下
+  **仅新测试转红**（51 passed / 1 failed，2a/2b/3 号全绿 ⇒ 共因盲区被精确堵住），诊断字段
+  `flipped-weight-would-give=313501` 与实际输出完全相等；M-A/M-B/M-C/M-E 下新测试亦全部
+  转红（覆盖面 = 2a ∪ 2b ∪ {M-D}）。
+- **哑弹 golden（捕获内容为空 ⇒ 门禁无牙）**：HQ golden 与低质量 golden 的**捕获样本全
+  为 0**（各 799 样本，最大绝对值 0）⇒ 改 FIR 系数、注入 DC 偏置，golden 仍 PASSED 3/3。
+  真因（不是「FIR 输入为零」）：管线探针实测 FIR 输入是恒定 DC 4185（非零）、FIR 输出恒定
+  34682，是下游 `SexyFilter`（隔直 IIR）把 DC 衰减到恰好 0，且捕获帧早已收敛 ⇒ 纯 DC 输入
+  下任何保持纯 DC 特性的 FIR 变化都不可观测。低质量 golden（kgmqa-024）**同病** ⇒ 非 HQ
+  独有，是共用 fixture ROM 集合的通病。
+- 修法与验证：自建 fixture `tests/fixtures/apu_square.nes`（新增
+  `generate_apu_square_rom()`：$4017=0 → $4015=1 → $4000=0xBF（50% 占空比、音量 15）→
+  $4001=0（关 sweep）→ $4002=0x40 / $4003=0x08（周期 0x408）→ 死循环 ⇒ 周期性方波 =
+  AC 内容；**自建资产、无第三方许可问题**）；`.gitignore` 加白名单
+  `!tests/fixtures/apu_square.nes`；并给两道门禁加「捕获必须非静默」的 fail-fast 断言
+  （只对 `apusq` 生效 —— 其余三个 ROM 按构造就是静音）。实测 HQ 799/799 样本非零、峰值
+  |幅度| 3231；低质量 734/734 非零、峰值 2776。变异两轮：FIR bias `1<<16`→`1<<17` ⇒
+  HQ golden 转红（byte mismatch offset 44）、低质量仍绿；`SexyFilter` `mul1` 94→95 ⇒
+  低质量转红（offset 46）、HQ 也红 ⇒ **两道门禁各自有牙且覆盖不同代码路径**（HQ 管
+  FIR/AVX2 内核，低质量管 SexyFilter/DC 隔直；低质量路径按设计根本不经过
+  `fir_pair_avx2` ⇒ 旧口径「golden 逐字节 = 守住 FIR」是错的）。门禁总态：media
+  52/52、GBA 249/249、vendor 242/242、`ctest -LE perf` 36/36。
+- **「测试与实现同错」第三次被记录**：① v2.0 GBA 线记过一次（自建门禁与被测路径同源于
+  同一处错误）；② v2.0.1 的 ARM SWI 编号缺陷 —— 自建门禁与 SWI 层测试构造 ARM `SWI`
+  指令字时同样把编号写在低字节，于是「核心读错的字节」与「测试写错的字节」互相抵消，246
+  项锁测试在缺陷存在的整段时间里全绿，**门禁曾是错误信念的镜像**；③ 本版 D1 S2 的 hijack
+  压栈 B=0 误读（见上文「模型纠错」）。推论（写进纪律）：新增门禁时先问「这条断言的
+  **通过原因**，与它要验的那条路径是不是同一条」；以及「相对比较型锁测试对共因变异结构性
+  无感」—— 凡要验「共享路径上的语义」，必须用**绝对金标准**或**独立参照实现**。
+- **参照表本身也会错，且锁可能压根没跑**（本版 F-2 的一手教训）：修 F-2 时新写的锁测试，
+  其期望值若仍按被测实现的分组结构书写，参照表与实现就会同错 —— 故期望值改写成**扁平独立
+  参照表**，与被测的分组 match 结构上不共享，且逐项对照官方矩阵核对后才钉值（**参照表写错
+  与实现写错同样致命**）。另一面：`cargo test -p fceux11-rust` **不跑依赖 crate 的测试**
+  （`fceux11-debug` / `fceux11-media` 是 path dependency，其 `#[cfg(test)]` 模块在该命令下
+  不参与编译），且 **CI 里没有任何 cargo 环节** ⇒ 93 + 52 项一次都不会跑、也没有任何一层
+  报警（A5 G3 的绝对金标准向量锁就在 media 里）。⇒ 新增锁测试时必须确认它落在哪条命令的
+  路径上；两条命令已补进门禁。留证：`docs/tech/gba-traps.md` 的陷阱清单由四种扩到六种；
+  AGENTS.md 纪律 3 / 12 / 13。
+
+### Changed — 「PASS」也可能是假绿：kgmqa-081 重分类
+
+- 现象与根因：kgmqa-081（.fds 加载 0xFE）此前被判 FAIL。字节取证证明该 .fds 是教科书
+  kind=1（"FDS\x1a"@0、1 边、65516 = 16+65500 自洽）⇒ 真根因是 **headless 从不调
+  `SetBaseDirectory`**（唯一调用点在 Qt config.cpp）⇒ BaseDirectory 空 ⇒ BIOS 查找落到
+  盘根 ⇒ 加载失败。连带证伪：082/083/084 的 PASS 同样被证伪（ROM 不在镜像里，走了
+  advisory skip 路径）；且 `$6000` 判据对「从未跑起来」也是假绿（`--frames 1` 即 0x00）。
+- 处置：D7-A 关闭为「前提证伪，零改动」；kgmqa-081 按业主裁决重分类为 **BIOS 门控
+  known-limit**（frozen baseline 不翻），tests.json known_limit 如实化 + 调查事实链
+  `docs/history/surveys/fds_bios_gating/`。教训：**「PASS」也可能是假绿** —— 用例是否
+  真的跑起来，与它报什么状态是两件事。
+
 ## [2.0.1] - 2026-10-07
 
 ### Changed — 电池存档落盘加最小间隔（防御性；实测未复现高频写盘）
