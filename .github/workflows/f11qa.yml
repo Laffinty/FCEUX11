@@ -507,8 +507,8 @@ jobs:
           #   - `test_set_diff.added/removed` — 显式暴露测试集增减供 review。
           #
           # 因此本门禁改为守真正的红线：**pass_to_fail（回归）必须为 0**。
-          # 这正是 `docs/plans/long-term-evolution/…_残留精度长期演进计划.md`
-          # 不变式 #2 的原文要求（该文档从未要求 fail_to_pass == 0）。
+          # 这正是 `docs/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md`
+          # §二 沿用的不变式要求（该口径从未要求 fail_to_pass == 0）。
           # -----------------------------------------------------------------------
           $p2f = $m.transition_matrix.pass_to_fail
           $p2fCount = if ($null -eq $p2f) { 0 } elseif ($p2f -is [array]) { $p2f.Count } else { [int]$p2f }

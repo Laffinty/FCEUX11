@@ -18,7 +18,7 @@
 3. **每项记一条**：在 §六的勾选表里填日期、结果、备注。
 4. **判红**：任一项红 ⇒ 记 §五要求的失败记录，**不要**自行改代码（改动归主会话决策）。
 5. **回写**：本清单每项的通过与否应回写到
-   `docs/plans/FCEUX11-v2.0.2_DEBUG与性能优化计划.md` §十 变更记录（主会话负责写）。
+   `docs/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md`（A1 条目，主会话负责写）。
    回写约定见 §六末尾。
 
 ### 术语与门控速查
@@ -776,7 +776,7 @@ Lua break_asap、NSF 播放、viewer 刷新）」。
 ### 6.3 回写约定
 
 **本清单每项的通过与否，应回写到
-`docs/plans/FCEUX11-v2.0.2_DEBUG与性能优化计划.md` §十 变更记录**（主会话负责写）。
+`docs/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md` 的 A1 条目**（主会话负责写）。
 
 回写时按下列格式：
 
@@ -858,8 +858,9 @@ Lua break_asap、NSF 播放、viewer 刷新）」。
 
 ## 八、相关文档
 
-- `docs/plans/FCEUX11-v2.0.2_DEBUG与性能优化计划.md` §二 A1（改法与风险）
-  与 §十 r5（A1 落地记录、本清单的来源）
+- `docs/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md` §1.1（A1：改法、风险、
+  与「验收未闭合」的现状）与
+  `docs/history/plans/FCEUX11-v2.0.2_DEBUG与性能优化-已完成项归档.md` §2.1（A1 的代码落点）
 - `docs/tech/cpu.md`（6502 指令与周期模型）
 - `docs/tech/precision.md`（精度治理与禁忌清单）
 - `docs/tech/gba-traps.md` §7（写检查之前必读的三问）

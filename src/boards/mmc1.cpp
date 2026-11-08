@@ -31,7 +31,7 @@
 // PRG bank register was allowed to move them. Silent otherwise, so ctest 34/34
 // is unaffected. Kept in-tree: it is the evidence behind the submapper-5
 // "Fixed PRG" model documented in
-// docs/plans/long-term-evolution/T0-指令时序与板级约束.md ②.
+// docs/history/plans/FCEUX11-v2.0.2_DEBUG与性能优化-已完成项归档.md §2.5 (078).
 #define MMC1_PROBE_LOG(...) do { if (mmc1_probe_on()) { std::fprintf(stderr, __VA_ARGS__); std::fflush(stderr); } } while (0)
 
 static bool mmc1_probe_on() {

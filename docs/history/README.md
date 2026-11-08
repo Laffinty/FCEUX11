@@ -64,6 +64,7 @@
 | `FCEUX11-1.17_计划.md` | 🔵 | v1.17 构建计划 — KagamiQA 统合、Rust 迁移与分级标准（2026-09 随 v1.17 发布归档） |
 | `FCEUX11-Stage3-权威性迭代与通用化路线.md` | 🟡 | Stage-3 路线草案（**P3 暂缓**，顶部有 DEFERRED 横幅） |
 | `v1.x_Modernization_Roadmap.md` | 🔵 | v1.x 现代化改造路线图（v1.1~v1.14，已收官） |
+| `FCEUX11-v2.0.2_DEBUG与性能优化-已完成项归档.md` | 🔵 | v2.0.2（DEBUG 与性能优化，NES 侧）的**已完成项**归档 —— 由原 `docs/plans/FCEUX11-v2.0.2_DEBUG与性能优化计划.md` 与 `docs/plans/long-term-evolution/` 经独立 code review 拆分而来；含归档当刻实跑的 ctest / cargo / F11QA 矩阵读数与附录 A 环境变量全表。**未完成项见 `docs/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md`** |
 
 ### 2.2 `reports/` — 执行 / 审计 / 验收报告
 

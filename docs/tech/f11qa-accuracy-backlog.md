@@ -34,7 +34,8 @@
 > **2026-09-28 更新**：本组 4 项里 **2 项已裁定 abandon**（097 / 096），
 > 两者都是 tepples 的 **survey ROM**（不实现 blargg `$6000` 协议，改 mapper 也不会转 PASS）。
 > 本组**实际只剩 093** 可攻。详见
-> [`long-term-evolution/README.md`](../plans/long-term-evolution/README.md) 与主报告 §2.2。
+> [`已完成项归档`](../history/plans/FCEUX11-v2.0.2_DEBUG与性能优化-已完成项归档.md) §2.5
+> 与 [`review 报告`](../plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md) §二。
 
 | id | 套件 | 现象 |
 |---|---|---|
@@ -72,4 +73,4 @@ R4 grade B 需要 blocking FAIL 明显下降。建议路径：
 4. 再评估 037 中断轮询下沉（工程量大，单独立项）
 
 > 后续 13 项的逐项完成度、易→难排序与两处纪律修正，见
-> `docs/plans/long-term-evolution/README.md`（§完成度速查）。
+> `docs/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md`（§二 逐项校准后的真实状态）。

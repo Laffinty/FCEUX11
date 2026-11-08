@@ -33,7 +33,7 @@
 // blargg/f11qa runner never installs one, so FCEU_printf output is silently
 // swallowed. Silent otherwise, so ctest 34/34 is unaffected. Kept in-tree: it
 // is the evidence behind the register-8 model documented in
-// docs/plans/long-term-evolution/T1-Mapper与DMA.md ④.
+// docs/history/plans/FCEUX11-v2.0.2_DEBUG与性能优化-已完成项归档.md §2.5 (096).
 #define M69_PROBE_LOG(...) do { if (m69_probe_on()) { std::fprintf(stderr, __VA_ARGS__); std::fflush(stderr); } } while (0)
 
 static bool m69_probe_on() {
