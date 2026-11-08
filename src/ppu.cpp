@@ -1512,6 +1512,10 @@ static DECLFW(B4014) {
 	// constant).
 	static constexpr uint32 kOamDma514Parity = 0;
 	const bool dma_514 = ((cycle_before & 1u) == kOamDma514Parity);
+	// S2.5 stage 3 (charter (C)): this instruction's interrupt sampling
+	// instant = the write-cycle end (BEFORE the halt+transfer) -- the DMA
+	// cycles belong to no instruction's sampling window.
+	fceu11_intl_set_poll_override(cycle_before);
 	g_cpu.add_cycles(1);  // dummy/halt cycle (no bus action)
 	if (dma_514)
 		g_cpu.add_cycles(1);  // alignment cycle (put-slot parity only)

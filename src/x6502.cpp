@@ -473,15 +473,18 @@ static inline void intl_stamp_legacy(int w) {
 // accounting end (ADDCYC pre-credited the whole sequence), which matches
 // the hardware hijack window: blargg 2-nmi_and_brk rows 4-8 (asserted
 // inside the sequence) hijack, rows 9-10 (asserted after) do not.
+static inline bool intl_nmi_live_at(uint64_t now) {
+	return (_IRQlow & FCEU_IQNMI) && g_intl_assert_at[INTL_NMI] < now;
+}
+
 static inline bool intl_nmi_live(void) {
-	return (_IRQlow & FCEU_IQNMI) && g_intl_assert_at[INTL_NMI] < intl_now_abs();
+	return intl_nmi_live_at(intl_now_abs());
 }
 
 // IRQ-channel lines visible at the poll point (I flag / jammed are the
 // caller's concern).  TEMP rides the IRQ channel (baseline B7).
-static inline uint32 intl_live_irq_mask(void) {
+static inline uint32 intl_live_irq_mask_at(uint64_t now) {
 	const uint32 m = _IRQlow & INTL_IRQ_MASK;
-	const uint64_t now = intl_now_abs();
 	uint32 live = 0;
 	if ((m & FCEU_IQEXT)    && g_intl_assert_at[INTL_EXT]    < now) live |= FCEU_IQEXT;
 	if ((m & FCEU_IQEXT2)   && g_intl_assert_at[INTL_EXT2]   < now) live |= FCEU_IQEXT2;
@@ -490,6 +493,23 @@ static inline uint32 intl_live_irq_mask(void) {
 	if ((m & FCEU_IQTEMP)   && g_intl_assert_at[INTL_TEMP]   < now) live |= FCEU_IQTEMP;
 	return live;
 }
+
+static inline uint32 intl_live_irq_mask(void) {
+	return intl_live_irq_mask_at(intl_now_abs());
+}
+
+// S2.5 stage 3 (r25 charter (C), revised): the poll point's sampling
+// instant override.  The $4014 handler credits its stall+transfer cycles
+// in-dispatch, but hardware samples the lines at the instruction's own
+// WRITE cycle (before the halt) -- those DMA cycles belong to no
+// instruction's sampling window.  B4014 registers cycle_before via
+// fceu11_intl_set_poll_override(); the next poll consumes it once.
+// Everything else samples at the full accounting end.  (Implementation
+// note: the first cut captured "now" post-hook pre-dispatch -- that ALSO
+// excluded the $2004 X6502_DMR/DMW credits, which ARE the accessing
+// instruction's own cycles -- int_5's pagecross T+04 row regressed as
+// evidence; the override form fixes the scoping.)
+static uint64 g_intl_poll_override = 0;
 
 #include "ops_table.inc"
 
@@ -800,6 +820,13 @@ uint64 fceu11_cpu_abs_ts(void) {
  return e1_cpu_abs();
 }
 
+// S2.5 stage 3 (charter (C)): register the $4014 write's hardware sampling
+// instant (cycle_before = the write-cycle end, BEFORE the halt+transfer).
+// Consumed by the very next poll point.
+void fceu11_intl_set_poll_override(uint64 when) {
+ g_intl_poll_override = when;
+}
+
 // E-1 probe (Phase 1 Step 1.3, 2026-08-02): NMI-latch freshness flag.
 // The VBL path (TriggerNMI) is called from the PPU loop between CPU runs;
 // the CPU's next loop-top check happens at the boundary where the previous
@@ -1074,11 +1101,13 @@ void X6502_RunDebug(fceu11::Cpu& cpu, int32 cycles)
     // sample, and an NMI sample replaces anything pending.  S2.5: a line
     // is only sampleable once its registered assert instant has passed
     // (strictly before this instruction's accounting end).
-    if(intl_nmi_live())
+    const uint64_t poll_now = g_intl_poll_override ? g_intl_poll_override : intl_now_abs();
+    g_intl_poll_override = 0;  // consume-once: the override belongs to THIS instruction's poll
+    if(intl_nmi_live_at(poll_now))
     {
      if(!_jammed) g_intl_pending = 1;
     }
-    else if(intl_live_irq_mask() && !(_PI&I_FLAG) && !_jammed)
+    else if(intl_live_irq_mask_at(poll_now) && !(_PI&I_FLAG) && !_jammed)
     {
      if(!g_intl_pending) g_intl_pending = 2;
     }

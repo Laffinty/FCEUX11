@@ -117,6 +117,10 @@ void TriggerNMIAt(uint64 when);
 // anchor the NMI assert instant to the VBL flag-set dot.
 uint64 fceu11_cpu_abs_ts(void);
 
+// S2.5 stage 3 (charter (C)): register the $4014 write's sampling instant
+// (the write-cycle end).  Consumed once by the next poll point.
+void fceu11_intl_set_poll_override(uint64 when);
+
 uint8 X6502_DMR(uint32 A);
 void X6502_DMW(uint32 A, uint8 V);
 
