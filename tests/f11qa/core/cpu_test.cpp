@@ -292,6 +292,8 @@ static void check_ftp_true(TestContext& ctx, bool cond, const char* label) {
 
 extern uint8* RAM;  // fceu.h（与 test_nestest_log_path 同一来源）
 
+
+
 // 每个 Run 切片前清预算残量：_count 是跨 X6502_Run 调用**累积**的
 // （X6502_RunDebug 开头 _count += cycles*16，而上一切片常以负残量退出）
 // ——不清则本切片可能一条指令都不跑，「恰好 N 条指令/一次派发」的切片
@@ -633,6 +635,42 @@ void test_poll_assert_timestamp(TestContext& ctx) {
                   "T-D1-5c-3: pushed PC = $201 (dispatch one instruction earlier than 5b)");
 }
 
+// T-D1-6（S2.5 阶段 1 锁，r25 章程 DMA）：OAM DMA 513/514 奇偶停机。
+// 硬件真值（blargg 4-irq_and_dma 18 行拟合 + INTLEDGER delta=519 实测）：
+// $4014 写的栅位奇偶决定停机段 1 dummy + 0-1 对齐 ⇒ 指令总长 4+513/4+514。
+// 测量法（两轮，grant 520 巨额透支 ⇒ 切片恰在 DMA 完成后退出，span =
+// 4 + stall + 512，无尾部吸收）：
+//   轮 0：STA abs $4014 @200（基线栅位）         ⇒ span0 = 4 + stall0 + 512
+//   轮 1：STA zp $00 @203（3 周期翻转器，真实执行）→ STA abs $4014 @205
+//         ⇒ span1 = 3 + 4 + stall1 + 512；翻转器奇数位移保证 stall1 ≠ stall0。
+// 绿色实测钉值（确定性 harness，start_abs=4）：(518, 520)。
+// 变异：删停机 ⇒ (516, 519) 红；奇偶位翻转 ⇒ (518,520)↔(518,520) 对调——
+// ⚠ 因 DMA 对齐周期的自锁结构（514 偶 + 两侧取指偶 = 写间位移偶），连续
+// DMA 流的奇偶自锁在 514 档是**硬件正确行为**（对齐周期就是干这个的）——
+// 本锁的翻转器路径（奇数位移）覆盖翻转语义，绝对校准另由 ROM 级 int_4
+// +526/+527 行裁决。I 置位封锁 IRQ 通道防测量窗污染。
+void test_oam_dma_513_514_parity(TestContext& ctx) {
+    poll_setup_boundary(false);
+    // round 0: STA abs $4014 @200（基线栅位，无翻转器）
+    RAM[0x200] = 0x8D;
+    RAM[0x201] = 0x14;
+    RAM[0x202] = 0x40;
+    const uint64_t t0 = poll_abs();
+    poll_run_exact(520);
+    const uint64_t span0 = poll_abs() - t0;
+    // round 1: STA zp $00 @203（3 周期翻转器）→ STA abs $4014 @205
+    RAM[0x203] = 0x85;
+    RAM[0x204] = 0x00;
+    RAM[0x205] = 0x8D;
+    RAM[0x206] = 0x14;
+    RAM[0x207] = 0x40;
+    const uint64_t t1 = poll_abs();
+    poll_run_exact(520);
+    const uint64_t span1 = poll_abs() - t1;
+    FCEU11_EXPECT(ctx, span0 == 518 && span1 == 520,
+                  "T-D1-6: OAM DMA stall spans (518=4+514, 520=3+4+513) -- parity-dependent");
+}
+
 int main() {
     std::setvbuf(stdout, nullptr, _IONBF, 0);
 
@@ -691,6 +729,7 @@ int main() {
     test_poll_target_two_phase_irq(ctx);
     test_poll_target_branch_delay(ctx);
     test_poll_assert_timestamp(ctx);
+    test_oam_dma_513_514_parity(ctx);
 
     fceu11::CloseGame();
     core_shutdown();

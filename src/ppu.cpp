@@ -1496,6 +1496,26 @@ static DECLFW(B4014) {
 	// SPR DMA duration for future investigation.
 	const uint32 cycle_before = g_cpu.timestamp_base() + (uint32)g_cpu.timestamp_ref();
 
+	// [OAM DMA 513/514] (r25, S2.5 stage 1 — charter "DMA 奇偶", survey §12.9):
+	// hardware halts the CPU for 1 dummy cycle + 0-1 alignment cycle (by the
+	// get/put slot parity of the $4014 write cycle) + 512 transfer cycles =
+	// 513 (odd write) / 514 (even write).  Our old loop credited exactly 512
+	// -- int_4's tail rows (+524..+527) and +526 (the only parity-discriminating
+	// row) pinned this.  The stall is credited BEFORE the D4 probe if/else so
+	// both branches pay it identically (probe byte-equivalence kept); DMC
+	// arbitration (kgmqa-042/sprdma_and_dmc_dma) is a separate charter and
+	// will reuse this halt+align shape.
+	// Parity calibration: kOamDma514Parity pins WHICH ordinal parity is the
+	// 514 slot -- derived from the INTLEDGER anchor (row0 assert_abs=178872,
+	// even = dly0 landing); the ROM-level adjudicator is int_4 +526/+527 (see
+	// survey §12.9; if +526 stays 9 while +527 flips to 8, invert this one
+	// constant).
+	static constexpr uint32 kOamDma514Parity = 0;
+	const bool dma_514 = ((cycle_before & 1u) == kOamDma514Parity);
+	g_cpu.add_cycles(1);  // dummy/halt cycle (no bus action)
+	if (dma_514)
+		g_cpu.add_cycles(1);  // alignment cycle (put-slot parity only)
+
 	// D4 取证探针（kgmqa-050）：probe 分支与下方原循环逐字节等价（先读后写、
 	// 同样的 X6502_DMR/DMW 与计费），只多了轨迹记录与字节边界 shadow 比对。
 	// 探针关闭时走原循环，零行为变化。不修 B4014 行为本身。
