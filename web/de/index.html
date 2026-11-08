@@ -209,35 +209,28 @@
     <div class="whatsnew-head reveal">
       <div class="kicker">Was ist neu</div>
       <h2>v2.0.2</h2>
-      <div class="sub">Veröffentlicht am 2026-10-07 · experimentelle Game Boy Advance (GBA)-Emulation</div>
+      <div class="sub">Veröffentlicht am 2026-11-08 · Performance, Genauigkeit und Debugging</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3>Experimentelle Game Boy Advance (GBA)-Emulation</h3>
-          <p>Experimentelle Game Boy Advance (GBA)-Emulation ist jetzt dabei: .gba-Cartridges werden unterstützt und der GBA-Kern ist vollständig von der NES-Seite entkoppelt. Ebenfalls behoben: alle Tastenbelegungen verschwanden beim erneuten Öffnen der Eingabeeinstellungen, echte GBA-Cartridges starteten nicht, der GBA-Bildschirm blieb unter bestimmten Grafiktreibern schwarz, Rot- und Blaukanäle im GBA-Bild waren vertauscht, und ein VBlankIntrWait-Selbstblock im Kern.</p>
+          <h3>Deutlich schneller und flüssigeres Spielen</h3>
+          <p>Diese Version konzentriert sich auf die Geschwindigkeit der NES- und der GBA-Emulation. Auf der NES-Seite wurden sinnlose Rechenarbeiten im Debug-Pfad entfernt und die Audio- sowie die Bildausgabe optimiert, wodurch die CPU-Last insgesamt um 27 % sinkt. Der High-Quality-Audiomodus ist nun fast doppelt so schnell, sodass auch die beste Soundqualität flüssig läuft. Auf der GBA-Seite fielen doppelte Arbeiten bei der Frame-Erzeugung und beim Kodieren von Spielständen weg: Bilder entstehen deutlich schneller und das Speichern dauert nur noch die Hälfte der Zeit. Spielstände, Bild und Ton bleiben unverändert – das Verhalten der Spiele ist exakt dasselbe, nur der CPU-Verbrauch sinkt, sodass auch ältere Rechner flüssig laufen.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">02</div>
         <div class="wn-text">
-          <h3>Startprobleme von Mario Kart: Super Circuit behoben</h3>
-          <p>Mario Kart: Super Circuit zeigte nach dem Start einen weißen Bildschirm und reagierte nicht mehr: Wurde der Prozessor durch einen Interrupt aus seinem Schlafzustand geweckt, berücksichtigte die Rücksprungadresse nicht die Breite eines Befehls, sodass derselbe Systemaufruf nach dem Aufwachen zweimal ausgeführt wurde. Nach der Behebung bestätigt eine frameweise Prüfung über 1200 Frames, dass sich die Anzeige weiter aktualisiert und der Titelbildschirm erreicht wird. Derselbe Korrekturdurchgang beseitigte auch einen Fehler bei BIOS-Aufrufen von Programmen im ARM-Modus: Die Nummer des Aufrufs wurde zuvor aus einem falschen Bitfeld gelesen, wodurch jeder Aufruf als System-Reset gewertet wurde und das Programm unmittelbar nach dem Start in eine Reset-Schleife geriet. Beide Fehler bestanden fort, obwohl sämtliche internen Tests bestanden, und wurden erst durch Prüfungen mit echten Modulen aufgedeckt; die Diagnoseverfahren wurden entsprechend verstärkt.</p>
+          <h3>Eine Reihe von Hardware-Emulationsfehlern behoben</h3>
+          <p>Ein Fehler in der OAM-DMA-Emulation, der bei manchen Spielen das Bild verfälschte, ist behoben, ebenso das Eingabeprotokoll der SNES-Maus, das wieder korrekt funktioniert. Außerdem wurden mehrere Testfälle korrigiert, die fälschlich als fehlgeschlagen gemeldet wurden: der Emulator war nicht falsch, den Tests liefen schlicht zu wenige Bilder; nach erhöhtem Bildlimit sind die Ergebnisse deutlich aussagekräftiger. Zudem wurde eine eigene Arbeit an der Interrupt-Behandlung begonnen – die CPU verarbeitet Interrupts nun näher an der echten 6502-Hardware, was bei etlichen zeitkritischen Spielen Abweichungen behebt.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">03</div>
         <div class="wn-text">
-          <h3>Korrekturen an Befehlszeiten und Timern</h3>
-          <p>Der Abgleich mit den offiziellen Hardwaretests bestätigte, dass die Phasen Befehlsabruf und Ausführung jedes Befehls doppelt abgerechnet wurden, sodass jeder Befehl mit dem doppelten Zeitaufwand gezählt wurde; die Abrechnung folgt nun dem echten Gerät. An den Timern wurden drei Fehler behoben: Der Prescaler-Teiler wurde aus dem falschen Register gelesen und lief stets mit Faktor 1, die Kaskadierung von Timern griff nicht, und die feste Startverzögerung echter Hardware wird nun nachgebildet. Alle drei Timer-Posten der Hardware-Testkarte bestehen nun.</p>
-        </div>
-      </div>
-      <div class="wn-item">
-        <div class="wn-num">04</div>
-        <div class="wn-text">
-          <h3>Korrekturen an Prefetch- und DMA-Zeiten (Benchmark 24/33 → 30/33)</h3>
-          <p>Zwei weitere Mechanismen entsprechen nun dem echten Gerät. Beim Befehls-Prefetch-Puffer unterbrach zuvor jeder Datenzugriff die Trefferermittlung; geprüft wird nun allein anhand des Befehlsstroms, und beide Prefetch-Messwerte stimmen exakt mit den offiziellen Erwartungswerten überein. Während DMA (Massenspeicherübertragung) arbeitete, standen die Timer zuvor vollständig still; sie zählen nun wie beim echten Gerät pro übertragener Einheit weiter, und die feste Verzögerung beim Beginn einer Übertragung wird berücksichtigt. Alle fünf Speicher-Zeittests bestehen, womit sich das Gesamtergebnis der Hardware-Benchmark von 24/33 auf 30/33 hebt; die verbleibenden zwei Posten (DMA-Anzeigeauslösung und Kanalpriorität) sind für nachfolgende Arbeiten vorgesehen.</p>
+          <h3>Stärkere Debug-Werkzeuge und automatisierte Tests</h3>
+          <p>Die Werkzeuge auf der Kommandozeile wurden um zusätzliche Debug-Ausgaben, Leistungsstatistik und Hardware-Sonden erweitert, die Anzeigefehler der Disassemblierung wurden behoben und die Skript-Schnittstelle vervollständigt – damit finden Entwickler Fehler in Spielen leichter.</p>
         </div>
       </div>
      <div class="wn-cta reveal">

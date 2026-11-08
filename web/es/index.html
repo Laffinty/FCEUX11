@@ -209,35 +209,28 @@
     <div class="whatsnew-head reveal">
       <div class="kicker">Novedades</div>
       <h2>v2.0.2</h2>
-      <div class="sub">Lanzado el 2026-10-07 · emulación experimental de Game Boy Advance (GBA)</div>
+      <div class="sub">Lanzado el 2026-11-08 · rendimiento, precisión y depuración</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3>Emulación experimental de Game Boy Advance (GBA)</h3>
-          <p>Se ha añadido emulación experimental de Game Boy Advance (GBA), con soporte para cartuchos .gba y totalmente desacoplada del lado NES. También se corrigen: los atajos de teclado quedaban vacíos al reabrir los ajustes de entrada, los cartuchos reales de GBA no arrancaban, la pantalla de GBA se quedaba en negra con algunos controladores gráficos, los canales rojo y azul salían intercambiados en la imagen de GBA, y un autobloqueo de VBlankIntrWait en el núcleo.</p>
+          <h3>Mucho más rápido, y mucho más fluido</h3>
+          <p>Esta versión se centra en la velocidad de los emuladores de NES y GBA. En el lado de NES se eliminaron cálculos inútiles del camino de depuración y se optimizó la lógica de reproducción de audio y vídeo, lo que reduce la carga de CPU un 27 %. El modo de audio de alta calidad es ahora casi el doble de rápido, así que incluso con los efectos de sonido más exigentes la emulación no se entrecorta. En el lado de GBA se eliminó el trabajo duplicado al generar fotogramas y al codificar las partidas guardadas: los fotogramas se generan mucho más rápido y guardar tarda la mitad. Nada de esto cambia el formato de las partidas guardadas ni lo que ves y oyes: los juegos se comportan exactamente igual, solo consumen menos CPU, así que hasta un equipo antiguo funciona con fluidez.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">02</div>
         <div class="wn-text">
-          <h3>Corregido el arranque de Mario Kart: Super Circuit</h3>
-          <p>Mario Kart: Super Circuit mostraba una pantalla blanca y dejaba de responder al arrancar: cuando una interrupción despertaba al procesador de su estado de reposo, la dirección de retorno no contemplaba el ancho de una instrucción y la misma llamada al sistema se ejecutaba dos veces tras el despertar; tras la corrección, una verificación fotograma a fotograma a lo largo de 1200 fotogramas confirma que la imagen sigue actualizándose y alcanza la pantalla de título. La misma ronda de correcciones resolvió también un defecto en las llamadas a la BIOS de los programas en modo ARM: el número de llamada se leía antes de un campo de bits incorrecto, de modo que cada llamada se trataba como un reinicio del sistema y el programa entraba en un bucle de reinicios nada más arrancar. Ambos defectos persistieron mientras todas las pruebas internas se superaban y fueron revelados en última instancia por pruebas con cartuchos reales; los medios de diagnóstico se han reforzado en consecuencia.</p>
+          <h3>Corregidos varios errores de emulación de hardware</h3>
+          <p>Se corrigió un defecto en la emulación de OAM DMA que distorsionaba la imagen en algunos juegos, y también el protocolo de entrada del ratón de SNES, que vuelve a funcionar correctamente. También se corrigieron varios casos de prueba que daban falsos negativos: el emulador no era el culpable, las pruebas simplemente no disponían de suficientes fotogramas; al elevar el límite de fotogramas, los resultados son mucho más fiables. También se ha iniciado una línea de trabajo específica sobre interrupciones: la gestión de interrupciones de la CPU sigue ahora el ritmo real del hardware 6502, lo que corrige desviaciones en varios juegos sensibles al timing.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">03</div>
         <div class="wn-text">
-          <h3>Correcciones de temporización de instrucciones y de temporizadores</h3>
-          <p>La verificación contra las pruebas oficiales de hardware confirmó que las fases de captación y ejecución de cada instrucción se contabilizaban por duplicado, duplicando el coste contado de cada instrucción; la contabilización sigue ahora la máquina real. Se corrigieron tres defectos de los temporizadores: el divisor del preescalador se leía del registro equivocado y operaba siempre a 1×, la cascada entre temporizadores no surtía efecto, y el retardo fijo de arranque presente en el hardware real ya se emula. Las tres entradas de temporizadores de la tarjeta de pruebas de hardware se superan ahora.</p>
-        </div>
-      </div>
-      <div class="wn-item">
-        <div class="wn-num">04</div>
-        <div class="wn-text">
-          <h3>Correcciones de temporización de prefetch y DMA (referencia 24/33 → 30/33)</h3>
-          <p>Dos mecanismos más coinciden ahora con la máquina real. En el búfer de prefetch de instrucciones, cualquier acceso a datos interrumpía antes la determinación de acierto; ahora se juzga únicamente por el flujo de instrucciones, y ambas mediciones de prefetch coinciden exactamente con los valores esperados oficiales. Durante el DMA (transferencia masiva de memoria), los temporizadores se detenían por completo; ahora siguen contando por unidad transferida como en la máquina real, y se contabiliza el retardo fijo al inicio de cada transferencia. Las cinco pruebas de temporización de memoria se superan, lo que eleva la puntuación global de la referencia de hardware de 24/33 a 30/33; las dos entradas restantes (disparador de inicio de visualización por DMA y prioridad de canales) están previstas para trabajo posterior.</p>
+          <h3>Mejores herramientas de depuración y pruebas automáticas</h3>
+          <p>Las herramientas de línea de comandos incorporan más registros de depuración, estadísticas de rendimiento y sondas de comportamiento del hardware; además se corrigió el error de visualización del desensamblado y se completó la interfaz de scripts, para que los desarrolladores puedan localizar los fallos de los juegos con más facilidad.</p>
         </div>
       </div>
      <div class="wn-cta reveal">

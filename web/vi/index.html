@@ -209,35 +209,28 @@
     <div class="whatsnew-head reveal">
       <div class="kicker">Có gì mới</div>
       <h2>v2.0.2</h2>
-      <div class="sub">Phát hành 2026-10-07 · trình giả lập Game Boy Advance (GBA) ở mức thử nghiệm</div>
+      <div class="sub">Phát hành 2026-11-08 · hiệu năng, độ chính xác và gỡ lỗi</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3>Trình giả lập Game Boy Advance (GBA) ở mức thử nghiệm</h3>
-          <p>Đã bổ sung trình giả lập Game Boy Advance (GBA) ở mức thử nghiệm, hỗ trợ băng đĩa .gba và tách biệt hoàn toàn khỏi phía NES. Đồng thời đã sửa: toàn bộ phím tắt bị mất sau khi mở lại cài đặt điều khiển, băng đĩa GBA thật không khởi động được, màn hình GBA đen trên một số driver đồ họa, kênh đỏ và xanh trong hình ảnh GBA bị hoán đổi, và lỗi tự khóa VBlankIntrWait trong lõi.</p>
+          <h3>Chạy nhanh hơn nhiều, chơi mượt hơn nhiều</h3>
+          <p>Bản này tập trung vào tốc độ của cả hai trình giả lập NES và GBA. Ở phía NES, chúng tôi loại bỏ những phép tính thừa trên đường gỡ lỗi và tinh gọn logic xử lý âm thanh cùng hình ảnh, nhờ đó tải CPU chung giảm 27%. Chế độ âm thanh cao cấp giờ nhanh gần gấp đôi, nên ngay cả khi bật hiệu ứng âm thanh chất lượng cao nhất, trình giả lập vẫn không bị giật. Ở phía GBA, chúng tôi loại bỏ phần việc bị lặp lại khi tạo khung hình và khi mã hóa tệp lưu: khung hình tạo ra nhanh hơn nhiều và thời gian lưu game chỉ còn một nửa. Không có gì trong số đó thay đổi định dạng tệp lưu, cũng không thay đổi hình ảnh và âm thanh của game — mọi game vẫn chạy y hệt trước, chỉ là dùng ít CPU hơn, nên máy cũ hơn cũng chạy mượt.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">02</div>
         <div class="wn-text">
-          <h3>Khắc phục lỗi khởi động của Mario Kart: Super Circuit</h3>
-          <p>Mario Kart: Super Circuit trước đây hiển thị màn hình trắng và ngừng phản hồi ngay khi khởi động: khi một ngắt đánh thức bộ xử lý khỏi trạng thái ngủ, địa chỉ trở về không tính bề rộng của một lệnh, khiến cùng một lời gọi hệ thống được thực hiện hai lần sau khi thức dậy; sau khi sửa, việc kiểm tra từng khung hình trên 1200 khung hình xác nhận màn hình tiếp tục cập nhật và tới được màn hình tiêu đề. Cùng đợt sửa chữa đó cũng xử lý một lỗi trong lời gọi BIOS của chương trình chạy ở chế độ ARM: trước đây số hiệu lời gọi bị đọc từ trường bit sai, nên mọi lời gọi đều bị coi là việc đặt lại hệ thống và chương trình rơi vào vòng lặp đặt lại ngay sau khi khởi động. Cả hai lỗi này từng tồn tại lâu dài trong khi mọi kiểm thử nội bộ đều đạt và chỉ được phát hiện qua kiểm thử bằng băng thật; phương tiện chẩn đoán đã được tăng cường tương ứng.</p>
+          <h3>Sửa một loạt lỗi mô phỏng phần cứng</h3>
+          <p>Chúng tôi đã sửa lỗi mô phỏng OAM DMA khiến hình ảnh của một số game bị méo, đồng thời sửa lại giao thức nhập chuột của SNES nên việc đọc chuột hoạt động đúng trở lại. Chúng tôi cũng sửa nhiều trường hợp kiểm thử báo lỗi giả — không phải trình giả lập sai, mà là các bài kiểm thử chưa được chạy đủ số khung hình; sau khi nới trần số khung hình, kết quả kiểm thử phản ánh thực tế hơn nhiều. Ngoài ra, chúng tôi còn mở thêm một hướng công việc riêng về xử lý ngắt: cách CPU xử lý ngắt giờ sát với nhịp thời gian thật của phần cứng 6502 hơn, giúp sửa sai lệch chạy ở một số game nhạy cảm với thời điểm.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">03</div>
         <div class="wn-text">
-          <h3>Sửa thời điểm lệnh và bộ định thời</h3>
-          <p>Đối chiếu từng mục với các bài kiểm tra phần cứng chính thức xác nhận: hai pha nạp lệnh và thực thi của mỗi lệnh trước đây bị tính trùng, khiến chi phí mỗi lệnh bị tính gấp đôi; hiện việc tính đã theo đúng máy thật. Ba lỗi của bộ định thời đã được sửa: hệ số chia trước đây đọc từ thanh ghi sai nên luôn chạy ở mức 1×, việc nối tầng giữa các bộ định thời không có hiệu lực, và độ trễ cố định lúc khởi động có trên máy thật nay đã được mô phỏng. Cả ba mục bộ định thời của băng kiểm tra phần cứng hiện đều đạt.</p>
-        </div>
-      </div>
-      <div class="wn-item">
-        <div class="wn-num">04</div>
-        <div class="wn-text">
-          <h3>Sửa thời điểm prefetch và DMA (chuẩn phần cứng 24/33 → 30/33)</h3>
-          <p>Hai cơ chế nữa nay khớp với máy thật. Với bộ đệm prefetch lệnh, trước đây mọi truy cập dữ liệu đều làm gián đoạn việc xét trúng; nay chỉ xét theo dòng nạp lệnh, và hai số đo prefetch khớp đúng với giá trị kỳ vọng chính thức. Trong lúc DMA (truyền dữ liệu hàng loạt) hoạt động, bộ định thời trước đây ngừng hẳn; nay tiếp tục đếm theo từng đơn vị truyền như trên máy thật, và độ trễ cố định đầu mỗi lần truyền được tính vào. Cả năm bài kiểm tra thời điểm bộ nhớ đều đạt, nâng tổng điểm chuẩn phần cứng từ 24/33 lên 30/33; hai mục còn lại (kích hoạt hiển thị DMA và độ ưu tiên kênh) nằm trong kế hoạch tiếp theo.</p>
+          <h3>Củng cố công cụ gỡ lỗi và kiểm thử tự động</h3>
+          <p>Các công cụ dòng lệnh được bổ sung thêm nhật ký gỡ lỗi, thống kê hiệu năng và bộ dò hành vi phần cứng; lỗi hiển thị khung dịch nghĩa được sửa, và giao diện script được hoàn thiện, giúp lập trình viên dễ dàng truy tìm lỗi trong game hơn.</p>
         </div>
       </div>
      <div class="wn-cta reveal">

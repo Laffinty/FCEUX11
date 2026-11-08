@@ -209,35 +209,28 @@
     <div class="whatsnew-head reveal">
       <div class="kicker">Nouveautés</div>
       <h2>v2.0.2</h2>
-      <div class="sub">Publié le 2026-10-07 · émulation expérimentale de Game Boy Advance (GBA)</div>
+      <div class="sub">Publié le 2026-11-08 · performances, justesse et débogage</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3>Émulation expérimentale de Game Boy Advance (GBA)</h3>
-          <p>Le programme prend désormais en charge l'émulation expérimentale de Game Boy Advance (GBA) ainsi que les cartouches .gba, entièrement découplée du côté NES. Nous corrigeons aussi : les raccourcis clavier qui disparaissaient à la réouverture des réglages d'entrées, les cartouches GBA physiques qui refusaient de démarrer, l'écran GBA noir sur certains pilotes graphiques, les canaux rouge et bleu inversés dans l'image GBA, et un auto-blocage de VBlankIntrWait dans le cœur.</p>
+          <h3>Bien plus rapide, et bien plus fluide</h3>
+          <p>Cette version se concentre sur la vitesse de l'émulation NES et de l'émulation GBA. Côté NES, nous avons supprimé des calculs inutiles du chemin de débogage et simplifié la logique de rendu audio et vidéo, ce qui réduit la charge processeur de 27 %. Le mode audio haute qualité est désormais presque deux fois plus rapide : même avec les meilleurs effets sonores, l'émulation ne saccade plus. Côté GBA, le travail fait deux fois lors de la génération des images et du codage des sauvegardes a été supprimé : les images sont produites bien plus vite et la sauvegarde prend deux fois moins de temps. Rien de tout cela ne change le format des sauvegardes ni ce que vous voyez et entendez : les jeux se comportent exactement de la même façon, ils consomment juste moins de CPU, si bien qu'une machine plus ancienne reste fluide.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">02</div>
         <div class="wn-text">
-          <h3>Correction du démarrage de Mario Kart: Super Circuit</h3>
-          <p>Mario Kart: Super Circuit affichait un écran blanc et cessait de répondre au démarrage : lorsqu'une interruption réveillait le processeur de son état de veille, l'adresse de retour ne prenait pas en compte la largeur d'une instruction et le même appel système était exécuté deux fois après le réveil ; après correction, une vérification image par image sur 1200 images confirme que l'affichage continue de s'actualiser et atteint l'écran-titre. La même série de corrections a également résolu un défaut des appels BIOS des programmes en mode ARM : le numéro d'appel était auparavant lu dans un champ de bits erroné, si bien que chaque appel était traité comme une réinitialisation du système et que le programme entrait dans une boucle de réinitialisation dès le démarrage. Ces deux défauts ont persisté alors que tous les tests internes réussissaient, et n'ont été révélés qu'à l'issue de tests sur cartouches réelles ; les moyens de diagnostic ont été renforcés en conséquence.</p>
+          <h3>Un lot de bugs d'émulation matérielle corrigés</h3>
+          <p>Un défaut d'émulation de l'OAM DMA, qui déformait l'image dans certains jeux, a été corrigé, de même que le protocole d'entrée de la souris SNES, qui fonctionne de nouveau correctement. Nous avons aussi rectifié plusieurs cas de test qui signalaient de fausses erreurs : l'émulateur n'était pas en cause, les tests n'avaient simplement pas assez d'images pour s'exécuter ; en augmentant la limite d'images, les résultats sont devenus bien plus fiables. Un travail dédié aux interruptions a par ailleurs été lancé : la gestion des interruptions par le processeur suit désormais de plus près le rythme réel du matériel 6502, ce qui corrige les écarts de plusieurs jeux sensibles au minutage.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">03</div>
         <div class="wn-text">
-          <h3>Corrections du chronométrage des instructions et des minuteries</h3>
-          <p>La vérification contre les tests matériels officiels a confirmé que les phases d'extraction et d'exécution de chaque instruction étaient facturées deux fois, doublant le coût compté de chaque instruction ; la facturation suit désormais la machine réelle. Trois défauts des minuteries sont corrigés : le diviseur du prédiviseur était lu dans le mauvais registre et fonctionnait toujours à 1×, la cascade entre minuteries ne prenait pas effet, et le délai fixe de démarrage présent sur le matériel réel est désormais émulé. Les trois entrées de minuteries de la carte de test matérielle réussissent désormais.</p>
-        </div>
-      </div>
-      <div class="wn-item">
-        <div class="wn-num">04</div>
-        <div class="wn-text">
-          <h3>Corrections du préchargement et du DMA (référence 24/33 → 30/33)</h3>
-          <p>Deux mécanismes supplémentaires correspondent désormais à la machine réelle. Pour le tampon de préchargement d'instructions, tout accès aux données interrompait auparavant la détermination de succès ; celle-ci repose désormais uniquement sur le flux d'instructions, et les deux mesures de préchargement correspondent exactement aux valeurs attendues officielles. Pendant le DMA (transfert de mémoire en masse), les minuteries s'arrêtaient totalement ; elles continuent désormais de compter par unité transférée comme sur la machine réelle, et le délai fixe au début de chaque transfert est pris en compte. Les cinq tests de chronométrage mémoire réussissent, portant le score global de référence matérielle de 24/33 à 30/33 ; les deux entrées restantes (déclenchement d'affichage DMA et priorité des canaux) sont prévues pour la suite.</p>
+          <h3>Outils de débogage et tests automatisés renforcés</h3>
+          <p>Les outils en ligne de commande ont gagné des journaux de débogage supplémentaires, des statistiques de performance et des sondes de comportement matériel ; l'erreur d'affichage du désassemblage a été corrigée et l'interface de script a été complétée, ce qui facilite la recherche des bugs de jeux.</p>
         </div>
       </div>
      <div class="wn-cta reveal">

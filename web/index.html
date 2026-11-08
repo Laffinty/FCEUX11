@@ -209,35 +209,28 @@
     <div class="whatsnew-head reveal">
       <div class="kicker">What's new</div>
       <h2>v2.0.2</h2>
-      <div class="sub">Released 2026-10-07 · experimental Game Boy Advance (GBA) emulation</div>
+      <div class="sub">Released 2026-11-08 · performance, accuracy, and debugging improvements</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3>Experimental Game Boy Advance (GBA) emulation</h3>
-          <p>.gba cartridges are now supported, and the GBA core is fully decoupled from the NES side. Also fixed: all key bindings going blank when input settings are reopened, real GBA cartridges failing to boot, the GBA screen staying black on some graphics drivers, swapped red and blue channels in the GBA picture, and a VBlankIntrWait self-lock in the core.</p>
+          <h3>Much faster, and much smoother to play</h3>
+          <p>This release is mainly about speed, for both the NES and the GBA. On the NES side we removed pointless work from the debug path and streamlined the audio and video rendering logic, which brings overall CPU load down by 27%. High-quality audio mode is now close to twice as fast, so even the best sound settings stay smooth. On the GBA side we removed the duplicated work in frame generation and in encoding save files: frames are produced much faster and saving a game takes half the time. None of this changes your save format or the picture and the sound you get; games behave exactly the same, they just use less of your CPU, so even an older machine keeps up.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">02</div>
         <div class="wn-text">
-          <h3>Mario Kart: Super Circuit failing to start — fixed</h3>
-          <p>Mario Kart: Super Circuit previously displayed a white screen and stopped responding on boot: when an interrupt woke the processor from its sleep state, the return address did not account for one instruction's width, and the same system call was executed twice after the wake; following the fix, a frame-by-frame verification across 1200 frames confirms that the display keeps updating and reaches the title screen. The same round of fixes also addressed a defect in BIOS calls made by ARM-mode programs: the emulator previously read the call number from an incorrect bit field, causing every call to be treated as a system reset and the program to enter a reset loop at startup. These defects had persisted while all internal tests passed and were ultimately uncovered by real-cartridge testing; the corresponding diagnostic tooling has been strengthened accordingly.</p>
+          <h3>A batch of hardware emulation bugs fixed</h3>
+          <p>An OAM DMA emulation defect that distorted the picture in some games is fixed, and so is the SNES mouse input protocol, which now reports correctly again. We also corrected several test cases that were reporting false failures: the emulator was not at fault, the tests simply were not given enough frames to run, so raising the frame limit made the results far more trustworthy. A dedicated interrupt overhaul was started as well: CPU interrupt handling now follows the real 6502 timing much more closely, which fixes the drift seen in a number of timing-sensitive games.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">03</div>
         <div class="wn-text">
-          <h3>Instruction timing and timer corrections</h3>
-          <p>Verification against the official hardware tests confirmed that the fetch and execute phases of each processor instruction were previously billed twice, doubling the counted cost of every instruction; pricing now follows the real machine. Three timer defects are corrected: the prescaler divider was read from the wrong register and always operated at 1×, cascading one timer into another did not take effect, and the fixed startup delay present on real hardware is now emulated. All three timer entries of the hardware test card now pass.</p>
-        </div>
-      </div>
-      <div class="wn-item">
-        <div class="wn-num">04</div>
-        <div class="wn-text">
-          <h3>Prefetch and DMA timing corrections (benchmark 24/33 → 30/33)</h3>
-          <p>Two further mechanisms now match the real machine. For the instruction prefetch buffer, any data access previously interrupted the prefetch-hit determination; hits are now judged solely on the instruction fetch stream, and both prefetch measurements match the official expected values exactly. During DMA (bulk memory transfer), the timers previously stopped entirely; they now continue counting per transferred unit as on the real machine, and the fixed delay at the start of each transfer is accounted for. All five memory-timing tests pass, raising the hardware benchmark score from 24/33 to 30/33; the remaining two entries (DMA display-start trigger and channel priority) are planned for follow-up work.</p>
+          <h3>Stronger debugging tools and automated tests</h3>
+          <p>The command line tools gained extra debug logging, performance statistics and hardware behaviour probes, the wrong disassembly display was fixed, and the scripting interface was completed, so developers can track down game bugs more easily.</p>
         </div>
       </div>
      <div class="wn-cta reveal">
