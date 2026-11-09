@@ -1,11 +1,14 @@
 # FCEUX11 v1.8 F11QA — CI Workflow
 #
-# Runs the v1.8 QA pipeline on every push to wip1.8 / wip2.0 / main. Produces a
-# migration matrix artifact, accuracy table, and baseline drift report.
+# Runs the v1.8 QA pipeline on every push to wip1.8 / wip2.0 / wip203 / main.
+# Produces a migration matrix artifact, accuracy table, and baseline drift report.
 #
 # wip2.0 (2026-09-28): added so the GBAEUX11 line is verified on its own branch
 # before it merges. It carries a 22K-line vendored core (crates/gba-core) and new
 # build glue (src/gba/, the swi_hook seam in gba-core).
+#
+# wip203 (2026-11-09): added so the v2.0.3 GBA cartridge-compatibility line is
+# verified on its own branch, same reason as wip2.0 above.
 #
 # What this workflow actually checks for the GBA work -- and what it does not
 # (corrected 2026-09-30, see plan r17; the previous text here claimed the
@@ -39,9 +42,9 @@ name: F11QA
 
 on:
   push:
-    branches: [main, wip1.8, wip2.0]
+    branches: [main, wip1.8, wip2.0, wip203]
   pull_request:
-    branches: [main, wip1.8, wip2.0]
+    branches: [main, wip1.8, wip2.0, wip203]
   workflow_dispatch:  # allow manual trigger
 
 jobs:
