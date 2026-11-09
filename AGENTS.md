@@ -13,7 +13,8 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 | 分支 | 用途 |
 |---|---|
 | `main` | 发布线 |
-| `wip2.0` | GBAEUX11 v2.0 的全部工作；推上去会触发外部门禁（f11qa.yml 已含 `wip2.0`） |
+| `wip2.0` | **已合入 `main`，远端分支已删除**（2026-11-09 核实：`git ls-remote --heads origin` 只有 `main` 与 `wip203`；GBAEUX11 v2.0 的全部成果——`src/gba_load.cpp`、`src/rust/src/gba/*`、v2.0/v2.0.1 归档计划——都已在 `main` 上） |
+| `wip203` | **v2.0.3 GBA 卡带兼容性线**的工作分支（2026-11-09 从 `main` 切出，**包含**已合入 main 的 GBAEUX11 v2.0 全部成果，在其之上做卡带兼容性）；计划见 `docs/plans/FCEUX11-v2.0.3_GBA卡带兼容性优化计划.md`；推上去会触发 F11QA 门禁（f11qa.yml 已含 `wip203`） |
 
 ## 治理文档（事实源）
 
