@@ -1,6 +1,9 @@
 # FCEUX11 v2.0.3 — GBA 卡带兼容性优化计划
 
 > **STATUS: DRAFT**（业主 2026-11-08 批准立项范围：**三段式** + **卡带不进仓库、判据换成自建最小夹具**）
+> **⚠️ r2（2026-11-09）：§一.2.2 的「可触达 panic 点」清单已按源码复核并收窄（6 处更正），§二.2 / §二.4 的夹具清单与出口判据已改写。**
+> **动 GBA 兼容性代码前先读 §一.2.2 开头的「更正」小节**——原文清单里 13 条有 11 条不可达，
+> **真正可达的只有 OAM 的两条**（shape=3 与 gfx mode=3）。
 > **立项目标**：把「商用手写 GBA 卡带跑不起来」这一类问题，从**靠人看**变成**可复现、可证伪、可回归**。
 > **基线**：`2960998`（v2.0.2 收口批次 r26 之后）· NES 侧 `ctest -LE perf` **36 项全绿** · F11QA 矩阵 **122 total / 112 passed / 10 failed / grade B / `pass_to_fail` 空** · GBA 锁测试 **249** + vendor **242** + debug **93** + media **52**
 > **产出定位**：只立项、排期、定验收；实施按工作项逐个开独立任务，**先 PLAN 后动手**的纪律不变。
@@ -100,20 +103,50 @@
   ⇒ 修这一条**必然要改这两条锁测试**，且断言必须从「park」改成「返回并记录」，
   否则等于把缺陷重新锁回去（AGENTS.md 纪律 3）。
 
-#### 1.2.2「闪退」＝ vendor 核在未建模寄存器上 panic，而 release 是 `panic = "abort"`
+#### 1.2.2「闪退」＝ vendor 核 panic，而 release 是 `panic = "abort"`
+
+> ⚠️ **更正（2026-11-09，r2）——本小节的「可触达」清单已按源码复核并收窄。**
+> **行号全部仍准确**，但清单里 **13 条中有 11 条不可达**：
+>
+> 1. `bus.rs` 的 11 处 `panic!` 是各 `*_raw` 函数的**兜底分支**，而 `read_raw`(`bus.rs:1077`) /
+>    `write_raw`(`bus.rs:1152`) 的 `match` 对各自 I/O 区间**已全覆盖** ⇒ 落不进去。
+>    「写一个未建模的 IO 寄存器」今天的行为是 `bus.rs:1203-1211` 的
+>    **静默忽略 + debug 日志**，零 panic。
+> 2. `internal_memory.rs:660` 同理不可达：`read_at` / `write_at` 的**全部**调用方只有
+>    `bus.rs:1088` / `bus.rs:1094` / `bus.rs:1157` 三处，而 `read_at` 的 match 缺口
+>    （`0x0400_0000–0x07FF_FFFF` 的 I/O、调色板、VRAM、OAM 区）**恰好由 bus 自己接管**。
+> 3. `operations.rs:896` 的 PLD `todo!` 是**死代码**：`arm7tdmi.rs:458-463` 先拦 `Pld` 抛
+>    UndefinedInstruction，`psr.rs:74` 的 `NV => false` 再挡一道 ⇒ PLD 的真实后果是
+>    「静默 no-op」或「跳 `0x04` 向量自旋」，**都不是 panic**。
+> 4. OAM 四处里 **gfx-mode=3 的 panic 现场是 `object_attributes.rs:144` 的 `unreachable!()`**，
+>    不是 `262`——`262` 的 `.unwrap()` 只在值 = 4 时才响，而该字段是 2 bit（0..3）⇒ 死分支；
+>    `389` / `475` 只向上转发。
+>
+> ⇒ **真正可达的 panic 面只有两条**：`object_attributes.rs:265`（OAM attr0 **shape = 3**）与
+> `object_attributes.rs:144`（OAM attr0 **gfx mode = 3**）。
+> ⇒ 另：真机上「禁用精灵」是 **obj mode = 2**（vendor 已正确处理，`layer_obj.rs:234-236` 跳过）；
+> **shape = 3 / gfx mode = 3 是「禁止值」（prohibited）**，真机当作「精灵不可见」，vendor 是崩溃。
+> ⇒ **S2-a 的修复语义应当是「映射为精灵禁用」**（与 obj mode = 2 的既有处理一致），不是「忽略」。
+>
+> **逐条证据与复核命令**：
+> `docs/plans/FCEUX11-v2.0.3_S1a_最小可复现夹具-实施计划.md` §一（含 §九.3 的复核命令）。
+> ⇒ **本节的结论方向不变**（闪退确实来自 vendor 核 panic + `panic = "abort"`），
+> **变的是证据清单** ⇒ S2-a 的表要按上面对照重读。
 
 - `src/rust/Cargo.toml:9-11`：`[profile.release] panic = "abort"`。
   在 `extern "C"` 帧里 panic **无法 unwind** ⇒ 直接带走整个进程 ⇒ **闪退**。
-- 可被游戏触达的 panic 点（全部已定位行号）：
-  | 位置 | 触发条件 |
-  |---|---|
-  | `gba-core/src/bus.rs:596` | `panic!("Not implemented write memory address: {address:x}")` |
-  | `gba-core/src/bus.rs:291/302/343/422/520/538/558/576` | 各 I/O 区域读写越界 panic |
-  | `gba-core/src/bus.rs:957/1069` | LCD 区域读写越界 panic |
-  | `gba-core/src/cpu/hardware/internal_memory.rs:660` | `unimplemented!("Unimplemented memory region. {address:x}")` |
-  | `gba-core/src/cpu/arm/operations.rs:896` | `todo!("implement single data transfer operation")`（PLD 指令） |
-  | `gba-core/src/cpu/hardware/lcd/object_attributes.rs:262/265/389/475` | OAM 属性 `.unwrap()`：**一个精灵的 shape 或 gfx-mode 字段为 3（真机禁用值）就每条扫描线 panic** |
-- 关键性质：**这些 panic 发生在**渲染中途**（OBJ 属性每扫描线解析一次，
+- panic 点清单（**已按 r2 复核收窄**；行号为原表，判定列是 r2 的复核结论）：
+  | 位置 | 触发条件 | r2 判定 |
+  |---|---|---|
+  | `gba-core/src/bus.rs:596` | `panic!("Not implemented write memory address: {address:x}")` | ❌ 不可达（兜底分支） |
+  | `gba-core/src/bus.rs:291/302/343/422/520/538/558/576` | 各 I/O 区域读写越界 panic | ❌ 不可达（兜底分支） |
+  | `gba-core/src/bus.rs:957/1069` | LCD 区域读写越界 panic | ❌ 不可达（兜底分支） |
+  | `gba-core/src/cpu/hardware/internal_memory.rs:660` | `unimplemented!("Unimplemented memory region. {address:x}")` | ❌ 不可达（bus 只转交三个区间） |
+  | `gba-core/src/cpu/arm/operations.rs:896` | `todo!("implement single data transfer operation")`（PLD 指令） | ❌ 死代码（两道防线） |
+  | `gba-core/src/cpu/hardware/lcd/object_attributes.rs:265` | OAM attr0 **shape = 3** ⇒ `.unwrap()` on `Err("Prohibited ObjShape")` | ✅ **可达** |
+  | `gba-core/src/cpu/hardware/lcd/object_attributes.rs:144` | OAM attr0 **gfx mode = 3** ⇒ `unreachable!()` in `GfxMode::try_from` | ✅ **可达** |
+  | `gba-core/src/cpu/hardware/lcd/object_attributes.rs:262/389/475` | 向上转发 | ❌ `262` 是死分支；`389`/`475` 只转发 |
+- 关键性质：**这两个 panic 发生在**渲染中途**（OBJ 属性每扫描线解析一次，
   `lcd/layers/layer_obj.rs:691-693`）⇒ 帧步进中途 abort ⇒ C++ 侧看到 `gba_step_frame()`
   永不正常返回 ⇒ **进程崩**。
 
@@ -147,11 +180,20 @@ GBATEK 权威（摘录见 §附录 A）：
 | `FLASH1M_Vnnn` | FLASH **128 KB** | `BackupType::Flash128`，`0x20000` | ✅ |
 
 - **容量映射是对的**（⚠️ 本轮我曾按「1M = 1MB」误判，被 GBATEK 否证 —— 见 §一.5）。
-- **但 EEPROM 没有真模型**：
-  - `internal_memory.rs:636` 对整个 0x0E 区域读**直接返回 0xFF**；
-  - EEPROM 只能靠 `internal_memory.rs:523-532` 的 `is_eeprom_access()` 命中
-    `0x0D000000–0x0DFFFFFF` 才生效；**该窗口宽度对 ≤16 MB 卡是错的**
-    （真机该区域只有 `0x0D000000–0x0D00FFFF` 是 EEPROM）；
+- ⚠️ **r2 更正**：**位级 EEPROM 模型是存在的** —— `internal_memory.rs:523-611` 有
+  `is_eeprom_access` / `eeprom_write` / `eeprom_read` / `eeprom_interpret_command`，
+  能解释请求位、方向位、6 位与 14 位地址宽、以及按位流长度推断宽度。
+  **真正缺的是下面三条**（原表把「无真模型」写得太宽）：
+  - **E1 · 访问窗口过宽 16 MB**：`internal_memory.rs:523-532` 的 `is_eeprom_access()`
+    对 ≤16 MB 的卡返回 `0x0D000000–0x0DFFFFFF`，而真机 EEPROM 只有 `0x0D00_0000–0x0D00_FFFF`
+    （64 KB）。⇒ `bus.rs:1638` / `bus.rs:1674` 会把 **`0x0D01_0000–0x0DFF_FFFF`
+    的每一次半字读写劫持进 EEPROM 位流** —— 那是卡的 **ROM（wait state 2）区**
+    ⇒ **EEPROM 卡读自己的 ROM 会拿到位流垃圾**（比原表的「窗口宽度错」更严重）。
+  - **E2 · 芯片容量不建模**：`internal_memory.rs:92-98` 的 `buffer_size()` 对 `Eeprom`
+    返回 `0x8000`（32 KB），真机是 **512 B 或 8 KB** ⇒ `.srm` 尺寸恒为 32768
+    （实测 5 个 `.srm` 全是 32768 字节，与此对上）。
+  - **E3 · `0x0E` 区域对 Eeprom 一律回 `0xFF`**：`internal_memory.rs:636`
+    （读）与 `:724`（写丢弃）—— EEPROM 内容实际存放在别处（`0x0D` 窗口的位流接口）。
   - **Dragon Ball / Minish Cap / NFS 三张卡都是 `EEPROM_V124`（8 KB）** ⇒
     它们读到的存档是全 `0xFF`，写进去的偏移也是错的。
 - **Flash 状态寄存器根本没有**：读 `0x0E000006/7` 落到 `internal_memory.rs:639-653`
@@ -223,6 +265,11 @@ GBATEK 权威（摘录见 §附录 A）：
 **关键条目的摘录写进本计划 §附录 A**，并给仓库加一条**抓取脚本**，
 免得每次重新抓、更免得每次靠记忆。
 
+> ⚠️ **r2 追加**：附录 A 当前**只有三节**（DMA 控制寄存器 / 存档 ID 串 / 卡带头布局），
+> **缺 EEPROM 命令协议与 GPIO/RTC 两章** ⇒ S1-a 的夹具 5（EEPROM 协议）与
+> 夹具 10（未写入前的 GPIO 行为）**取不到权威依据** ⇒ 这是 S1-a 的**前置条件**
+> （见 §二.4 最后一条）。**取不到就停下来记录，不许凭记忆写**（纪律 4，本项目已因此翻车两次）。
+
 ---
 
 ## 二、S1 阶段 · 可复现门禁（**必须先做**）
@@ -241,27 +288,45 @@ GBATEK 权威（摘录见 §附录 A）：
 ⇒ **不先解决这个，后面每个修复都无法证伪** —— 这正是 AGENTS.md 纪律 3
 （变异验证）与纪律 10（门禁没跑 ≠ 通过）的同一个坑。
 
-### 2.2 S1-a 最小可复现夹具（自建合成 ROM，**进仓库**）
+### 2.2 S1-a 最小可复现夹具（自建合成 ROM，**Rust 内建，不入库二进制**）
 
-业主裁决：卡带不进仓库，判据换成**自建最小夹具**。夹具放 `tests/fixtures/gba/`，
-由 `tests/fixtures/generate_test_roms.py` 生成（与既有 `apu_square.nes` 同款流程），
-`.gitignore` 加 `*.gba` + `!tests/fixtures/gba_*.gba` 两条。
+业主裁决：卡带不进仓库，判据换成**自建最小夹具**。
 
-| 夹具 | 触发什么 | 对应缺陷 | 期望断言 |
-|---|---|---|---|
-| `gba_swi_unimpl.gba` | 执行 SWI `0x1A`（SoundDriverInit） | §1.2.1 | **不永久自旋**；机器能继续跑下一条指令；读数里报出「SWI 0x1A 未实现」 |
-| `gba_swi_diff.gba` | 执行 SWI `0x16`（Diff8bitUnFilterWram） | §1.2.1 | 同上 |
-| `gba_oam_badshape.gba` | 在 OAM 写一个 shape 字段为 3 的精灵 | §1.2.2 | **不 panic**；该精灵按「禁用」处理；帧正常步进 |
-| `gba_io_unmapped.gba` | 写一个未建模的 IO 寄存器 | §1.2.2 | **不 panic**；写被忽略 |
-| `gba_eeprom8k.gba` | 按 `EEPROM_V124` 协议读写 8 KB EEPROM | §1.2.4 | 读回写进去的值；`.srm` 尺寸 = 8 KB |
-| `gba_flash_status.gba` | 轮询 Flash 状态寄存器 `0x0E000006` | §1.2.4 | 读回 ready 位（bit0 = 1） |
-| `gba_rom_mirror.gba` | 读超过自身容量的 ROM 地址 | §1.2.5 | 读回**镜像**内容，不是开放总线垃圾 |
-| `gba_gpio_rtc.gba` | **先读后写** GPIO 0xC4–0xC9 | §1.2.3 线索 | 读回 GPIO 状态（不是 ROM 字节） |
+> ⚠️ **r2 改写（业主 2026-11-09 拍板 D1）——载体形态与清单都改了。**
+>
+> **载体**：夹具改为 **Rust 内建**（`src/rust/src/gba/fixtures.rs` 里的函数，现场拼出 ROM 镜像），
+> **不再**放 `tests/fixtures/gba/`、**不再**由 `generate_test_roms.py` 生成、**不产生任何二进制入库**。
+> `.gitignore` 相应**只加一条 `*.gba`（全局忽略，不加例外）** —— 机械保证商业卡带永远进不了仓库。
+> 理由三条：① 纪律 5「测试向量按字段拼装」在二进制 blob 上无法满足；② 门禁链路上**没有 cargo 环节**
+> （CI 侧），「测试依赖仓库里一个二进制文件」是**无监控的依赖**；③ ARM 编码器只能有一份实现。
+>
+> **清单**：删 `gba_io_unmapped.gba`（该缺陷**不可达**，夹具今天就是绿的 ⇒ 无牙门禁）；
+> EEPROM 拆成三条独立缺陷 ⇒ **8 条变 9 条**（详见 r2 与
+> `docs/plans/FCEUX11-v2.0.3_S1a_最小可复现夹具-实施计划.md` §五）。
+
+| # | 夹具 | 触发什么 | 对应缺陷 | 期望断言 | 归属 |
+|---|---|---|---|---|---|
+| 1 | `swi_unimpl_1a` | 执行 SWI `0x1A`（SoundDriverInit） | §1.2.1 | **不永久自旋**；机器能继续跑下一条指令；读数里报出「SWI 0x1A 未实现」 | S2-b |
+| 2 | `swi_unimpl_16` | 执行 SWI `0x16`（Diff8bitUnFilterWram） | §1.2.1 | 同上 | S2-b（兜底）+ S3-a（真实现） |
+| 3 | `oam_bad_shape` | 用 `STRH` 把 OAM 精灵 0 的 attr0 写成 **shape = 3** | §1.2.2（`:265`） | **不 panic**；该精灵按「禁用」处理；帧正常步进 | S2-a |
+| 4 | `oam_gfx_mode3` | 同上，但 attr0 写成 **gfx mode = 3** | §1.2.2（`:144`） | 同上 | S2-a |
+| 5 | `eeprom_8k_protocol` | ROM 含 `EEPROM_V124`；按 **GBATEK 协议**读写 8 KB EEPROM | §1.2.4 E2/E3 | 读回写进去的值 | S3-b |
+| 6 | `eeprom_window_width` | ROM 含 `EEPROM_V124`；对 `0x0D01_0000`（真机是 **ROM 区**）做一次半字写 | §1.2.4 **E1** | 该地址**不被劫持进 EEPROM 位流**；读到的是 ROM 内容 | S3-b |
+| 7 | `eeprom_srm_size` | ROM 含 `EEPROM_V124`；走一遍存档通路 | §1.2.4 **E2** | `.srm` 尺寸 = 8192（8 KB 芯片） | S3-b |
+| 8 | `flash_status_reg` | ROM 含 `FLASH_V124`；先往 `0x0E00_0000` 写 `0x00`，再读 `0x0E00_0006` | §1.2.4 **E3** | 读回的是**芯片状态**（ready 位 bit0 = 1），不是存档原始字节 | S3-b |
+| 9 | `rom_window_mirror` | ROM 只有 `0x200` 字节；读 `0x0800_0040` 与 `0x0800_0240` | §1.2.5 | 两个地址读到**同一个绝对金标准值**（不是开放总线垃圾） | S3-d |
+| 10 | `gpio_read_before_write` | ROM 含 `EEPROM_V124`；**先读后写** GPIO 0xC4–0xC9 | §1.2.3 线索 | 第一次读就该拿到 **GPIO 状态**（不是 ROM 字节） | S3-c |
 
 **夹具的纪律**：
 - 每条夹具**必须能单独触发一条缺陷**，一个夹具不混两件事；
-- 夹具的期望值**按字段拼装，不手写字面量**（AGENTS.md 纪律 5）；
-- 每条夹具配套**变异验证**：把被断言的行为改回去 ⇒ 该锁测试必须转红。
+- 夹具的期望值**按字段拼装，不手写字面量**（AGENTS.md 纪律 5）——
+  **二进制 blob 无法满足这一条**，这是 r2 改载体形态的首要理由；
+- 每条夹具配套**变异验证**：把被断言的行为改回去 ⇒ 该锁测试必须转红；
+- ⚠️ **OAM 必须用半字/字写**：`bus.rs:1231-1234` 把 `STRB` 写 OAM **忽略**了，
+  用字节写造不出非法 shape/gfx ⇒ 夹具会「测了个寂寞」；
+- ⚠️ **断言必须能区分「状态」与「数据」**（AGENTS.md 纪律 13）：
+  夹具 8 若直接读 `0x0E00_0006`，今天的返回值 `0xFF` 的 bit0 **恰好也是 1** ⇒ 无牙门禁；
+  必须先往存档区写 `0x00` 再读状态位才能区分。
 
 ### 2.3 S1-b 探针改造（在**现有**探针上加，不另起炉灶）
 
@@ -276,13 +341,35 @@ GBATEK 权威（摘录见 §附录 A）：
 
 ### 2.4 S1 出口判据（**可证伪**）
 
-- [ ] 8 条夹具全部生成，`cargo test -p fceux11-rust --no-default-features --features gba --lib`
-      **从 249 项增加到 257 项，全绿**；
+> ⚠️ **r2 改写（业主 2026-11-09 拍板 D2）——前两条改了口径与数字。**
+>
+> **原第一条与「§〇 范围内第 2 条：每条缺陷都要有一条会红的锁测试」互相矛盾**：
+> 一条断言「SWI 0x1A 之后机器不永久自旋」的测试，在 S2-b 修复之前**必然是红的**，
+> 「会红」与「全绿」不可能同时成立。
+>
+> ⇒ **裁决：复现器标 `#[ignore]`** —— 断言写的是**目标行为**（不是缺陷行为），
+> 修复落地时转成常驻锁测试（当场先红后绿 + 变异验证）；
+> **另加 3 条常驻守卫**（孤儿 `#[ignore]` / 夹具完整性 / 复现器存在性）防止 ignore 腐烂。
+> ⇒ **不采用「断言写成缺陷当前行为以求全绿」**：那等于把缺陷锁成预期行为，
+> 与本计划 §1.2.1 自己对 `bios.rs:396-401` / `bios.rs:218-223` 的批评冲突。
+
+- [ ] 9 条夹具全部就位（`src/rust/src/gba/fixtures.rs`，**Rust 内建、无二进制入库**）；
+- [ ] `cargo test -p fceux11-rust --no-default-features --features gba --lib`
+      **从 249 项增加到 269 项，全绿**（= 249 + **8** 条编码器端到端自检 + **3** 条守卫）；
+      另有 **9 条 `#[ignore]` 复现器**，在 `-- --ignored` 下运行，
+      **它们必须逐条为红**（红 = 缺陷在场）；
+- [ ] 每条复现器都带 `#[ignore = "S2-x / S3-x: 修复后转常驻锁测试"]` 的**指名归属**；
 - [ ] 每条新锁测试的**变异验证双向可红**（改回修复前的值 ⇒ 转红；还原 ⇒ 复绿）；
+- [ ] **编码器端到端自检逐条变异可红** —— 编码器是全部 9 条夹具的**共因**，
+      它错了 ⇒ 夹具都在测别的东西，而且照样「全绿」（AGENTS.md 纪律 12 的同族，更隐蔽）；
 - [ ] `cartprobe` 在 4 张失败卡带本地跑出**明确读数**（哪张卡、卡在哪个 PC、
       踩了哪些未实现 SWI、有没有 panic）；**进仓库的是夹具读数，不是卡带读数**；
 - [ ] `cartprobe` 的 verdict 判词修正后**不再出现**误导性表述；
-- [ ] **NES 零回归**：`ctest -LE perf` 36 项全绿 + F11QA 矩阵 `pass_to_fail = 0` + grade ≥ B。
+- [ ] **NES 零回归**：`ctest -LE perf` 36 项全绿 + F11QA 矩阵 `pass_to_fail = 0` + grade ≥ B；
+- [ ] ⚠️ **前置条件**：GBATEK 快照须补齐 **EEPROM 命令协议** 与 **GPIO/RTC** 两章
+      （§一.5 已承诺的动作项；附录 A 当前**只有三节**，缺这两章）
+      ⇒ 夹具 5 与夹具 10 的协议级断言**取不到权威依据就不许写**（AGENTS.md 纪律 4，
+      本项目已因此翻车两次）。
 
 ---
 
@@ -494,6 +581,7 @@ curl.exe -x http://127.0.0.1:7897 -o .zcode\gbatek_probe.html https://mgba-emu.g
 | # | 日期 | 内容 |
 |---|---|---|
 | r1 | 2026-11-08 | **初稿**。业主提供 7 张真实商用手写卡带 + 实测报告（真实性背书）。主会话以 4 个并行只读 agent + 自跑探针完成取证：**① 读出 ODT 报告全文（4 个失败症状 + 截图位置）；② 解析 7 个 ROM 头（全部合法）与存档 ID 串；③ 实跑仓库自带 `cartprobe`（7 卡 × 240 帧窗口）；④ 实跑 `probe_why_a_game_stalls` + `probe_trace_a_stuck_game` 定位 FireRed 卡死指令与寄存器；⑤ 抓 GBATEK 权威快照核对位级格式（**本轮据此否证了自己两条记忆**）；⑥ 代码审计：SWI 覆盖、存档芯片模型、显示管线、panic 面。**结论：三条独立根因（未实现 SWI→`b .` 自旋 / vendor 核 panic + `panic="abort"` ⇒ 闪退 / 存档芯片模型不完整）+ 一条次要缺陷（ROM 窗口无镜像）+ 一条显示侧小修。** 业主拍板范围：**三段式**（S1 可复现门禁 → S2 止血 → S3 修根因）+ **卡带不进仓库、判据换成自建最小夹具**。本条为计划立项，未动任何生产代码 |
+| r2 | 2026-11-09 | **S1-a 开工前的只读复核 —— 计划的事实底座有 6 处需要更正，夹具清单与出口判据随之改写。未动任何生产代码。** **① §1.2.2 的「可触达 panic 点」清单收窄**：行号全部仍准确，但 **13 条里 11 条不可达** —— `bus.rs` 的 11 处 `panic!` 是各 `*_raw` 的兜底分支，而 `read_raw`(`bus.rs:1077`)/`write_raw`(`bus.rs:1152`) 的 match 对各自 I/O 区间**已全覆盖**（「写未建模 IO」今天 = `bus.rs:1203-1211` 的**静默忽略 + debug 日志**，零 panic）；`operations.rs:896` 的 PLD `todo!` 是**死代码**（`arm7tdmi.rs:458-463` 先拦 `Pld` 抛 UndefinedInstruction，`psr.rs:74` 的 `NV => false` 再挡一道）；`internal_memory.rs:660` 同样不可达（`read_at`/`write_at` 的**全部**调用方只有 `bus.rs:1088/1094/1157` 三处，缺口区间恰由 bus 自己接管）。**② OAM 的真现场是两条不是一条**：gfx-mode=3 的 panic 现场是 **`object_attributes.rs:144` 的 `unreachable!()`**，不是 `262`（`262` 的 `.unwrap()` 只在值=4 时才响，而该字段是 2 bit ⇒ 死分支）；shape=3 才是 `265`。另更正「真机禁用值」的表述：真机禁用精灵是 **obj mode=2**（vendor 已正确处理），**shape=3 / gfx mode=3 是「禁止值」**，真机当作精灵不可见、vendor 是崩溃 ⇒ **S2-a 的修复语义应是「映射为精灵禁用」**。⇒ **可达 panic 面收窄为 OAM 两条**（`:265` shape=3、`:144` gfx=3）⇒ §1.2.2 加「更正」小节。**结论方向不变**（闪退仍来自 vendor 核 panic + `panic="abort"`），**变的是证据清单** ⇒ S2-a 的表须按对照重读。**③ §1.2.4 的「EEPROM 没有真模型」不准确**：位级模型**存在**（`internal_memory.rs:523-611` 的 `is_eeprom_access`/`eeprom_write`/`eeprom_read`/`eeprom_interpret_command`），真正缺的是三条 —— **E1 访问窗口过宽 16 MB**（`is_eeprom_access` 对 ≤16 MB 的卡返回 `0x0D00_0000–0x0DFF_FFFF`，而真机 EEPROM 只有 64 KB ⇒ `bus.rs:1638/1674` 会把 **`0x0D01_0000–0x0DFF_FFFF` 的半字读写劫持进 EEPROM 位流**，那是卡的 ROM 区 ⇒ **EEPROM 卡读自己的 ROM 会拿到位流垃圾**，比原表的「窗口宽度错」更严重）、**E2 芯片容量不建模**（`.srm` 恒 32768）、**E3 Flash 状态寄存器不存在**。**④ 业主拍板 S1-a 的三个决策**：**D1 载体 = Rust 内建**（`src/rust/src/gba/fixtures.rs` 现场拼 ROM 镜像，**不产生二进制入库**；`.gitignore` **只加一条 `*.gba`，不加例外** —— 例外规则是它的漏洞；理由：纪律 5「按字段拼装」在二进制 blob 上做不到 + 门禁链路上**没有 cargo 环节**，「测试依赖仓库里一个二进制文件」是无监控的依赖 + ARM 编码器只能有一份实现）；**D2 门禁口径 = 复现器标 `#[ignore]` + 3 条常驻守卫**（消解「§〇 说会红」与「§2.4 说全绿」的矛盾；**断言写目标行为，不写缺陷行为** —— 写成缺陷行为就是把缺陷锁成预期行为，与 §1.2.1 自己对 `bios.rs:396-401` 的批评冲突）；**D3 夹具条数 = 9 条**（删不可达的 `gba_io_unmapped.gba`，EEPROM 拆协议/窗口/尺寸三条）⇒ **§2.2 与 §2.4 相应改写**（出口计数 **249 → 269 全绿** + **9 条 `#[ignore]` 复现器**，且复现器在 `--ignored` 下必须逐条为红）。**⑤ 新增前置条件**：GBATEK 快照须补齐 **EEPROM 命令协议** 与 **GPIO/RTC** 两章（附录 A 当前只有三节）⇒ 夹具 5 与夹具 10 的协议级断言**取不到权威依据就不许写**。**⑥ 登记不修的观察项**：vendor 的 `OperandKind` 判别与真 ARM 相反（`cpu/arm/instructions.rs:796`）⇒ `bios.rs:78` 的 `ADD_LR_PC` 在真 ARM 上是 `ADD lr, pc, r0`；vendor 的 `SingleDataTransfer` 立即数偏移**不乘 4**。实施计划见 `docs/plans/FCEUX11-v2.0.3_S1a_最小可复现夹具-实施计划.md`（Step 0..7） |
 
 ---
 
