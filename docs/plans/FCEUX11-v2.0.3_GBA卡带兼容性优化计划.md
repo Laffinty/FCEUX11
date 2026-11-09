@@ -6,6 +6,11 @@
 > **⚠️ r4（2026-11-09）：S1-a 的 Step 1（G3 编码器自检）已过变异验收 —— 测出 3 条盲区并修掉，
 > 8/8 的目标都能红；但 §2.4 的「只改一个字段 ⇒ 其它 7 条仍然绿」有 **2 行结构性达成不了**
 > （`mov_imm` 是唯一的造地址手段、`swi(HALT)` 是每条自检的终止器）⇒ **需裁决**。**
+> **✅ r5（2026-11-09）：S1-a 的 Step 0 余账 + Step 2/3/4/5/6 已完成 —— 9 条夹具（7 红 + 2 绿锁）
+> 与 3 条守卫落地，**7 条复现器在夹具域过滤下逐条为红**，门禁 **262 passed / 26 ignored**。
+> 同时更正三处计划口径：① §四 S3-b 的「flash 状态寄存器按 GBATEK 的状态位定义返回」**
+> 无依据**（GBATEK 根本没有状态寄存器）；② SWI 向量字应为 `MOVS PC, LR`（vendor 的 LR 差 4）；
+> ③ 夹具是 **9 条**不是 8 条。**
 > **动 GBA 兼容性代码前先读 §一.2.2 开头的「更正」小节**——原文清单里 13 条有 11 条不可达，
 > **真正可达的只有 OAM 的两条**（shape=3 与 gfx mode=3）。
 > **立项目标**：把「商用手写 GBA 卡带跑不起来」这一类问题，从**靠人看**变成**可复现、可证伪、可回归**。
@@ -335,6 +340,8 @@ GBATEK 权威（摘录见 §附录 A）：
 | — | `eeprom_protocol_lock` | 🟢 | 按 **GBATEK 协议**读写 8 KB EEPROM | §1.2.4 | **维持现状**：vendor 与 GBATEK **逐位一致**（r3），此条是**防 S3-b 改坏协议**的回归锁 | S3-b（回归锁） |
 
 > ⚠️ **r3（2026-11-09）**：**8 条夹具里只有 7 条会红**（🔴），另 2 条是**绿色回归锁**（🟢）。
+> ⚠️ **r5（2026-11-09）更正：夹具实为 9 条（7 红 + 2 绿锁），不是 8 条** —— 7 + 2 = 9。
+> **门禁计数 262 不受影响**（绿锁只算 2 条常驻）。
 > 原因是 GBATEK 逐位核实（§1.2.4 的 r3 追加）：**EEPROM 的命令协议 vendor 本来就是对的**，
 > **GPIO「未写入前」的行为 GBATEK 未定义** ⇒ 这两条不能写成会红的断言。
 > ⇒ **`-- --ignored` 下的复现器集合 = 7 条**。
@@ -375,7 +382,8 @@ GBATEK 权威（摘录见 §附录 A）：
 > ⇒ **不采用「断言写成缺陷当前行为以求全绿」**：那等于把缺陷锁成预期行为，
 > 与本计划 §1.2.1 自己对 `bios.rs:396-401` / `bios.rs:218-223` 的批评冲突。
 
-- [ ] 8 条夹具全部就位（`src/rust/src/gba/fixtures.rs`，**Rust 内建、无二进制入库**）；
+- [ ] **9 条夹具**全部就位（`src/rust/src/gba/fixtures/*.rs`，按缺陷域分四个文件
+      `swi` / `oam` / `backup` / `rom`，公共底座在 `fixtures.rs`；**Rust 内建、无二进制入库**）；
       其中 **7 条会红**（`--ignored` 集合）+ **2 条绿色回归锁**（常驻）；
 - [ ] `cargo test -p fceux11-rust --no-default-features --features gba --lib`
       **从 249 项增加到 262 项，全绿**（= 249 + **8** 条编码器端到端自检 + **3** 条守卫 + **2** 条绿色回归锁）；
@@ -434,7 +442,7 @@ GBATEK 权威（摘录见 §附录 A）：
 
 ### 3.4 S2 出口判据
 
-- [ ] 8 条夹具全部**从「会崩/会卡死」变成「能跑完」**（对应条目逐条打勾）；
+- [ ] **9 条夹具**全部**从「会崩/会卡死」变成「能跑完」**（对应条目逐条打勾）；
 - [ ] `gba_step_frame` 在所有夹具下**不返回 panic**；
 - [ ] 4 张失败卡带本地跑：**不再闪退**（卡死/黑屏允许存在 —— 那是 S3 的事）；
 - [ ] NES 零回归（同上）。
@@ -468,6 +476,12 @@ GBATEK 权威（摘录见 §附录 A）：
    `internal_memory.rs:523-532` 的 `is_eeprom_access()` 窗口**收窄**到真机范围。
 2. **Flash 状态寄存器**：`0x0E000006/7` 按 GBATEK 的状态位定义返回；
    擦除/写入的「忙→就绪」状态机要真的走。
+   > **⚠️ r5 更正：GBATEK 没有 flash 状态寄存器。** 全 4.0 MB 快照 grep `E000006`
+   > **零命中**；GBATEK 的 flash 轮询是**回读比较**（`:8981` "wait until
+   > [E00xxxxh]=dat"、`:8915` "[E000000h]=FFh"）⇒ **「按 GBATEK 的状态位定义返回」这句
+   > 没有权威依据**。⇒ S3-b 开工前必须先解决 `0x0E000006/7` 与「ready = bit0」的
+   > **来源问题**（另找权威来源，或用真卡带实测重新推导）；在补上来源之前，
+   > 复现器 `flash_status_reg` 断言的是**本计划**给的这两个约定，不是 GBATEK。
 3. **`.srm` 尺寸跟芯片走**：`buffer_size()` 已按芯片给，但 EEPROM 目前是占位 32 KB
    ⇒ 改为 512 B / 8 KB 真实尺寸。
 4. **存档类型可覆盖**：`gba_set_save_type` 已有 ⇒ UI 侧接线（属产品决定，另议）。
@@ -557,8 +571,9 @@ S3 修根因（可多路并行，文件域互斥）
 ## 七、整包出口判据
 
 - [ ] `ctest -LE perf` **36 项全绿**；F11QA 矩阵 **`pass_to_fail = 0`**、**grade ≥ B**
-- [ ] GBA 锁测试 **≥ 257 项全绿**（249 + 8 条夹具）；vendor **242** / debug **93** / media **52** 全绿
-- [ ] **8 条夹具**逐条绿，且每条的**变异验证双向可红**
+- [ ] GBA 锁测试 **≥ 262 项全绿**（249 + 8 条编码器自检 + 3 条守卫 + 2 条绿锁）；
+      vendor **242** / debug **93** / media **52** 全绿
+- [ ] **9 条夹具**逐条绿，且每条的**变异验证双向可红**
 - [ ] **4 张失败卡带本地逐张复核通过**（判据见 §四 S3 出口表）；
       **卡带不进仓库**，仓库内判据一律是夹具
 - [ ] `cartprobe` 的 verdict 判词**已修正**，不再输出误导性表述
@@ -609,6 +624,7 @@ curl.exe -x http://127.0.0.1:7897 -o .zcode\gbatek_probe.html https://mgba-emu.g
 | r2 | 2026-11-09 | **S1-a 开工前的只读复核 —— 计划的事实底座有 6 处需要更正，夹具清单与出口判据随之改写。未动任何生产代码。** **① §1.2.2 的「可触达 panic 点」清单收窄**：行号全部仍准确，但 **13 条里 11 条不可达** —— `bus.rs` 的 11 处 `panic!` 是各 `*_raw` 的兜底分支，而 `read_raw`(`bus.rs:1077`)/`write_raw`(`bus.rs:1152`) 的 match 对各自 I/O 区间**已全覆盖**（「写未建模 IO」今天 = `bus.rs:1203-1211` 的**静默忽略 + debug 日志**，零 panic）；`operations.rs:896` 的 PLD `todo!` 是**死代码**（`arm7tdmi.rs:458-463` 先拦 `Pld` 抛 UndefinedInstruction，`psr.rs:74` 的 `NV => false` 再挡一道）；`internal_memory.rs:660` 同样不可达（`read_at`/`write_at` 的**全部**调用方只有 `bus.rs:1088/1094/1157` 三处，缺口区间恰由 bus 自己接管）。**② OAM 的真现场是两条不是一条**：gfx-mode=3 的 panic 现场是 **`object_attributes.rs:144` 的 `unreachable!()`**，不是 `262`（`262` 的 `.unwrap()` 只在值=4 时才响，而该字段是 2 bit ⇒ 死分支）；shape=3 才是 `265`。另更正「真机禁用值」的表述：真机禁用精灵是 **obj mode=2**（vendor 已正确处理），**shape=3 / gfx mode=3 是「禁止值」**，真机当作精灵不可见、vendor 是崩溃 ⇒ **S2-a 的修复语义应是「映射为精灵禁用」**。⇒ **可达 panic 面收窄为 OAM 两条**（`:265` shape=3、`:144` gfx=3）⇒ §1.2.2 加「更正」小节。**结论方向不变**（闪退仍来自 vendor 核 panic + `panic="abort"`），**变的是证据清单** ⇒ S2-a 的表须按对照重读。**③ §1.2.4 的「EEPROM 没有真模型」不准确**：位级模型**存在**（`internal_memory.rs:523-611` 的 `is_eeprom_access`/`eeprom_write`/`eeprom_read`/`eeprom_interpret_command`），真正缺的是三条 —— **E1 访问窗口过宽 16 MB**（`is_eeprom_access` 对 ≤16 MB 的卡返回 `0x0D00_0000–0x0DFF_FFFF`，而真机 EEPROM 只有 64 KB ⇒ `bus.rs:1638/1674` 会把 **`0x0D01_0000–0x0DFF_FFFF` 的半字读写劫持进 EEPROM 位流**，那是卡的 ROM 区 ⇒ **EEPROM 卡读自己的 ROM 会拿到位流垃圾**，比原表的「窗口宽度错」更严重）、**E2 芯片容量不建模**（`.srm` 恒 32768）、**E3 Flash 状态寄存器不存在**。**④ 业主拍板 S1-a 的三个决策**：**D1 载体 = Rust 内建**（`src/rust/src/gba/fixtures.rs` 现场拼 ROM 镜像，**不产生二进制入库**；`.gitignore` **只加一条 `*.gba`，不加例外** —— 例外规则是它的漏洞；理由：纪律 5「按字段拼装」在二进制 blob 上做不到 + 门禁链路上**没有 cargo 环节**，「测试依赖仓库里一个二进制文件」是无监控的依赖 + ARM 编码器只能有一份实现）；**D2 门禁口径 = 复现器标 `#[ignore]` + 3 条常驻守卫**（消解「§〇 说会红」与「§2.4 说全绿」的矛盾；**断言写目标行为，不写缺陷行为** —— 写成缺陷行为就是把缺陷锁成预期行为，与 §1.2.1 自己对 `bios.rs:396-401` 的批评冲突）；**D3 夹具条数 = 9 条**（删不可达的 `gba_io_unmapped.gba`，EEPROM 拆协议/窗口/尺寸三条）⇒ **§2.2 与 §2.4 相应改写**（出口计数 **249 → 269 全绿** + **9 条 `#[ignore]` 复现器**，且复现器在 `--ignored` 下必须逐条为红）。**⑤ 新增前置条件**：GBATEK 快照须补齐 **EEPROM 命令协议** 与 **GPIO/RTC** 两章（附录 A 当前只有三节）⇒ 夹具 5 与夹具 10 的协议级断言**取不到权威依据就不许写**。**⑥ 登记不修的观察项**：vendor 的 `OperandKind` 判别与真 ARM 相反（`cpu/arm/instructions.rs:796`）⇒ `bios.rs:78` 的 `ADD_LR_PC` 在真 ARM 上是 `ADD lr, pc, r0`；vendor 的 `SingleDataTransfer` 立即数偏移**不乘 4**。实施计划见 `docs/plans/FCEUX11-v2.0.3_S1a_最小可复现夹具-实施计划.md`（Step 0..7） |
 | r3 | 2026-11-09 | **GBATEK 逐位核实 ⇒ 撤回 r2 的一条结论，并据此改写夹具清单与出口计数。仍只动文档，未动任何生产代码。** ① **撤回「E1 · 访问窗口过宽 16 MB」**：GBATEK 快照（**本来就在本地**：`.zcode/gbatek_plain.txt`，4.0 MB，2026-11-08 抓取）`:8692-8694` 明文「**On carts with 16MB or smaller ROM, eeprom can be alternately accessed anywhere at D000000h-DFFFFFFh**」⇒ `internal_memory.rs:523-532` 的 `is_eeprom_access()` **与 GBATEK 一致**，**不是缺陷**。② **EEPROM 的命令协议 vendor 本来就是对的**：GBATEK `:8710-8786` 与 `internal_memory.rs:566-614` 逐位一致（请求位 `"11"`/`"10"`、6 或 14 位地址、64 位数据、读回 68 位 = 4 忽略 + 64 数据、MSB first、Ready 位、以 64 位为单位；写分支宽度判据 `buffer.len() >= 81` 也对）⇒ **存档芯片侧真正缺的只有 E2（型号丢失 ⇒ `.srm` 恒 32768）与 E3（Flash 状态寄存器不存在）**。③ **GPIO 侧取证只到位一半**：GBATEK 有 GPIO/RTC 章节（`:7984`/`:9189`/`:9287-9353`，含 Boktai 的引脚表），但**没有**定义「游戏尚未写入时读 `0x080000C4` 读到什么」⇒ 按纪律 4 **不许硬写断言** ⇒ 该条**降级为绿色回归锁**。⇒ **夹具清单：9 条 → 8 条**（**7 条会红** + **2 条绿锁**），**D3（业主原裁决「9 条」）相应改为 8 条**；⇒ **出口判据：常驻 249 → 262 全绿**（+8 G3 编码器自检 +3 守卫 +2 绿锁），**`-- --ignored` 另有 7 条复现器**（必须逐条为红），**S3 全修完 269 项全绿**。④ **教训**：本条与 r1 的「DMA 起始时序」「FLASH1M 容量」是**同一类错误**（凭记忆写位级/协议），本项目**已犯第四次** ⇒ **位级与协议一律查快照原文**。⑤ **Step 0 取证已完成**（快照在本地，不必联网），只剩「把 EEPROM / GPIO-RTC 两章的关键条目摘录写进附录 A + 加一条可重跑的抓取脚本」。 |
 | r4 | 2026-11-09 | **S1-a 的 Step 1（G3 编码器自检）已过变异验收 —— 测出 3 条盲区并修掉；8/8 的目标都能红，但 §2.4 的「只改一个字段 ⇒ 其它 7 条仍然绿」有 2 行结构性达成不了 ⇒ 需裁决。** ① **做法**：8 个编码器各一处**单字段**变异，逐次跑 8 条 G3 自检记逐条红绿（执行器 `.zcode/mutation_matrix.ps1`，不入库）。② **首轮测出 3 条盲区**（目标测试在自己的编码器被改坏时**照样绿** ⇒ 无牙门禁）：`g3_orr_imm`（立即数不需要旋转 ⇒「忘记旋转」不可观测）、`g3_strh`（存的值**高半字为 0** ⇒ `STR` 与 `STRH` 写出的字节完全相同）、`g3_ldrh`（源字高半字为 0 + 内存往返抹掉差异）⇒ **已修**：改用需要旋转的立即数 / **预置哨兵 `0xDEAD_BEEF`** / 源字改 `0xC5C5C500`，并把断言从「内存往返」改为**读寄存器**（否则自检会依赖别的编码器，矩阵无法定位）。③ **修后矩阵**：**8/8 的目标都红**；**6/8 行只红目标**（M2/M3/M4/M5/M6/M8）；**M1（`mov_imm`）红 5 条 = 恰好是「用 `mov_imm` 造地址」的自检集合**（1/3/4/5/6）—— 它是**唯一**能造地址的手段 ⇒ 结构性共因；**M7（`swi`）红 8 条** —— `swi(HALT)` 是**每条自检的终止器** ⇒ 结构性共因（一个坏 SWI 编码器 = 全局失败，**响亮地失败是对的**，代价是该行无法定位）。⇒ **要消掉这两行需改夹具脚手架**（基址寄存器预置 + 终止器改用 `gate.rs` 参考实现）⇒ **设计变更，超出 S1-a 授权 ⇒ 交业主裁决**；⚠️ 附带风险：改用「跑到预算耗尽」当终止器会**假绿**（程序没跑也读到预置值）⇒ 终止器必须可判定。④ **顺带登记一个坑**：变异验证的**还原腿会假红** —— 还原源文件不更新 mtime ⇒ cargo 判定「无需重建」⇒ 跑的是上一轮变异版的二进制 ⇒ **反向腿必须确认二进制是新的**。⑤ 门禁：根 crate **257**、vendor **242**、debug **93**、media **52**，全绿；**未动任何生产代码**。逐格读数见 `docs/plans/FCEUX11-v2.0.3_S1a_最小可复现夹具-实施计划.md` §十一 r4 与 §七 Step 1 验收记录 |
+| r5 | 2026-11-09 | **S1-a 完成 Step 0 余账 + Step 2/3/4/5/6 —— 9 条夹具与 3 条守卫落地，7 条复现器逐条为红，门禁命中 262；同时更正三处计划口径。** ① **Step 0 余账销清**：附录 A 补 **A.4（EEPROM 命令协议 `:8710-8786`）/ A.5（EEPROM 寻址与容量 `:8661-8706`）**（照抄原文、带行号）；新增 `tools/fetch_gbatek.ps1`（抓 HTML → 转纯文本，**逐字节复现**现有快照 ⇒ 附录 A 的行号引用在重抓后仍成立；错误路径实测：代理不可达 / HTTP 404 / 超时均 exit 3）。⚠️ **未销清**：§一.5 要求的 **GPIO/RTC 两章摘录（A.6）仍缺** ⇒ 该行动项未完全收口。② **Step 2**：9 条夹具按**缺陷域**拆成 `src/rust/src/gba/fixtures/{swi,oam,backup,rom}.rs`（公共底座留在 `fixtures.rs`）⇒ 文件域互斥、可并行；**7 条会红 + 2 条绿锁**，每条做过**双向变异验证**（变异腿 + 还原腿，还原后刷新 mtime）。③ **Step 3**：3 条常驻守卫 `fixtures/guards.rs`（G1 孤儿 `#[ignore]` / G2 夹具集合完整性 / G4 复现器存在性与归属）。④ **Step 4**：`.gitignore` 加 `*.gba`（**无例外**）⇒ 商业卡带机械地进不了仓库。⑤ **读数**：根 crate **262 passed / 26 ignored**（= 249 + 8 G3 + 2 绿锁 + 3 守卫）；**7 条复现器逐条为红**（`0 passed; 7 failed`）；`gba-core` **242** / `debug` **93** / `media` **52** 全绿；`ctest -LE perf` **36/36**。⚠️ **复现器必须带夹具域过滤**（`… --lib gba::fixtures:: -- --ignored`），不带过滤会拉进 19 个需要真卡带的测量工具。⑥ **三处口径更正（由本轮取证得出）**：**(a) §四 S3-b 第 2 条「`0x0E000006/7` 按 GBATEK 的状态位定义返回」不成立** —— GBATEK 快照全文 grep `E000006` **零命中**，GBATEK 的 flash 轮询是**回读比较**（`:8981` "wait until [E00xxxxh]=dat"）⇒ **GBATEK 没有 flash 状态寄存器**；S3-b 开工前须另找权威来源或用真卡带重新推导（现有夹具断言的是**本计划**给的 `0x0E000006/7` + ready=bit0）。**(b) §1.2.1 的兜底配方要改**：vendor 的 LR 约定与真机差 4 ⇒ SWI 向量若照抄 IRQ 向量的 `SUBS PC, LR, #4` 会**退回 SWI 自身重入**，正确的向量字是 **`MOVS PC, LR`**。**(c) 0x16 的命名三处不同**（GBATEK `Diff8bitUnFilterWrite8bit` / 仓库 `Diff8BitUnFilterWram` / 计划 `Diff8bitUnFilterWram`），号码相同。⑦ **计数口径**：夹具是 **9 条**（7 红 + 2 绿），**不是**「8 条（7 会红 + 2 绿锁）」⇒ 7 + 2 = 9；**门禁计数 262 不受影响**（绿锁只算 2 条常驻）。⑧ **两个坑**：① 变异验证的**还原腿会假红**（还原源文件不更新 mtime ⇒ cargo 跳过重建 ⇒ 跑的是上一轮变异版的二进制）；② **多个 worker 并发改同一个 vendor 文件会互撞** ⇒ 共享 vendor 树的变异验证必须串行或用隔离副本。⑨ **未动任何生产代码**（vendor 树零改动，逐文件哈希核对）。 |
 
 ---
 
@@ -617,6 +633,8 @@ curl.exe -x http://127.0.0.1:7897 -o .zcode\gbatek_probe.html https://mgba-emu.g
 > **快照来源**：`https://mgba-emu.github.io/gbatek/`（经代理 `127.0.0.1:7897` 抓取，2026-11-08）
 > **本地副本**：`.zcode/gbatek_probe.html` / `.zcode/gbatek_plain.txt`（gitignored，**不进仓库**）
 > **用法**：动手前先查这里的摘录；摘录没有的条目**回快照查**，**不许凭记忆**。
+> **重抓脚本**：`tools/fetch_gbatek.ps1`（经代理抓 HTML → 转纯文本；转换规则与本快照一致
+> ⇒ 重抓后行号不变，摘录的行号引用可复核）。
 
 ### A.1 GBA DMA 控制寄存器（`DMA CNT_H`，`40000BAh` 等）
 
@@ -661,6 +679,74 @@ FLASH1M_Vnnn   FLASH 128 Kbytes (1Mbit)
 00BD-00BF  Complement Check
 00C0-00FF  Start of ARM7/ARM9 Program
 ```
+
+### A.4 EEPROM 命令协议
+
+> 快照行号范围：`.zcode/gbatek_plain.txt:8710-8786`
+> （GBATEK「GBA Cart Backup EEPROM」章的「Set Address (For Reading)」「Read Data」
+> 「Write Data to Address」三小节；**原文空行已略去，其余逐字未改**。）
+
+```
+Set Address (For Reading)
+Prepare the following bitstream in memory:
+  2 bits "11" (Read Request)
+  n bits eeprom address (MSB first, 6 or 14 bits, depending on EEPROM)
+  1 bit "0"
+Then transfer the stream to eeprom by using DMA.
+Read Data
+Read a stream of 68 bits from EEPROM by using DMA,
+then decipher the received data as follows:
+  4 bits - ignore these
+ 64 bits - data (conventionally MSB first)
+Write Data to Address
+Prepare the following bitstream in memory, then transfer the stream to eeprom
+by using DMA, it’ll take ca. 108368 clock cycles (ca. 6.5ms) until the old data
+is erased and new data is programmed.
+  2 bits "10" (Write Request)
+  n bits eeprom address (MSB first, 6 or 14 bits, depending on EEPROM)
+ 64 bits data (conventionally MSB first)
+  1 bit "0"
+After the DMA, keep reading from the chip, by normal LDRH [DFFFF00h], until Bit
+0 of the returned data becomes “1” (Ready). To prevent your program from
+locking up in case of malfunction, generate a timeout if the chip does not
+reply after 10ms or longer.
+```
+
+> 用途：S3-b「EEPROM 真模型」的命令协议依据（读请求 `"11"` / 写请求 `"10"`、6 或 14 位地址、
+> 64 位数据、读回 68 位 = 4 忽略 + 64 数据、Ready 位），同时是 §一.2.4 r3「vendor 协议逐位一致」
+> 与绿色回归锁 `eeprom_protocol_lock` 的原文出处。
+
+### A.5 EEPROM 寻址与容量
+
+> 快照行号范围：`.zcode/gbatek_plain.txt:8661-8706`
+> （章节头 `:8661`；芯片型号行 `:8665` / `:8669`；「Addressing and Waitstates」`:8677-8694`；
+> 「Data and Address Width」`:8698-8706`；**原文空行已略去，其余逐字未改**。）
+
+```
+GBA Cart Backup EEPROM
+9853 - EEPROM 512 Bytes (0200h) (4Kbit) (eg. used by Super Mario Advance)
+9854 - EEPROM 8 KBytes (2000h) (64Kbit) (eg. used by Boktai)
+Lifetime: 100,000 writes per address
+Addressing and Waitstates
+The eeprom is connected to Bit0 of the data bus, and to the upper 1 bit (or
+upper 17 bits in case of large 32MB ROM) of the cartridge ROM address bus,
+communication with the chip takes place serially.
+The eeprom must be used with 8 waitstates (set WAITCNT=X3XXh; 8,8 clks in WS2
+area), the eeprom can be then addressed at DFFFF00h..DFFFFFFh.
+Respectively, with eeprom, ROM is restricted to 8000000h-9FFFeFFh (max.
+1FFFF00h bytes = 32MB minus 256 bytes). On carts with 16MB or smaller ROM,
+eeprom can be alternately accessed anywhere at D000000h-DFFFFFFh.
+Data and Address Width
+Data can be read from (or written to) the EEPROM in units of 64bits (8 bytes).
+Writing automatically erases the old 64bits of data. Addressing works in units
+of 64bits respectively, that is, for 512 Bytes EEPROMS: an address range of
+0-3Fh, 6bit bus width; and for 8KByte EEPROMs: a range of 0-3FFh, 14bit bus
+width (only the lower 10 address bits are used, upper 4 bits should be zero).
+```
+
+> 用途：S3-b「EEPROM 真模型」的寻址与容量依据（512 B ⇒ 6 位地址 `0-3Fh`、8 KB ⇒ 14 位地址
+> `0-3FFh`），也是 §一.2.4 E2「芯片型号与容量不建模 ⇒ `.srm` 尺寸恒 32768」的原文出处，
+> 而 `:8692-8694` 又是 r3 撤回「E1 访问窗口过宽 16 MB」的原文依据。
 
 ---
 

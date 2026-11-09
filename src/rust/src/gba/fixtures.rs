@@ -121,6 +121,34 @@ pub const ROM_LEN: usize = 0x200;
 /// The SWI number that stops the machine.
 pub const HALT: u32 = crate::gba::swi::Swi::Halt as u32;
 
+/// How many steps a self-check may run before it is declared stuck.
+///
+/// A generous budget: the stub BIOS boots in a handful of instructions and a
+/// fixture's program is a few words long, so this is far above what a working
+/// program needs and far below "wait and see".
+pub const BUDGET: usize = 100_000;
+
+/// Where the self-checks put their scratch bytes.
+///
+/// IWRAM, so the writes are visible through the bus exactly as a game's would
+/// be.
+pub const SCRATCH: usize = 0x0300_0000;
+
+// ---------------------------------------------------------------------------
+// The eight S1-a fixtures, one module per defect domain
+// ---------------------------------------------------------------------------
+//
+// One file per domain, so that the domains can be written, reviewed and
+// mutation-tested independently -- and so that two people never edit the same
+// file. The shared toolkit (the cartridge builder, the runner, the ARM
+// encoders) stays here; each module below owns exactly one defect domain.
+
+pub mod backup;
+pub mod guards;
+pub mod oam;
+pub mod rom;
+pub mod swi;
+
 // ---------------------------------------------------------------------------
 // ARM instruction encoders
 // ---------------------------------------------------------------------------
@@ -408,19 +436,9 @@ impl Fixture {
 #[cfg(test)]
 mod tests {
     use super::{
-        ldr, ldrh, mov_imm, mov_reg, orr_imm, str, strh, swi, Cartridge, Fixture, HALT,
+        ldr, ldrh, mov_imm, mov_reg, orr_imm, str, strh, swi, Cartridge, Fixture, BUDGET,
+        HALT, SCRATCH,
     };
-
-    /// A generous budget: the stub BIOS boots in a handful of instructions and
-    /// the body is a few words long, so this is far above what a working
-    /// program needs and far below "wait and see".
-    const BUDGET: usize = 100_000;
-
-    /// Where the self-checks put their scratch bytes.
-    ///
-    /// IWRAM, so the writes are visible through the bus exactly as a game's
-    /// would be.
-    const SCRATCH: usize = 0x0300_0000;
 
     /// Build the machine for `body` **without running it**.
     ///

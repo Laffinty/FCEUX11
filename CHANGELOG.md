@@ -5,6 +5,63 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — v2.0.3 GBA 卡带兼容性线
+
+### Added — S1 可复现门禁落地（S1-a，最小可复现夹具）
+
+- **9 条最小可复现夹具**（**7 条会红**的复现器 + **2 条绿锁**），按缺陷域分四个文件：
+  `src/rust/src/gba/fixtures/{swi,oam,backup,rom}.rs`（公共底座在 `fixtures.rs`）。
+  载体是 **Rust 内建**（现场拼出卡带镜像），**不产生任何二进制入库**；`.gitignore`
+  已加 `*.gba`（**无例外**）⇒ 商业卡带机械地进不了仓库。
+  - `swi_unimpl_1a` / `swi_unimpl_16`（S2-b / S3-a）：未实现的 BIOS SWI 落到 stub 的
+    `b .` 向量 ⇒ 永久自旋。
+  - `oam_bad_shape` / `oam_gfx_mode3`（S2-a）：OAM attr0 的 shape = 3 / gfx mode = 3
+    ⇒ vendor 核在**渲染中途** panic（`object_attributes.rs:265` / `:144`），
+    `panic = "abort"` ⇒ 进程闪退。夹具断言的是**「精灵按禁用处理」**（禁止精灵的
+    渲染帧与显式禁用精灵**逐字节相同**），不是「不会 panic」。
+  - `eeprom_chip_capacity` / `flash_status_reg`（S3-b）：`.srm` 恒 32768（芯片型号丢失）
+    / Flash 状态寄存器不存在。
+  - `rom_window_mirror`（S3-d）：超容量地址回**开放总线垃圾**而非镜像卡带。
+  - `gpio_read_before_write` / `eeprom_protocol_lock`（绿锁）：GBATEK 未定义
+    「未写入前读 GPIO」⇒ 锁现状；EEPROM 命令协议 vendor 与 GBATEK 逐位一致 ⇒ 锁协议。
+- **3 条常驻守卫**（`fixtures/guards.rs`）：G1 孤儿 `#[ignore]`（原因串必须指名工作项）/
+  G2 夹具集合完整性 / G4 复现器存在性与归属 ⇒ 防「ignore 腐烂」「夹具被删」
+  「红夹具被摘掉 `#[ignore]` 变成常驻绿锁」。
+- **GBA 锁测试 249 → 262**（+8 条编码器端到端自检 + 2 条绿锁 + 3 条守卫），
+  **26 ignored**（19 个测量工具 + **7 条复现器**，后者在 `--ignored` 下**逐条为红**）。
+- **GBATEK 取证可重跑**：`tools/fetch_gbatek.ps1` 抓取并转纯文本，**逐字节复现**现有
+  快照 ⇒ 计划里那些行号引用在重抓后依然成立；附录 A 补 **A.4（EEPROM 命令协议）**
+  与 **A.5（EEPROM 寻址与容量）**（照抄原文，带行号）。
+
+### Fixed — 编码器自检的「无牙门禁」（变异验证查出）
+
+- 8 条 G3 编码器自检首轮**测出 3 条盲区**（自己的编码器被改坏却照样全绿）：
+  `g3_orr_imm`（用的立即数根本不需要旋转）、`g3_strh`（存的值高半字为 0 ⇒ `STR` 与
+  `STRH` 写出的字节完全相同）、`g3_ldrh`（源字高半字为 0 + 内存往返抹掉差异）。
+  ⇒ 改用需要旋转的立即数 / **预置哨兵 `0xDEAD_BEEF`** / 源字改 `0xC5C5C500`，
+  并把断言从「内存往返」改为**读寄存器**。修后矩阵 **8/8 的目标都能红**，6/8 行
+  只红目标。
+
+### Changed — 计划口径的三处更正（由本轮取证得出）
+
+- ⚠️ **E3（Flash 状态寄存器）没有权威依据**：GBATEK 快照全文 grep `E000006` **零命中**，
+  GBATEK 的 flash 轮询是**回读比较**（`:8981`）⇒ 计划 §1.2.4 那句「按 GBATEK 的状态位
+  定义返回」**不成立**，S3-b 开工前须另找来源或用真卡带重新推导。
+- ⚠️ **vendor 的 LR 约定与真机差 4** ⇒ SWI 向量若照抄 IRQ 向量的 `SUBS PC, LR, #4`
+  会退回 SWI 自身重入；正确的向量字是 **`MOVS PC, LR`**（S2-b 的现成结论）。
+- ⚠️ **0x16 的命名三处不同**（GBATEK `Diff8bitUnFilterWrite8bit` / 仓库
+  `Diff8BitUnFilterWram` / 计划 `Diff8bitUnFilterWram`）—— 号码相同。
+- 计数口径：夹具是 **9 条**（7 红 + 2 绿），不是文档里写的「8 条」；门禁计数 262 不受影响。
+
+### Notes — 两个坑（已记入计划与 AGENTS.md）
+
+- **变异验证的还原腿会假红**：还原源文件不更新 mtime ⇒ cargo 判定「无需重建」⇒ 跑的是
+  上一轮变异版的二进制 ⇒ 还原处必须刷新 mtime。
+- **多个 worker 并发改同一个 vendor 文件会互撞**（一次把 vendor 自己的两条开放总线断言
+  弄红）⇒ 共享 vendor 树的变异验证必须串行或用隔离副本。
+
+> 本轮**未动任何生产代码**（夹具全在 `#[cfg(test)]` 下；vendor 树零改动，已逐文件哈希核对）。
+
 ## [2.0.2] - 2026-11-08
 
 本版以 **DEBUG 与性能优化** 为主线：NES 侧把调试门控、APU 帧计数器、PPU 扫描线与
