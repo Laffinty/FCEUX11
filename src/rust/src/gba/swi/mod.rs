@@ -50,9 +50,23 @@ impl BusLike for gba_core::bus::Bus {
 ///
 /// Returns `true` if we serviced it (the core then returns from the
 /// exception), `false` to let the core's own `match` try.
+///
+/// The test builds also tally every arrival (`note_dispatch` / `note_served`):
+/// the v2.0.3 probes report which SWI numbers a cartridge reached and whether
+/// anyone serviced them (plan §2.3 "加 SWI 陷阱记录"). The recorder is
+/// `#[cfg(test)]`, so the release build runs exactly the [`dispatch_inner`]
+/// body and nothing else.
 pub fn dispatch(cpu: &mut Arm7tdmi, swi_num: u32, old_cpsr: Psr, return_addr: u32) -> bool {
     #[cfg(test)]
     note_dispatch(swi_num);
+    let served = dispatch_inner(cpu, swi_num, old_cpsr, return_addr);
+    #[cfg(test)]
+    note_served(swi_num, served);
+    served
+}
+
+/// [`dispatch`]'s body, without the test tallying.
+fn dispatch_inner(cpu: &mut Arm7tdmi, swi_num: u32, old_cpsr: Psr, return_addr: u32) -> bool {
     let swi = Swi::from_raw(swi_num);
     match swi {
         Some(Swi::GetBiosChecksum) => {
@@ -607,6 +621,66 @@ fn note_dispatch(swi_num: u32) {
 fn take_last_dispatch() -> Option<u32> {
     let seen = LAST_DISPATCH.with(|slot| slot.replace(u32::MAX));
     (seen != u32::MAX).then_some(seen)
+}
+
+/// Per-number call tallies since the last drain, as `(calls, served calls)`.
+///
+/// `served = false` covers two different things -- a number in `0x00-0x2A`
+/// that only the vendored core implements (it will still run), and a number
+/// nobody implements (the CPU parks at BIOS 0x08). [`vendor_core_serves`]
+/// tells the two apart. Thread-local like [`LAST_DISPATCH`]: the test harness
+/// runs tests in parallel and one test's tallies must not answer another's
+/// question.
+#[cfg(test)]
+thread_local! {
+    static TALLIES: std::cell::RefCell<std::collections::BTreeMap<u32, (u64, u64)>> =
+        std::cell::RefCell::new(std::collections::BTreeMap::new());
+}
+
+#[cfg(test)]
+fn note_served(swi_num: u32, served: bool) {
+    TALLIES.with(|tallies| {
+        let mut map = tallies.borrow_mut();
+        let entry = map.entry(swi_num).or_insert((0, 0));
+        entry.0 += 1;
+        if served {
+            entry.1 += 1;
+        }
+    });
+}
+
+/// The per-number tallies since the last call, drained:
+/// `(number, calls, served calls)`.
+///
+/// Test-only like the recording itself -- the counters are `#[cfg(test)]`, so
+/// the release build carries none of this -- and the consumers are the
+/// research probes, which only exist under `cargo test`.
+#[cfg(test)]
+pub fn take_swi_tallies() -> Vec<(u32, u64, u64)> {
+    TALLIES.with(|tallies| std::mem::take(&mut *tallies.borrow_mut()))
+        .into_iter()
+        .map(|(num, (calls, served))| (num, calls, served))
+        .collect()
+}
+
+/// The name of a SWI number, for probe reports. Numbers outside the BIOS
+/// range get a phrase instead of a name.
+#[cfg(test)]
+pub fn swi_name(swi_num: u32) -> String {
+    match Swi::from_raw(swi_num) {
+        Some(swi) => swi.name().to_string(),
+        None => "outside 0x00-0x2A".to_string(),
+    }
+}
+
+/// Whether the vendored core services this number itself when we decline it
+/// (`arm7tdmi.rs` `handle_swi_hle`, plan §1.2.1): `0x00`, `0x06-0x08`, `0x0B`,
+/// `0x0C`. For these a declined dispatch is **not** "unimplemented" -- the
+/// core's own `match` handles them -- so `served = false` in a tally must not
+/// be read as a missing implementation.
+#[cfg(test)]
+pub fn vendor_core_serves(swi_num: u32) -> bool {
+    matches!(swi_num, 0x00 | 0x06 | 0x07 | 0x08 | 0x0B | 0x0C)
 }
 
 /// BIOS software-interrupt numbers, as encoded by the ARM `SWI` immediate.

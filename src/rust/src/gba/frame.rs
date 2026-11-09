@@ -146,21 +146,26 @@ fn machine_slot() -> &'static Mutex<Option<Machine>> {
 /// consumer end and the frame accounting both live on it, and duplicating the
 /// lock here would put two guards on one state.
 ///
-/// A poisoned lock means a previous call panicked while holding it. The state
-/// is then of unknown validity, so it is dropped rather than reused: an
-/// emulator that keeps going on a half-torn-down machine is worse than one
-/// that reports "no ROM".
+/// A poisoned lock means a previous call panicked while holding it. The
+/// poison is permanent for the life of the process -- std offers no
+/// unpoison -- so every call after the first panic would fail forever unless
+/// it recovers the guard, which is what `into_inner` does here,
+/// unconditionally.
+///
+/// Recovering and *using* the state is safe because the torn state is
+/// dropped at the one place a panic can be caught on this path --
+/// [`gba_step_frame`]'s catch drops the machine -- so a recovered lock finds
+/// either an empty slot (the normal post-panic state, reported as "no ROM")
+/// or a machine a later call legitimately installed. What this recovery must
+/// never do is re-lock inside the same expression: the first version did
+/// (`match machine_slot().lock() { Err(_) => machine_slot().lock() ... }`)
+/// and deadlocked on its own scrutinee, whose guard lives until the match
+/// ends -- the same self-hold that made the original `try_lock` recovery
+/// dead code.
 pub(crate) fn with_machine<R>(body: impl FnOnce(&mut Machine) -> R) -> Result<R, i32> {
-    let mut guard = match machine_slot().lock() {
-        Ok(guard) => guard,
-        Err(_) => {
-            // Take the state out and let it drop, so the next call starts clean.
-            if let Ok(mut slot) = machine_slot().try_lock() {
-                *slot = None;
-            }
-            return Err(GBA_ERR_STATE);
-        }
-    };
+    let mut guard = machine_slot()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     guard.as_mut().map(body).ok_or(GBA_ERR_NO_ROM)
 }
 
@@ -168,11 +173,15 @@ pub(crate) fn with_machine<R>(body: impl FnOnce(&mut Machine) -> R) -> Result<R,
 ///
 /// Dropping the old machine while holding the lock is what keeps the two from
 /// overlapping; a `Box<Gba>` moved out and freed on another thread is exactly
-/// what produced the heap corruption.
+/// what produced the heap corruption. The poison recovery is what keeps the
+/// install working after a caught frame panic (see [`with_machine`]) -- the
+/// first version's `if let Ok(...)` silently did nothing on a poisoned
+/// mutex, which would have made the machine permanently un-reloadable.
 fn set_machine(machine: Machine) {
-    if let Ok(mut slot) = machine_slot().lock() {
-        *slot = Some(machine);
-    }
+    let mut slot = machine_slot()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    *slot = Some(machine);
 }
 
 /// Prepare the GBA side. Idempotent, and safe to call before any ROM is
@@ -208,9 +217,10 @@ pub extern "C" fn gba_unload_rom() -> i32 {
 
 /// Drop the machine, if there is one.
 fn set_machine_unload() {
-    if let Ok(mut slot) = machine_slot().lock() {
-        *slot = None;
-    }
+    let mut slot = machine_slot()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    *slot = None;
 }
 
 /// Last error text, for the C++ side to show.
@@ -371,31 +381,143 @@ pub extern "C" fn gba_set_overlay(enable: i32) -> i32 {
 ///
 /// One frame of emulation, per the plan's `gba_step_frame`. `Gba::step`
 /// returns `true` on entering VBlank, which is the frame boundary.
+///
+/// A panic unwinding out of this `extern "C"` frame is undefined behaviour
+/// (plan invariant 3 / AGENTS.md discipline 6), so the frame step is caught
+/// here and reported as a code plus a readable reading
+/// ([`take_last_frame_panic`]). Under the release profile's `panic = "abort"`
+/// the catch cannot fire -- the process dies at the panic, exactly as before
+/// -- so the shipping build is unchanged; the catch exists for the test and
+/// probe builds, where cargo forces unwind for test targets even under
+/// `--release` (verified 2026-11-09 with a minimal out-of-repo experiment),
+/// and turns a core panic into a reading instead of a dead test binary
+/// (v2.0.3 plan §2.3 "加 panic 捕获").
 #[unsafe(no_mangle)]
 pub extern "C" fn gba_step_frame() -> i32 {
-    with_machine(|machine| {
-        // Bounded so a machine wedged before it ever reaches VBlank -- a
-        // game looping on an unclaimed SWI, say -- returns instead of
-        // hanging the emulator. The bound is far above a real frame: one
-        // GBA frame is 280,896 cycles.
-        const CYCLE_LIMIT: u64 = 16 * 280_896;
-        let mut cycles = 0u64;
-        while cycles < CYCLE_LIMIT {
-            if machine.gba.step() {
-                break;
+    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        with_machine(|machine| {
+            // Bounded so a machine wedged before it ever reaches VBlank -- a
+            // game looping on an unclaimed SWI, say -- returns instead of
+            // hanging the emulator. The bound is far above a real frame: one
+            // GBA frame is 280,896 cycles.
+            const CYCLE_LIMIT: u64 = 16 * 280_896;
+            let mut cycles = 0u64;
+            while cycles < CYCLE_LIMIT {
+                if machine.gba.step() {
+                    break;
+                }
+                cycles += 1;
             }
-            cycles += 1;
+            // The audio for this frame is whatever the core pushed while the CPU
+            // ran, so the drain belongs here and not in `gba_render_audio`: by the
+            // time a caller asks for samples the core may already be half a frame
+            // into the next one. Draining on a wedged machine is still correct --
+            // it produces the silence the clock asks for, and counts it, rather
+            // than leaving last frame's samples to be replayed.
+            machine.audio.advance_frame();
+            GBA_OK
+        })
+    }));
+    match outcome {
+        Ok(inner) => inner.unwrap_or(GBA_ERR_NO_ROM),
+        Err(payload) => {
+            note_frame_panic(&payload);
+            // The panic unwound through the machine lock, so the state is torn
+            // and the mutex poisoned: recover the guard and drop the machine
+            // rather than leave the slot wedged -- the same decision
+            // `with_machine` documents. The next frame reports "no ROM".
+            let mut slot = machine_slot()
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            *slot = None;
+            GBA_ERR_STATE
         }
-        // The audio for this frame is whatever the core pushed while the CPU
-        // ran, so the drain belongs here and not in `gba_render_audio`: by the
-        // time a caller asks for samples the core may already be half a frame
-        // into the next one. Draining on a wedged machine is still correct --
-        // it produces the silence the clock asks for, and counts it, rather
-        // than leaving last frame's samples to be replayed.
-        machine.audio.advance_frame();
-        GBA_OK
-    })
-    .unwrap_or(GBA_ERR_NO_ROM)
+    }
+}
+
+// Where to find the reading: `take_last_frame_panic`. Test-only, like the
+// probes that read it -- the release build never catches anything (abort),
+// so there is nothing for it to store. (A doc comment here would be an
+// "unused doc comment": `thread_local!` does not attach it.)
+#[cfg(test)]
+thread_local! {
+    static LAST_FRAME_PANIC: std::cell::RefCell<Option<String>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Install the hook that renders a caught panic as a readable reading.
+///
+/// The hook, not the payload, is the source of the text: on this toolchain a
+/// formatted panic (`Result::unwrap` among them) hands `catch_unwind` a
+/// payload that downcasts to neither `&str` nor `String` (measured
+/// 2026-11-10), while `PanicHookInfo::payload_as_str` reads it. The
+/// same trick, hook + thread-local, is what `fixtures/oam.rs` does.
+///
+/// Installed **once** per process and chained to the hook it replaced, so
+/// every other panicking test keeps the output it had. The record is
+/// thread-local, so one test's panic never lands in another test's slot.
+#[cfg(test)]
+fn install_frame_panic_probe() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        let previous = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            let location = info
+                .location()
+                .map(|location| format!("{}:{}", location.file(), location.line()));
+            let text = match info.payload_as_str() {
+                Some(text) => text.to_string(),
+                None => info.to_string(),
+            };
+            LAST_FRAME_PANIC.with(|slot| {
+                *slot.borrow_mut() = Some(match location {
+                    Some(location) => format!("{location}: {text}"),
+                    None => text,
+                })
+            });
+            previous(info);
+        }));
+    });
+}
+
+/// Record a caught frame-panic as text. The `eprintln` is unconditional so a
+/// build that does allow unwinding still says what happened on stderr, even
+/// outside the tests.
+fn note_frame_panic(payload: &(dyn std::any::Any + Send)) {
+    #[cfg(test)]
+    {
+        // The hook (if installed) already recorded the rendered text on this
+        // thread; use it, and fall back to the payload downcast only for the
+        // very first catch, which can happen before the probe was installed.
+        let text = take_last_frame_panic().unwrap_or_else(|| panic_payload_text(payload));
+        LAST_FRAME_PANIC.with(|slot| *slot.borrow_mut() = Some(text.clone()));
+        eprintln!("[gba] frame panic caught: {text}");
+    }
+    #[cfg(not(test))]
+    {
+        eprintln!("[gba] frame panic caught: {}", panic_payload_text(payload));
+    }
+}
+
+/// The last caught frame-panic on this thread, drained.
+#[cfg(test)]
+fn take_last_frame_panic() -> Option<String> {
+    LAST_FRAME_PANIC.with(|slot| slot.borrow_mut().take())
+}
+
+/// A caught panic payload as text. Local to each catch site (this file and
+/// `cartprobe.rs`): ten lines do not justify a new cross-module seam. Best
+/// effort -- on this toolchain a formatted panic's payload does not downcast,
+/// so the hook (`install_frame_panic_probe`) is the primary source and this
+/// only serves a catch that happened before any hook was installed.
+fn panic_payload_text(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(text) = payload.downcast_ref::<&str>() {
+        (*text).to_string()
+    } else if let Some(text) = payload.downcast_ref::<String>() {
+        text.clone()
+    } else {
+        "<non-string panic payload>".to_string()
+    }
 }
 
 // ---- savestates (v2.0 S2-b2) ------------------------------------------------
@@ -991,8 +1113,9 @@ mod tests {
         gba_battery_read, gba_battery_save_type, gba_battery_size, gba_battery_take_dirty,
         gba_battery_write, gba_savestate_load, gba_savestate_save, gba_savestate_size,
         gba_set_buttons, gba_set_overlay, gba_set_save_type, gba_step_frame, gba_unload_rom,
-        gba_buttons, machine_slot, read_c_string, scale5, with_machine, write_frame_bytes,
-        bgr555_to_rgba_scalar, BGR555_TO_RGBA,
+        gba_buttons, install_frame_panic_probe, machine_slot, read_c_string, scale5,
+        with_machine, write_frame_bytes, bgr555_to_rgba_scalar, take_last_frame_panic,
+        BGR555_TO_RGBA,
     };
     use gba_core::cpu::hardware::internal_memory::BackupType;
 use gba_core::cpu::hardware::keypad::GbaButton;
@@ -1124,6 +1247,76 @@ use gba_core::cpu::hardware::keypad::GbaButton;
                 );
             }
             assert_eq!(gba_load_rom_bytes(&vec![0u8; MIN_CARTRIDGE]), GBA_OK);
+        });
+    }
+
+    /// A core panic on the frame path is caught, reported as a code, and made
+    /// readable (v2.0.3 plan §2.3 "加 panic 捕获").
+    ///
+    /// The trigger is the OAM shape=3 path -- the one reachable vendor panic
+    /// (plan §1.2.2) -- driven through the public fixture encoders because
+    /// `fixtures/` must not be touched from outside. The program is the same
+    /// one the `oam_bad_shape` reproducer runs; the attr0 value `0xC001`
+    /// (shape bits 14-15 = 3, Y = 1) is `fixtures/oam.rs:109-110`'s
+    /// `SHAPE_PROHIBITED_*`.
+    ///
+    /// Under the release profile a core panic aborts -- the catch cannot fire
+    /// -- so this lock is about the test/probe builds; the shipping behaviour
+    /// is unchanged. Reverting the `catch_unwind` in `gba_step_frame` must
+    /// turn this red (the panic then propagates out of the test body).
+    #[test]
+    fn a_core_panic_in_step_frame_is_caught_and_readable() {
+        use crate::gba::fixtures::{Cartridge, HALT, mov_imm, orr_imm, strh, swi};
+
+        // Installed before the first catch, because the hook is what renders
+        // the panic as text on this toolchain (see its doc).
+        install_frame_panic_probe();
+        exclusively(|| {
+            gba_unload_rom();
+            let mut oam_cart = Cartridge::new();
+            oam_cart.code(&[
+                mov_imm(3, 0x0700_0000), // OAM base
+                mov_imm(2, 0xC000),      // attr0 high: shape bits 14-15 = 3
+                orr_imm(1, 2, 0x0001),   // attr0 low: Y = 1
+                strh(1, 3),              // attr0 = 0xC001 -- prohibited shape
+                mov_imm(1, 20),          // attr1: X = 20
+                orr_imm(0, 3, 2),
+                strh(1, 0),
+                mov_imm(1, 1), // attr2: tile 1
+                orr_imm(0, 3, 4),
+                strh(1, 0),
+                swi(HALT),
+            ]);
+            assert_eq!(gba_load_rom_bytes(&oam_cart.build()), GBA_OK);
+            // The sprite is only parsed when OBJ rendering is on -- the OAM
+            // reproducer plants the same DISPCNT bit before running.
+            with_machine(|machine| machine.gba.cpu.bus.write_word(0x0400_0000, 0x1000))
+                .unwrap();
+
+            let first = gba_step_frame();
+            assert_eq!(
+                first, GBA_ERR_STATE,
+                "a caught panic must report the machine unusable, got {first}"
+            );
+            let reading = take_last_frame_panic()
+                .expect("the panic must have been recorded as a reading");
+            assert!(
+                reading.contains("Prohibited ObjShape"),
+                "the reading must name the defect: {reading}"
+            );
+            // The torn machine was dropped, so the next frame reports "no
+            // ROM" -- the poison recovery in `with_machine` finds an empty
+            // slot, not the wreck.
+            let second = gba_step_frame();
+            assert_eq!(
+                second, GBA_ERR_NO_ROM,
+                "the torn machine must be gone, got {second}"
+            );
+            // The process recovers: a fresh load installs over the poisoned
+            // mutex and the frame path runs it to a normal VBlank.
+            assert_eq!(gba_load_rom_bytes(&cartridge()), GBA_OK);
+            assert_eq!(gba_step_frame(), GBA_OK);
+            assert_eq!(gba_unload_rom(), GBA_OK);
         });
     }
 
@@ -2920,6 +3113,11 @@ use gba_core::cpu::hardware::keypad::GbaButton;
     /// then stops, and an arbitrary step count lands somewhere inside that
     /// or inside the next sleep.
     ///
+    /// A machine that never sleeps gets an instruction-count window instead:
+    /// FireRed busy-waits (plan §1.2.3), so the fallback samples the PC and,
+    /// once a loop dominates the samples, opens the window by step count --
+    /// v2.0.3 plan §2.3 "让 `probe_what_one_frame_changes` 能对付忙等".
+    ///
     /// ```text
     /// set GBA_PROBE_ROM=C:\path\to\game.gba
     /// cargo test -p fceux11-rust --release --no-default-features --features gba --lib \
@@ -2928,7 +3126,13 @@ use gba_core::cpu::hardware::keypad::GbaButton;
     #[test]
     #[ignore = "a diagnostic probe for S4: it needs a real .gba and only reports"]
     fn probe_what_one_frame_changes() {
-        const WARMUP: u64 = 5_000_000;
+        /// Run this long before looking for the window, so the burst is the
+        /// settled behaviour rather than the boot sequence. `GBA_PROBE_WARMUP`
+        /// overrides it, the same knob the trace probe reads.
+        let WARMUP: u64 = std::env::var("GBA_PROBE_WARMUP")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(5_000_000);
         /// Hard cap on waiting for the machine to settle into its loop. If it
         /// never sleeps, this probe has no window to report and says so rather
         /// than inventing one.
@@ -2961,29 +3165,63 @@ use gba_core::cpu::hardware::keypad::GbaButton;
             settled += 1;
         }
         if !gba.cpu.halted {
+            // The machine spins instead of sleeping, so there is no halt to
+            // open the window on. Fall back to watching the PC settle: if one
+            // address dominates the samples, the machine is in its steady
+            // loop and an instruction-count window is the honest substitute.
+            const SAMPLE_EVERY: u64 = 64;
+            let mut samples: std::collections::BTreeMap<u32, u64> =
+                std::collections::BTreeMap::new();
+            let mut taken = 0u64;
+            for step in 0..SETTLE_LIMIT {
+                gba.step();
+                if step % SAMPLE_EVERY == 0 {
+                    *samples
+                        .entry(gba.cpu.registers.program_counter() as u32)
+                        .or_insert(0) += 1;
+                    taken += 1;
+                }
+            }
+            let (top_pc, top_count) = samples
+                .iter()
+                .max_by_key(|&(_, &count)| count)
+                .map(|(&pc, &count)| (pc, count))
+                .unwrap_or((0, 0));
+            let share = if taken > 0 {
+                top_count as f64 / taken as f64
+            } else {
+                0.0
+            };
             println!(
-                "  the machine never went to sleep in {SETTLE_LIMIT} steps, so it is\n  \
-                 spinning rather than waiting and this probe has no frame to open"
+                "  the machine never went to sleep in {SETTLE_LIMIT} steps: it is\n  \
+                 spinning rather than waiting, and the window below is opened\n  \
+                 by instruction count instead of by a halt. Over {taken} PC\n  \
+                 samples the hottest PC was {top_pc:#010x} with {share:.0}% of them.\n"
             );
-            return;
+            if share < 0.5 {
+                println!(
+                    "  the PC never settled on one loop; the window may not be a steady state"
+                );
+            }
+        } else {
+            // Sleeping is the *end* of a frame, not the start. Recording from here
+            // would watch a machine that is still asleep and report an empty frame
+            // for a game that is running perfectly well, so wait for it to wake
+            // before opening the window.
+            let mut slept = 0;
+            while gba.cpu.halted && slept < SETTLE_LIMIT {
+                gba.step();
+                slept += 1;
+            }
+            if gba.cpu.halted {
+                println!("  it never woke up in {SETTLE_LIMIT} steps; there is no frame to report");
+                return;
+            }
+            println!(
+                "  it fell asleep {settled} steps after the warm-up and stayed asleep\n  \
+                 {slept} more; opening the window when it wakes\n"
+            );
         }
-        // Sleeping is the *end* of a frame, not the start. Recording from here
-        // would watch a machine that is still asleep and report an empty frame
-        // for a game that is running perfectly well, so wait for it to wake
-        // before opening the window.
-        let mut slept = 0;
-        while gba.cpu.halted && slept < SETTLE_LIMIT {
-            gba.step();
-            slept += 1;
-        }
-        if gba.cpu.halted {
-            println!("  it never woke up in {SETTLE_LIMIT} steps; there is no frame to report");
-            return;
-        }
-        println!(
-            "  it fell asleep {settled} steps after the warm-up and stayed asleep\n  \
-             {slept} more; opening the window when it wakes\n"
-        );
 
         // IWRAM only. It is 32 KB, which is small enough to rescan every step,
         // and it is where a game keeps its flags -- the thing this probe is

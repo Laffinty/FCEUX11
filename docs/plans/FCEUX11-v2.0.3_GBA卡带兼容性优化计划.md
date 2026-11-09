@@ -11,6 +11,12 @@
 > 同时更正三处计划口径：① §四 S3-b 的「flash 状态寄存器按 GBATEK 的状态位定义返回」**
 > 无依据**（GBATEK 根本没有状态寄存器）；② SWI 向量字应为 `MOVS PC, LR`（vendor 的 LR 差 4）；
 > ③ 夹具是 **9 条**不是 8 条。**
+> **✅ r6（2026-11-10）：S1-b 探针改造完成 —— §2.3 六项全部落地，根 crate **264 / 26**（+2 常驻锁），
+> 复现器仍 7 红，ctest **36/36**，7 张卡带基线**零 panic、零未实现 SWI**，Dragon Ball 注入实验
+> 证明**游戏对输入有响应**（卡死未复现，交 S3-b/S3-c）。附录 A 补 **A.6（GPIO/RTC）**，
+> §一.5 行动项至此收口。三个实现层新事实见 §九 r6：**cargo test --release 仍 unwind**、
+> **格式化 panic 的 payload 不可 downcast（读数必须走 hook 的 payload_as_str）**、
+> **match scrutinee 自死锁**（初版毒锁恢复曾把全套件挂起）。**
 > **动 GBA 兼容性代码前先读 §一.2.2 开头的「更正」小节**——原文清单里 13 条有 11 条不可达，
 > **真正可达的只有 OAM 的两条**（shape=3 与 gfx mode=3）。
 > **立项目标**：把「商用手写 GBA 卡带跑不起来」这一类问题，从**靠人看**变成**可复现、可证伪、可回归**。
@@ -625,6 +631,7 @@ curl.exe -x http://127.0.0.1:7897 -o .zcode\gbatek_probe.html https://mgba-emu.g
 | r3 | 2026-11-09 | **GBATEK 逐位核实 ⇒ 撤回 r2 的一条结论，并据此改写夹具清单与出口计数。仍只动文档，未动任何生产代码。** ① **撤回「E1 · 访问窗口过宽 16 MB」**：GBATEK 快照（**本来就在本地**：`.zcode/gbatek_plain.txt`，4.0 MB，2026-11-08 抓取）`:8692-8694` 明文「**On carts with 16MB or smaller ROM, eeprom can be alternately accessed anywhere at D000000h-DFFFFFFh**」⇒ `internal_memory.rs:523-532` 的 `is_eeprom_access()` **与 GBATEK 一致**，**不是缺陷**。② **EEPROM 的命令协议 vendor 本来就是对的**：GBATEK `:8710-8786` 与 `internal_memory.rs:566-614` 逐位一致（请求位 `"11"`/`"10"`、6 或 14 位地址、64 位数据、读回 68 位 = 4 忽略 + 64 数据、MSB first、Ready 位、以 64 位为单位；写分支宽度判据 `buffer.len() >= 81` 也对）⇒ **存档芯片侧真正缺的只有 E2（型号丢失 ⇒ `.srm` 恒 32768）与 E3（Flash 状态寄存器不存在）**。③ **GPIO 侧取证只到位一半**：GBATEK 有 GPIO/RTC 章节（`:7984`/`:9189`/`:9287-9353`，含 Boktai 的引脚表），但**没有**定义「游戏尚未写入时读 `0x080000C4` 读到什么」⇒ 按纪律 4 **不许硬写断言** ⇒ 该条**降级为绿色回归锁**。⇒ **夹具清单：9 条 → 8 条**（**7 条会红** + **2 条绿锁**），**D3（业主原裁决「9 条」）相应改为 8 条**；⇒ **出口判据：常驻 249 → 262 全绿**（+8 G3 编码器自检 +3 守卫 +2 绿锁），**`-- --ignored` 另有 7 条复现器**（必须逐条为红），**S3 全修完 269 项全绿**。④ **教训**：本条与 r1 的「DMA 起始时序」「FLASH1M 容量」是**同一类错误**（凭记忆写位级/协议），本项目**已犯第四次** ⇒ **位级与协议一律查快照原文**。⑤ **Step 0 取证已完成**（快照在本地，不必联网），只剩「把 EEPROM / GPIO-RTC 两章的关键条目摘录写进附录 A + 加一条可重跑的抓取脚本」。 |
 | r4 | 2026-11-09 | **S1-a 的 Step 1（G3 编码器自检）已过变异验收 —— 测出 3 条盲区并修掉；8/8 的目标都能红，但 §2.4 的「只改一个字段 ⇒ 其它 7 条仍然绿」有 2 行结构性达成不了 ⇒ 需裁决。** ① **做法**：8 个编码器各一处**单字段**变异，逐次跑 8 条 G3 自检记逐条红绿（执行器 `.zcode/mutation_matrix.ps1`，不入库）。② **首轮测出 3 条盲区**（目标测试在自己的编码器被改坏时**照样绿** ⇒ 无牙门禁）：`g3_orr_imm`（立即数不需要旋转 ⇒「忘记旋转」不可观测）、`g3_strh`（存的值**高半字为 0** ⇒ `STR` 与 `STRH` 写出的字节完全相同）、`g3_ldrh`（源字高半字为 0 + 内存往返抹掉差异）⇒ **已修**：改用需要旋转的立即数 / **预置哨兵 `0xDEAD_BEEF`** / 源字改 `0xC5C5C500`，并把断言从「内存往返」改为**读寄存器**（否则自检会依赖别的编码器，矩阵无法定位）。③ **修后矩阵**：**8/8 的目标都红**；**6/8 行只红目标**（M2/M3/M4/M5/M6/M8）；**M1（`mov_imm`）红 5 条 = 恰好是「用 `mov_imm` 造地址」的自检集合**（1/3/4/5/6）—— 它是**唯一**能造地址的手段 ⇒ 结构性共因；**M7（`swi`）红 8 条** —— `swi(HALT)` 是**每条自检的终止器** ⇒ 结构性共因（一个坏 SWI 编码器 = 全局失败，**响亮地失败是对的**，代价是该行无法定位）。⇒ **要消掉这两行需改夹具脚手架**（基址寄存器预置 + 终止器改用 `gate.rs` 参考实现）⇒ **设计变更，超出 S1-a 授权 ⇒ 交业主裁决**；⚠️ 附带风险：改用「跑到预算耗尽」当终止器会**假绿**（程序没跑也读到预置值）⇒ 终止器必须可判定。④ **顺带登记一个坑**：变异验证的**还原腿会假红** —— 还原源文件不更新 mtime ⇒ cargo 判定「无需重建」⇒ 跑的是上一轮变异版的二进制 ⇒ **反向腿必须确认二进制是新的**。⑤ 门禁：根 crate **257**、vendor **242**、debug **93**、media **52**，全绿；**未动任何生产代码**。逐格读数见 `docs/plans/FCEUX11-v2.0.3_S1a_最小可复现夹具-实施计划.md` §十一 r4 与 §七 Step 1 验收记录 |
 | r5 | 2026-11-09 | **S1-a 完成 Step 0 余账 + Step 2/3/4/5/6 —— 9 条夹具与 3 条守卫落地，7 条复现器逐条为红，门禁命中 262；同时更正三处计划口径。** ① **Step 0 余账销清**：附录 A 补 **A.4（EEPROM 命令协议 `:8710-8786`）/ A.5（EEPROM 寻址与容量 `:8661-8706`）**（照抄原文、带行号）；新增 `tools/fetch_gbatek.ps1`（抓 HTML → 转纯文本，**逐字节复现**现有快照 ⇒ 附录 A 的行号引用在重抓后仍成立；错误路径实测：代理不可达 / HTTP 404 / 超时均 exit 3）。⚠️ **未销清**：§一.5 要求的 **GPIO/RTC 两章摘录（A.6）仍缺** ⇒ 该行动项未完全收口。② **Step 2**：9 条夹具按**缺陷域**拆成 `src/rust/src/gba/fixtures/{swi,oam,backup,rom}.rs`（公共底座留在 `fixtures.rs`）⇒ 文件域互斥、可并行；**7 条会红 + 2 条绿锁**，每条做过**双向变异验证**（变异腿 + 还原腿，还原后刷新 mtime）。③ **Step 3**：3 条常驻守卫 `fixtures/guards.rs`（G1 孤儿 `#[ignore]` / G2 夹具集合完整性 / G4 复现器存在性与归属）。④ **Step 4**：`.gitignore` 加 `*.gba`（**无例外**）⇒ 商业卡带机械地进不了仓库。⑤ **读数**：根 crate **262 passed / 26 ignored**（= 249 + 8 G3 + 2 绿锁 + 3 守卫）；**7 条复现器逐条为红**（`0 passed; 7 failed`）；`gba-core` **242** / `debug` **93** / `media` **52** 全绿；`ctest -LE perf` **36/36**。⚠️ **复现器必须带夹具域过滤**（`… --lib gba::fixtures:: -- --ignored`），不带过滤会拉进 19 个需要真卡带的测量工具。⑥ **三处口径更正（由本轮取证得出）**：**(a) §四 S3-b 第 2 条「`0x0E000006/7` 按 GBATEK 的状态位定义返回」不成立** —— GBATEK 快照全文 grep `E000006` **零命中**，GBATEK 的 flash 轮询是**回读比较**（`:8981` "wait until [E00xxxxh]=dat"）⇒ **GBATEK 没有 flash 状态寄存器**；S3-b 开工前须另找权威来源或用真卡带重新推导（现有夹具断言的是**本计划**给的 `0x0E000006/7` + ready=bit0）。**(b) §1.2.1 的兜底配方要改**：vendor 的 LR 约定与真机差 4 ⇒ SWI 向量若照抄 IRQ 向量的 `SUBS PC, LR, #4` 会**退回 SWI 自身重入**，正确的向量字是 **`MOVS PC, LR`**。**(c) 0x16 的命名三处不同**（GBATEK `Diff8bitUnFilterWrite8bit` / 仓库 `Diff8BitUnFilterWram` / 计划 `Diff8bitUnFilterWram`），号码相同。⑦ **计数口径**：夹具是 **9 条**（7 红 + 2 绿），**不是**「8 条（7 会红 + 2 绿锁）」⇒ 7 + 2 = 9；**门禁计数 262 不受影响**（绿锁只算 2 条常驻）。⑧ **两个坑**：① 变异验证的**还原腿会假红**（还原源文件不更新 mtime ⇒ cargo 跳过重建 ⇒ 跑的是上一轮变异版的二进制）；② **多个 worker 并发改同一个 vendor 文件会互撞** ⇒ 共享 vendor 树的变异验证必须串行或用隔离副本。⑨ **未动任何生产代码**（vendor 树零改动，逐文件哈希核对）。 |
+| r6 | 2026-11-10 | **S1-b 探针改造完成——§2.3 六项全部落地，新增 2 条常驻锁（根 crate 262 → 264 / 26 ignored），复现器 7 条仍逐条红；三个实现层新事实（工具链 ×2、并发 ×1），其中一个是全 suite 挂起级死锁的根因。改动只落在 `cartprobe.rs` / `frame.rs` / `swi/mod.rs` 三个文件；fixtures/ 与 vendor 树零改动。** ① **§2.3 六项**：(a) cartprobe verdict **通道化**——`describe_timing(channel, timing)`：DMA1/2 时序 3 标「sound FIFO，核心已服务」、DMA3 标「video capture —— never fired」、DMA0 标 prohibited；verdict 行按通道分别判，逐通道「STILL ENABLED」读数保留；(b) `swi/mod.rs` `dispatch` 拆为薄壳 + `dispatch_inner`，壳记录 `(号码, 是否认领)` 进 **`#[cfg(test)]`** thread-local 计数表（`take_swi_tallies` 排空 + `swi_name` / `vendor_core_serves` 判读辅助；vendor 自答集 {0x00,0x06–0x08,0x0B,0x0C}）——**release 生产零开销**（C3 同口径）；cartprobe 每卡打印「踩了哪些号码、谁服务、第一个未实现号之后 CPU 停在 0x08 所以之后的 SWI 不可能发生」；(c) `gba_step_frame` 外层 `catch_unwind` ⇒ 命中返回 **GBA_ERR_STATE**（**不新增错误码**——新码要动 build.rs，超出授权；语义对：机器已不可信），读数经 panic hook 记录；(d) 输入注入 `GBA_PROBE_INPUT="帧:键;…"`（1 基于测量窗、全状态语义、解析错即 panic 不静默）+ `GBA_PROBE_ONLY` 文件名过滤；(e) 窗口可配 `GBA_PROBE_FRAMES`/`GBA_PROBE_WARMUP`（默认 180/60 = 原 240）与 `GBA_PROBE_STUCK_FRAMES`（默认 30），verdict 新增「PC 连续 N 帧不变」读数（逐帧 modal PC 比对，报**终局**连击、不报历史最大）；(f) `probe_what_one_frame_changes` **忙等开窗**——halt 等不到时降级为 PC 采样稳定判定 + 按指令数开窗（FireRed 忙等从此可开窗）。② **两条常驻锁（264 = 262 + 2）**：`special_timing_wording_is_channel_aware`（cartprobe，钉 §1.3 判词措辞）与 `a_core_panic_in_step_frame_is_caught_and_readable`（frame.rs，断言**完整恢复周期**：返回 STATE / 读数含 "Prohibited ObjShape" / 下一帧 NO_ROM / **毒锁下重载成功且新机器跑通** / unload）。触发程序用 fixtures **公开**积木复刻 oam 夹具（attr0 = 0xC001 引自 `fixtures/oam.rs:109-110`；fixtures/ 未动）。③ **变异三腿双向可红**：腿 1 describe_timing 改回通道盲 ⇒ Lock A 红；腿 2 catch 改 `resume_unwind` ⇒ **0xC0000409 fail-fast**（panic 穿越 `extern "C"` 帧被判 foreign unwind 直接 abort——**生产「闪退」机制的活体演示**，AGENTS.md 纪律 6 的实证）；腿 3 摘掉 catch 处理器的机器丢弃 ⇒ 「torn machine must be gone, got 5」红。三腿还原后**刷 mtime** 复绿。④ **工具链事实 ×2（实测，有读数）**：(a) **`cargo test --release` 仍是 unwind**——`[profile.release] panic="abort"` 对测试目标不生效（仓库外微型实验实证）⇒ 探针/锁在 `--release` 取证跑法下 catch_unwind 与 panic hook **都工作**；⇒ **fixtures/oam.rs 注释「release 下 catch_unwind 无法挽救」被否证**（该文件本轮不动，仅在此记录；也意味着 OAM 复现器将来可在 --release 下跑）。(b) **格式化 panic 的 payload 拿不到字符串**——rustc 1.96 上 `Result::unwrap` 对 `Err(&'static str)` 的 panic，`is::<&str>()` 与 `is::<String>()` **双双为 false**（type_id 诊断实测）⇒ 读数必须走 **panic hook** 的 `PanicHookInfo::payload_as_str()`（fixtures/oam.rs 的 `payload_message` 有同一盲区，其 message 恒为 "<non-string panic payload>"、靠 location 工作——该文件本轮不动）。⑤ **并发事实 ×1（挂起级）**：**match scrutinee 自死锁**——`match m.lock() { Err(_) => m.lock() }` 里 scrutinee 临时 `Result`（**内含已持有的 guard**）存活到整个 match 结束 ⇒ Err 臂内对同一互斥量再 lock = 自己等自己。初版 with_machine 的毒锁恢复正中此坑：Lock B 第二次 step_frame 挂死 ⇒ `exclusively` 的 TEST_LOCK 永久被占 ⇒ 全套件其后 12+ 个 exclusively 测试排队挂起（首次全量门禁 60+ 秒无响应的根因）；这也解释了**旧代码 `try_lock` 恢复为何是死代码**（try_lock 同时被「毒」与「scrutinee 自持」双重挡死，r5 之前从未有人踩到）。修复 = **毒锁透明恢复**（`into_inner` 无条件恢复并使用；毒对进程终身有效，std 无 unpoison），撕毁态的丢弃收敛到 catch 处理器这个**唯一捕获点**；`set_machine` / `set_machine_unload` 同步恢复（否则毒锁后机器永久无法重载——初版 `if let Ok(...)` 在毒锁下静默不做事）。⑥ **门禁读数**：根 crate **264 passed / 26 ignored**（9.7 s）；复现器（`gba::fixtures::` 域过滤 + `--ignored`）**0 passed / 7 failed**；vendor **242** / debug **93** / media **52** 全绿；`ctest -LE perf` **36/36**（Release 全链重链，`-j 1`，BUILD_EXIT=0、零 LNK1104）。⑦ **卡带实测（本地取证，不进仓库）**：**7 张卡基线（默认 240 帧窗口）零 panic、零 NOT-SERVED SWI**——未实现 SWI 与 OAM panic 在开机窗口内都不触发，与「4 张失败卡的故障点在更深处」一致；判词无误导措辞（Dragon Ball 的 DMA1/2 FIFO 行正确标注 serviced）。画像：Dragon Ball/Minish Cap/Mario Kart 各自稳定在片头循环 PC（`0x08115ad0` 连击 135 帧 / `0x080b1500` 连击 180 帧 / `0x0806138c` 连击 176 帧）= **都在等输入**；FireRed「picture FROZEN」复现 §1.2.3 忙等画像；Kirby/NFS/SMA2 正常跑。**Dragon Ball 注入两轮（Start/A，300 帧 / 600 帧连打）**：**游戏对输入有响应**（每次有效按键后 30 帧内画面变化，600 帧 185 个不同帧哈希、预算零耗尽、零 panic、零未实现 SWI）——**「按键后卡死」在本时程/键位下未复现**；差异留给 S3-b/S3-c 用同一工具追（首要嫌疑：菜单后的存档通路 = §1.2.4 E2/E3 的 EEPROM_V124）。⑧ **生产 release 行为不变的边界**：`panic="abort"` 下 catch_unwind 不可能返回（abort 前原 diag hook 照记），本轮 catch/恢复只在 unwind 可用的构建（cargo test 全系、debug）改变行为——「panic 带走进程」变「错误码 + stderr 读数」。⑨ **bat 编码坑（补录）**：`.bat` 里写中文路径（`v2.0.3实测依据`）会被 cmd 按 OEM 码页读成乱码 ⇒ 探针目录/过滤/注入等含非 ASCII 的环境变量一律**从 bash 侧传入**（Git Bash 正确转 UTF-16），bat 内不放 `set` 行。AGENTS.md 已同步（v2.0.3 进度块 + 计数 + scrutinee 自死锁登记）。 |
 
 ---
 
@@ -747,6 +754,70 @@ width (only the lower 10 address bits are used, upper 4 bits should be zero).
 > 用途：S3-b「EEPROM 真模型」的寻址与容量依据（512 B ⇒ 6 位地址 `0-3Fh`、8 KB ⇒ 14 位地址
 > `0-3FFh`），也是 §一.2.4 E2「芯片型号与容量不建模 ⇒ `.srm` 尺寸恒 32768」的原文出处，
 > 而 `:8692-8694` 又是 r3 撤回「E1 访问窗口过宽 16 MB」的原文依据。
+
+### A.6 GPIO 寄存器与 RTC（S1-a 遗留，r6 补齐）
+
+> 快照行号范围：`.zcode/gbatek_plain.txt:9218-9276`（GPIO 寄存器三件套与写语义）、
+> `:9280-9295`（连接示例表）、`:9312-9331`（RTC 芯片与访问方式）、`:9371-9394`（RTC
+> Control Register）、`:9402-9406`（Datetime/Time 编码）；
+> **原文空行已略去，其余逐字未改。**
+
+```
+The I/O registers are mapped to a 6-byte region in the ROM-area at 80000C4h,
+the 6-byte region should be zero-filled in the ROM-image. In Boktai, the size
+of the zero-filled region is 0E0h bytes - that probably due to an incorrect
+definition (the additional bytes do not contain any extra ports, nor mirrors of
+the ports in the 6-byte region). Observe that ROM-bus writes are limited to
+16bit/32bit access (STRB opcodes are ignored; that, only in DS mode?).
+80000C4h - I/O Port Data (selectable W or R/W)
+  bit0-3  Data Bits 0..3 (0=Low, 1=High)
+  bit4-15 not used (0)
+80000C6h - I/O Port Direction (for above Data Port) (selectable W or R/W)
+  bit0-3  Direction for Data Port Bits 0..3 (0=In, 1=Out)
+  bit4-15 not used (0)
+80000C8h - I/O Port Control (selectable W or R/W)
+  bit0    Register 80000C4h..80000C8h Control (0=Write-Only, 1=Read/Write)
+  bit1-15 not used (0)
+In write-only mode, reads return 00h (or possible other data, if the rom
+contains non-zero data at that location).
+Connection Examples
+  GPIO       | Boktai  | Wario
+  Bit Pin    | RTC SOL | GYR RBL
+  -----------+---------+---------
+  0   ROM.1  | SCK CLK | RES -
+  1   ROM.2  | SIO RST | CLK -
+  2   ROM.21 | CS  -   | DTA -
+  3   ROM.22 | -   FLG | -   MOT
+  -----------+---------+---------
+  IRQ ROM.43 | IRQ -   | -   -
+GBA Cart Real-Time Clock (RTC)
+S3511 - 8pin RTC with 3-wire serial bus (used in Boktai)
+The chip is accessed via 4bit I/O port (only 3bits are used for RTC):
+Control Register
+  Bit Dir Expl.
+  0   -   Not used
+  1   R/W IRQ duty/hold related?
+  2   -   Not used
+  3   R/W Per Minute IRQ (30s duty)        (0=Disable, 1=Enable)
+  4   -   Not used
+  5   R/W Unknown?
+  6   R/W 12/24-hour Mode                  (0=12h, 1=24h) (usually 1)
+  7   R   Power-Off (auto cleared on read) (0=Normal, 1=Failure, time lost)
+Setting after Battery-Shortcut is 82h. Setting after Force-Reset is 00h.
+Datetime and Time Registers
+Same as NDS, except AM/PM flag moved from hour.bit6 (NDS) to hour.bit7 (GBA).
+```
+
+> 用途：S3-c「GPIO / RTC 与 FireRed 的标志位」的位级依据。**两条对本计划最要紧的原文事实**：
+> ① 「**the 6-byte region should be zero-filled in the ROM-image**」—— GPIO 区在 ROM 镜像里
+> 应零填充，且 ② 「**In write-only mode, reads return 00h (or possible other data, if the
+> rom contains non-zero data at that location)**」—— 这两条**共同**界定了「游戏尚未写入时
+> 读 GPIO 读到什么」：GBATEK 没有给出独立的「未初始化」语义，读到的就是 ROM 镜像里的字节
+> （应零填充）⇒ 夹具 8（`gpio_read_before_write`，绿锁）断言的「写入前读到 ROM 字节」
+> 与此一致，**不得改写成别的语义**。⇒ §一.5 的行动项（GPIO/RTC 两章摘录）至此收口。
+> RTC 侧注意：GBATEK 此处只定义了寄存器编码与 3-wire 串行访问方式，**没有**给出
+> 位流时序的逐位协议（那在 NDS 章节由引用覆盖）——S3-c 若要实现位级 RTC 对话，
+> **先回快照 NDS RTC 章核对**，不许凭此处摘录引申。
 
 ---
 

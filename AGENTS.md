@@ -107,6 +107,29 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 > 跳过重建 ⇒ 跑的是上一轮变异版的二进制）⇒ 还原处必须刷新 mtime；
 > ② **多个 worker 并发改同一个 vendor 文件会互撞** ⇒ 共享 vendor 树的变异验证
 > 必须串行或用隔离副本。
+>
+> ✅ **S1-b 探针改造已完成（2026-11-10，v2.0.3 r6）**：§2.3 六项（verdict 通道化 / SWI
+> 陷阱记录 / `gba_step_frame` catch_unwind / 输入注入 `GBA_PROBE_INPUT` + `GBA_PROBE_ONLY`
+> / 窗口与「PC 连续 N 帧不变」可配 / `probe_what_one_frame_changes` 忙等开窗）全部落地，
+> 只碰 `cartprobe.rs` / `frame.rs` / `swi/mod.rs`；fixtures/ 与 vendor 树零改动。
+> ⇒ **GBA 锁测试 262 → 264**（+2 常驻锁：`special_timing_wording_is_channel_aware`、
+> `a_core_panic_in_step_frame_is_caught_and_readable`——后者断言完整恢复周期：
+> panic→STATE / 读数 / 下一帧 NO_ROM / 毒锁下重载成功且新机器跑通），**26 ignored 不变**；
+> 复现器仍 7 红；vendor 242 / debug 93 / media 52 / `ctest -LE perf` 36/36 全绿。
+> 7 张卡基线（240 帧窗口）**零 panic、零未实现 SWI**（故障点在更深处）；Dragon Ball
+> 注入证明游戏对输入有响应、「按键后卡死」未复现（交 S3-b/S3-c 用同一工具追）。
+> ⇒ ⚠️ **三个工具链/并发事实（细节见计划 §九 r6）**：① **`cargo test --release` 仍是
+> unwind**（`panic="abort"` 不作用于测试目标）——fixtures/oam.rs 注释的相反说法被否证；
+> ② **格式化 panic 的 payload 不可 downcast**（rustc 1.96，`is::<&str>()`/`is::<String>()`
+> 双 false）⇒ panic 读数必须走 hook 的 `PanicHookInfo::payload_as_str()`（hook + thread-local
+> 是 fixtures/oam.rs 已验证的模式）；
+> ③ **match scrutinee 自死锁**——`match m.lock() { Err(_) => m.lock() }` 的 scrutinee
+> （内含 guard）活到 match 结束 ⇒ Err 臂内对同一互斥量再 lock = 自己等自己；毒锁恢复一律
+> **先 bind 再 `into_inner`**，不许在 match 臂内重入同一锁（初版 with_machine 正中此坑，
+> 全套件 12+ 测试排队挂起；也解释了旧 `try_lock` 恢复为何是死代码）。
+> ⇒ ⚠️ **bat 编码坑（补录）**：`.bat` 文件里写中文路径会被 cmd 按 OEM 码页读成乱码
+> ⇒ 含非 ASCII 的环境变量（探针目录 / 过滤 / 注入）一律**从 bash 侧传入**，bat 内不放
+> `set` 行。
 
 > ⚠️ **不变式 1 的判据是 F11QA 矩阵 `108P/12F`**，本机跑的是它的**本地近似**
 > `ctest`。**本地确定性门禁 = `ctest -LE perf`（36 项，须全绿；计数随新增测试增长，
