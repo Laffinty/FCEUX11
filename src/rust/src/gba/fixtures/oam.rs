@@ -26,6 +26,10 @@
 //!   and the fixture would measure nothing.
 //! * The assertion writes the **target** behaviour, never the panic.
 //! * Every reproducer carries `#[ignore = "S2-a: 修复后转常驻锁测试"]`.
+//!   ⚠️ **S2-a 补记（v2.0.3 r7）**：`oam_bad_shape` 与 `oam_gfx_mode3` 已随
+//!   S2-a 的修复摘掉 `#[ignore]` 转为**常驻绿锁**（vendor 把禁止值映射为
+//!   `ObjMode::Disabled`，目标行为成立）；其余复现器的 `#[ignore]` 不变，
+//!   守卫 G4 的复现器集合相应从 7 条减到 5 条。
 //! * A panic must be **caught and read**, never left to abort the test
 //!   binary: the release profile's `panic = "abort"` makes `catch_unwind`
 //!   useless, so the reproducer has to survive in the debug profile and say
@@ -485,8 +489,10 @@ mod tests {
     /// for 3 (`object_attributes.rs:194-205`), and `ObjAttribute0::try_from`
     /// unwraps it (`object_attributes.rs:265`) — the first of the two
     /// reachable panic sites.
+    /// Resident since S2-a (v2.0.3 r7): the vendor now maps shape = 3 onto
+    /// `ObjMode::Disabled`, so the target behaviour holds and this lock runs
+    /// in the gate instead of waiting behind an `#[ignore]`.
     #[test]
-    #[ignore = "S2-a: 修复后转常驻锁测试"]
     fn oam_bad_shape() {
         assert_treated_as_disabled("shape = 3", SHAPE_PROHIBITED_HIGH, SHAPE_PROHIBITED_LOW);
     }
@@ -500,8 +506,8 @@ mod tests {
     /// The vendor's `GfxMode::try_from` has no arm for 3 and falls into
     /// `unreachable!()` (`object_attributes.rs:136-147`) — the second of the
     /// two reachable panic sites.
+    /// Resident since S2-a (v2.0.3 r7), like [`oam_bad_shape`].
     #[test]
-    #[ignore = "S2-a: 修复后转常驻锁测试"]
     fn oam_gfx_mode3() {
         assert_treated_as_disabled(
             "gfx mode = 3",

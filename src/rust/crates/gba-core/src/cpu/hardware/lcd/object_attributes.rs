@@ -140,8 +140,17 @@ impl TryFrom<u16> for GfxMode {
             0 => Ok(Self::Normal),
             1 => Ok(Self::AlphaBlending),
             2 => Ok(Self::ObjectWindow),
-            4 => Err("Forbidden GfxMode"),
-            _ => unreachable!(),
+            // v2.0.3 S2-a: value 3 is prohibited (GBATEK attr0 bits 10-11:
+            // "10-11 OBJ Mode (0=Normal, 1=Semi-Transparent, 2=OBJ Window,
+            // 3=Prohibited)"), and anything larger cannot come out of a
+            // 2-bit field. The answer is an error, not a panic: real
+            // hardware treats a prohibited mode as "the sprite is not
+            // drawn", while the old `unreachable!()` here aborted the whole
+            // emulator mid-render across the extern "C" boundary
+            // (v2.0.3 plan §1.2.2, the commercial-cartridge crash).
+            // `ObjAttribute0::try_from` maps this error onto a disabled
+            // sprite.
+            _ => Err("Prohibited GfxMode"),
         }
     }
 }
@@ -256,13 +265,42 @@ pub struct ObjAttribute0 {
 impl TryFrom<u16> for ObjAttribute0 {
     type Error = &'static str;
     fn try_from(value: u16) -> Result<Self, Self::Error> {
+        // v2.0.3 S2-a: attr0 shape = 3 and gfx mode = 3 are **prohibited
+        // values** (GBATEK: "3=Prohibited" on both bit pairs). Real hardware
+        // treats them as "the sprite is not drawn"; this code used to panic
+        // on them (`.unwrap()` / `unreachable!()`) once per visible scanline
+        // -- mid-render -- which across the extern "C" boundary aborts the
+        // whole emulator (v2.0.3 plan §1.2.2, the commercial-cartridge
+        // crash). Both now map onto the existing `ObjMode::Disabled`
+        // representation, which `layer_obj.rs` already skips everywhere
+        // (`process_sprites_scanline` and
+        // `process_winobj_sprites_scanline`), so the observable behaviour is
+        // exactly the hardware's: the sprite is invisible, the frame
+        // continues. This is an externally-reachable input, so the fault
+        // tolerance is deliberate; genuinely internal invariants (values
+        // that cannot exist out of their field width) keep their panics.
+        let mut obj_mode: ObjMode = value.get_bits(8..=9).into();
+        let gfx_mode = match GfxMode::try_from(value.get_bits(10..=11)) {
+            Ok(gfx_mode) => gfx_mode,
+            Err(_) => {
+                obj_mode = ObjMode::Disabled;
+                GfxMode::Normal
+            }
+        };
+        let obj_shape = match ObjShape::try_from(value.get_bits(14..=15)) {
+            Ok(obj_shape) => obj_shape,
+            Err(_) => {
+                obj_mode = ObjMode::Disabled;
+                ObjShape::Square
+            }
+        };
         Ok(Self {
             y_coordinate: value.get_bits(0..=7) as u8,
-            obj_mode: value.get_bits(8..=9).into(),
-            gfx_mode: value.get_bits(10..=11).try_into().unwrap(),
+            obj_mode,
+            gfx_mode,
             obj_mosaic: value.get_bit(12),
             color_mode: value.get_bit(13).into(),
-            obj_shape: value.get_bits(14..=15).try_into().unwrap(),
+            obj_shape,
         })
     }
 }

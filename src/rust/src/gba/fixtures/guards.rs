@@ -47,12 +47,14 @@ const PLANNED: &[(&str, &[&str])] = &[
     ("gpio_read_before_write", &["S3-c"]),
 ];
 
-/// The seven that must be red today, and only those.
+/// The ones that must be red today, and only those. The two OAM reproducers
+/// (`oam_bad_shape` / `oam_gfx_mode3`) left this list on S2-a (v2.0.3 r7):
+/// their defect is fixed, their `#[ignore]` is gone, and they are resident
+/// green locks now — which is exactly what G4 must never see (a reproducer
+/// that lost its `#[ignore` without a fix).
 const REPRODUCERS: &[&str] = &[
     "swi_unimpl_1a",
     "swi_unimpl_16",
-    "oam_bad_shape",
-    "oam_gfx_mode3",
     "eeprom_chip_capacity",
     "flash_status_reg",
     "rom_window_mirror",

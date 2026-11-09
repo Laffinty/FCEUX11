@@ -396,6 +396,15 @@ pub extern "C" fn gba_set_overlay(enable: i32) -> i32 {
 pub extern "C" fn gba_step_frame() -> i32 {
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         with_machine(|machine| {
+            // Test-only mechanism-lock trigger (see `INJECT_FRAME_PANIC`):
+            // panics from the same spot a vendor panic would, while the
+            // machine lock is held.
+            #[cfg(test)]
+            {
+                if INJECT_FRAME_PANIC.with(std::cell::Cell::take) {
+                    panic!("injected frame panic");
+                }
+            }
             // Bounded so a machine wedged before it ever reaches VBlank -- a
             // game looping on an unclaimed SWI, say -- returns instead of
             // hanging the emulator. The bound is far above a real frame: one
@@ -443,6 +452,16 @@ pub extern "C" fn gba_step_frame() -> i32 {
 thread_local! {
     static LAST_FRAME_PANIC: std::cell::RefCell<Option<String>> =
         const { std::cell::RefCell::new(None) };
+
+    /// Test-only panic injection for `a_frame_panic_is_caught_and_the_machine_recovers`
+    /// (S2-a, v2.0.3 r7): S2-a mapped the two reachable vendor panics onto
+    /// "sprite disabled", so the core no longer panics on cartridge data and
+    /// the mechanism lock needs a trigger of its own. Set from the test, read
+    /// (and reset) inside `gba_step_frame`'s machine body -- the exact spot a
+    /// vendor panic unwinds from, so the catch, the poison recovery and the
+    /// reading are exercised on the production path. Compiled out of every
+    /// non-test build.
+    static INJECT_FRAME_PANIC: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 /// Install the hook that renders a caught panic as a readable reading.
@@ -1115,7 +1134,7 @@ mod tests {
         gba_set_buttons, gba_set_overlay, gba_set_save_type, gba_step_frame, gba_unload_rom,
         gba_buttons, install_frame_panic_probe, machine_slot, read_c_string, scale5,
         with_machine, write_frame_bytes, bgr555_to_rgba_scalar, take_last_frame_panic,
-        BGR555_TO_RGBA,
+        INJECT_FRAME_PANIC, BGR555_TO_RGBA,
     };
     use gba_core::cpu::hardware::internal_memory::BackupType;
 use gba_core::cpu::hardware::keypad::GbaButton;
@@ -1250,48 +1269,34 @@ use gba_core::cpu::hardware::keypad::GbaButton;
         });
     }
 
-    /// A core panic on the frame path is caught, reported as a code, and made
-    /// readable (v2.0.3 plan §2.3 "加 panic 捕获").
+    /// The frame-catch mechanism: a panic on the frame path is caught,
+    /// reported as a code, made readable, and the process recovers (v2.0.3
+    /// plan §2.3 "加 panic 捕获").
     ///
-    /// The trigger is the OAM shape=3 path -- the one reachable vendor panic
-    /// (plan §1.2.2) -- driven through the public fixture encoders because
-    /// `fixtures/` must not be touched from outside. The program is the same
-    /// one the `oam_bad_shape` reproducer runs; the attr0 value `0xC001`
-    /// (shape bits 14-15 = 3, Y = 1) is `fixtures/oam.rs:109-110`'s
-    /// `SHAPE_PROHIBITED_*`.
+    /// The trigger is **injected**, not a vendor defect: S2-a (v2.0.3 r7)
+    /// mapped the two reachable vendor panics (OAM shape/gfx prohibited
+    /// values) onto "sprite disabled", so the core no longer panics on
+    /// cartridge data -- and those two cases are now pinned by the resident
+    /// fixture locks `oam_bad_shape` / `oam_gfx_mode3`, which assert there is
+    /// no panic to catch. The injection point sits inside `gba_step_frame`'s
+    /// machine body (the exact spot a vendor panic unwinds from, machine lock
+    /// held), so the catch, the poisoned-lock recovery and the reading are
+    /// exercised on the production path; it compiles out of every non-test
+    /// build.
     ///
-    /// Under the release profile a core panic aborts -- the catch cannot fire
-    /// -- so this lock is about the test/probe builds; the shipping behaviour
-    /// is unchanged. Reverting the `catch_unwind` in `gba_step_frame` must
-    /// turn this red (the panic then propagates out of the test body).
+    /// Under the release profile a panic aborts -- the catch cannot fire --
+    /// so this lock is about the test/probe builds; the shipping behaviour is
+    /// unchanged. Reverting the `catch_unwind` in `gba_step_frame` must turn
+    /// this red (the injected panic then propagates out of the test body).
     #[test]
-    fn a_core_panic_in_step_frame_is_caught_and_readable() {
-        use crate::gba::fixtures::{Cartridge, HALT, mov_imm, orr_imm, strh, swi};
-
+    fn a_frame_panic_is_caught_and_the_machine_recovers() {
         // Installed before the first catch, because the hook is what renders
         // the panic as text on this toolchain (see its doc).
         install_frame_panic_probe();
         exclusively(|| {
             gba_unload_rom();
-            let mut oam_cart = Cartridge::new();
-            oam_cart.code(&[
-                mov_imm(3, 0x0700_0000), // OAM base
-                mov_imm(2, 0xC000),      // attr0 high: shape bits 14-15 = 3
-                orr_imm(1, 2, 0x0001),   // attr0 low: Y = 1
-                strh(1, 3),              // attr0 = 0xC001 -- prohibited shape
-                mov_imm(1, 20),          // attr1: X = 20
-                orr_imm(0, 3, 2),
-                strh(1, 0),
-                mov_imm(1, 1), // attr2: tile 1
-                orr_imm(0, 3, 4),
-                strh(1, 0),
-                swi(HALT),
-            ]);
-            assert_eq!(gba_load_rom_bytes(&oam_cart.build()), GBA_OK);
-            // The sprite is only parsed when OBJ rendering is on -- the OAM
-            // reproducer plants the same DISPCNT bit before running.
-            with_machine(|machine| machine.gba.cpu.bus.write_word(0x0400_0000, 0x1000))
-                .unwrap();
+            assert_eq!(gba_load_rom_bytes(&cartridge()), GBA_OK);
+            INJECT_FRAME_PANIC.with(|slot| slot.set(true));
 
             let first = gba_step_frame();
             assert_eq!(
@@ -1301,8 +1306,8 @@ use gba_core::cpu::hardware::keypad::GbaButton;
             let reading = take_last_frame_panic()
                 .expect("the panic must have been recorded as a reading");
             assert!(
-                reading.contains("Prohibited ObjShape"),
-                "the reading must name the defect: {reading}"
+                reading.contains("injected frame panic"),
+                "the reading must name the panic: {reading}"
             );
             // The torn machine was dropped, so the next frame reports "no
             // ROM" -- the poison recovery in `with_machine` finds an empty

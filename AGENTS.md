@@ -130,6 +130,22 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 > ⇒ ⚠️ **bat 编码坑（补录）**：`.bat` 文件里写中文路径会被 cmd 按 OEM 码页读成乱码
 > ⇒ 含非 ASCII 的环境变量（探针目录 / 过滤 / 注入）一律**从 bash 侧传入**，bat 内不放
 > `set` 行。
+>
+> ✅ **S2-a 已落地（2026-11-10，v2.0.3 r7）**：vendor 的两个可达 panic 点
+> （`object_attributes.rs` 的 OAM attr0 **shape=3 / gfx mode=3**）改为映射 **`ObjMode::Disabled`**
+> （真机语义：精灵不显示）——§1.2.2 的「闪退」根因消除；§3.1 表其余条目按 r2 判定
+> **不可达、不动**（业主裁决按 r2 收窄）。
+> ⇒ vendor 补丁 **27 → 28 处、5 → 6 个源文件**（ATTRIBUTION §3.2.12，#30）。
+> ⇒ **复现器 7 → 5**：`oam_bad_shape` / `oam_gfx_mode3` 摘 `#[ignore]` 转常驻绿锁
+> （`assert_treated_as_disabled` 双对照设计直接成立），守卫 G4 集合同步收窄；
+> **根 crate 264/26 → 266/24**，vendor 242 / debug 93 / media 52 / `ctest -LE perf` 36/36 全绿，
+> 7 卡基线复跑零回归（verdict 与 r6 逐字一致）。
+> ⇒ **S1-b 的 Lock B 改造为注入式机制锁**（业主裁决）：OAM 触发器随修复退役，改名
+> `a_frame_panic_is_caught_and_the_machine_recovers`——`#[cfg(test)]` 的
+> `INJECT_FRAME_PANIC` 在 `gba_step_frame` 的 machine body 内注入 panic（与 vendor panic
+> 同一条 unwind 路径，release 编译期消失）；断言链不变（STATE / 读数 / NO_ROM /
+> 毒锁下重载成功）。变异两腿双向可红（shape 映射改回 panic ⇒ oam_bad_shape 红；
+> gfx 映射「只回 Normal 不置 Disabled」⇒ oam_gfx_mode3 红）。
 
 > ⚠️ **不变式 1 的判据是 F11QA 矩阵 `108P/12F`**，本机跑的是它的**本地近似**
 > `ctest`。**本地确定性门禁 = `ctest -LE perf`（36 项，须全绿；计数随新增测试增长，
@@ -146,7 +162,7 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 > r54（**用户裁决 2026-10-03：接受 GBA 模块不完美**）解除，验证转 S4 长尾；
 > **GBA 长期 Alpha，不阻塞本体发版。**
 
-v2.0 对 vendor 树的本地修改是 **27 处、跨 5 个源文件**（文件清单用
+v2.0 对 vendor 树的本地修改是 **28 处、跨 6 个源文件**（文件清单用
 `git log --name-only --diff-filter=M -- src/rust/crates/gba-core/src/` 实测得出，
 不是手数；第 6 个文件是 `Cargo.toml`，不算源改动；r56 增 1 处，
 v2.0.1 P0 增 1 处、P2 先行工作项增 1 处、r5 增 2 处、r12 计费修复增 1 处、
@@ -160,6 +176,7 @@ r17 定时器分频增 1 处、r21/r22 定时器两项增 2 处、r34 预取命�
 | `src/cpu/hardware/timers.rs` | 3 | r17 的**定时器分频取错寄存器**（读 `TMxCNT_H` ⇒ 恒为 ÷1）修复 + r21/r22 的 TM0 cascade 位与使能启动延迟（**改变行为**）—— 见 ATTRIBUTION §3.2.7/§3.2.8 |
 | `src/cpu/hardware/rtc.rs` | 3 | S2-b3：固定时刻覆盖（**不改变上游行为**） |
 | `src/cpu/hardware/internal_memory.rs` | 4 | S2-b3 的 `rtc()` / `rtc_mut()` 2 处 + S3-1 的 `backup_type()` / `set_backup_type()` 2 处 |
+| `src/cpu/hardware/lcd/object_attributes.rs` | 1 | v2.0.3 S2-a（r7）：OAM 禁止值（attr0 shape=3 / gfx mode=3）映射为 `ObjMode::Disabled`（**改变行为**：原每扫描线 panic ⇒ 闪退根因；现为真机语义「精灵不显示」）——见 ATTRIBUTION §3.2.12；⚠️ 重新 vendor 时新版上游大概率仍是 panic，**合并会静默把闪退带回来** |
 
 **后三个文件里的改动都不改变「不覆盖时的行为」。** 但**补丁集已不再是「集中在一个
 文件」**（r38 ④ / r46 ①）—— 改动前先确认这一点是否仍成立，`rtc.rs`、

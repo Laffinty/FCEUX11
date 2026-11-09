@@ -67,7 +67,7 @@ inheritance:
 
 `[lints.clippy]` was carried over unchanged.
 
-### 3.2 Source files — 27 live local changes across 5 files (the reverted #24 and #27 keep their numbers but are not counted)
+### 3.2 Source files — 28 live local changes across 6 files (the reverted #24 and #27 keep their numbers but are not counted)
 
 `crates/gba-core/src/**` was byte-identical to upstream `emu/src/**` at the end
 of **S0** (verified file-by-file with SHA-256). Local edits begin at **S0'**, when
@@ -398,6 +398,14 @@ the timing-3 trigger and channel arbitration, which are separate mechanisms
 with their own RE to come.
 
 Patch count after this change: **27 live changes across 5 files**.
+
+#### 3.2.12 v2.0.3 (plan S2-a, r7) — prohibited sprite attributes panicked mid-render: 1 more change in `object_attributes.rs`
+
+| # | Change | Why |
+|---|--------|-----|
+| 30 | `object_attributes.rs`: `ObjAttribute0::try_from` maps attr0 **shape = 3** and **gfx mode = 3** onto the existing `ObjMode::Disabled` representation (shape falls back to `Square`; gfx mode to `Normal`) instead of panicking (`.unwrap()` / `unreachable!()`); `GfxMode::try_from` returns `Err("Prohibited GfxMode")` for the prohibited value instead of `unreachable!()` (the old `4 => Err` arm was dead — value 4 cannot come out of a 2-bit field — and folds into the same error). | Both values are **prohibited** per GBATEK (attr0 bits 14-15 "3=Prohibited", bits 10-11 "3=Prohibited") and real hardware treats them as "the sprite is not drawn"; the vendor panicked on them **once per visible scanline, mid-render** (`layer_obj.rs` `handle_enter_vdraw` → `get_attributes`), which across the `extern "C"` frame aborts the whole emulator — the commercial-cartridge crash of v2.0.3 plan §1.2.2 (the only two *reachable* panic sites in the vendor tree, per that plan's r2 audit). The mapping target is the vendor's own "invisible" representation: `process_sprites_scanline` and `process_winobj_sprites_scanline` both `continue` on `ObjMode::Disabled`, so the observable behaviour is exactly the hardware's. Genuinely internal invariants (values impossible out of their field width) keep their panics, per the plan's S2-a discipline. Pinned by the two resident fixture locks `oam_bad_shape` / `oam_gfx_mode3` (`src/rust/src/gba/fixtures/oam.rs` — formerly `#[ignore]`d reproducers, now permanent; each asserts the prohibited sprite is invisible while an explicitly-disabled control and a legal control bracket the comparison). Mutations: mapping either value back to a panic turns both locks red via `catch_panic_reading`; restoring turns them green (mtime refreshed). |
+
+Patch count after this change: **28 live changes across 6 files** (`object_attributes.rs` is the sixth).
 
 ### 3.3 `src/gba/` — new code, no upstream content
 
