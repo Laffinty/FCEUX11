@@ -147,6 +147,30 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 > 毒锁下重载成功）。变异两腿双向可红（shape 映射改回 panic ⇒ oam_bad_shape 红；
 > gfx 映射「只回 Normal 不置 Disabled」⇒ oam_gfx_mode3 红）。
 >
+> ✅ **S2-b 已落地（2026-11-11，v2.0.3 r12）**：stub BIOS 的 SWI 向量从 `b .` 自旋改为
+> **`MOVS PC, LR`**（`0xE1B0F00E`）——未实现 SWI 从「机器冻结在 BIOS 0x08」变「返回 +
+> 记录」，ARM 与 Thumb 双路夹具实证（Thumb 返回经 SPSR 恢复 THUMB 态）。
+> ⚠️ **计划 §3.2「寄存器默认值按 mGBA」口径已修正**：mGBA 源码不在本机
+> （`Research_only/` 已不存在），改按 **GBATEK SWI ABI 自建依据**（`:192058-192062`：
+> R2,R4-R14 保持不变 ⇒ 全寄存器保留、零编造返回值）；GBATEK 行号链独立确认
+> `MOVS PC, LR` 处方（ARM LR=PC+4 `:185686`、Thumb LR=PC+2 `:189222`）。
+> ⇒ **两条把缺陷锁成预期行为的测试已按 §1.2.1 预告改写**：
+> `abort_vectors_park_and_the_swi_vector_returns`（abort 向量仍 park——那是真异常）与
+> `an_unclaimed_swi_returns_and_is_recorded`；**生产侧记录器** `note_unimplemented_swi`
+> （每号首次 `eprintln!` + 常驻计数，vendor 自答 6 号不计入；跨 ABI 暴露为延后项）。
+> ⇒ **复现器 5 → 3**（`swi_unimpl_1a`/`swi_unimpl_16` 转常驻绿锁），夹具 9 → 10
+> （新增 Thumb 绿锁）；**根 crate 266/24 → 270/22**，vendor 242 / debug 93 / media 52 /
+> formats 153 / `ctest -LE perf` 36/36 全绿；7 卡基线逐字一致；变异 M1–M4 逐腿双向可红。
+> ⚠️ **新坑**：ARM `BX` 基字 bits 7-4 必须是 `0001`（`0xE12FFF10|rm`），写成
+> `0xE12FFF00` 会被 vendor 解码劫走当 MSR——「注释写对位段、常量写错」要靠 disasm 实证抓。
+>
+> ✅ **S2-c 已落地（2026-11-11，v2.0.3 r13）**：`gba_load.cpp` 每帧步进的错误码从
+> 「静默吞掉」改为**去重日志**（同码 streak 只报首帧、码变再报、干净帧/新会话清闩；
+> 走 `FCEU_printf`＝stdout + 消息日志 dock，**刻意避开 `FCEU_PrintError`**——它下游是
+> 弹窗）。不弹窗/不崩/不卸载，语义对齐 r6 的 catch_unwind 恢复机制；release
+> （panic="abort"）下 STATE 不可达，日志读者是 debug/探针构建。**红线 2 的容错读数自此
+> 在 C++ 侧也有落点。**
+>
 > ✅ **S4 · FC 侧修复批次已落地（2026-11-10，v2.0.3 r9）**：GitHub issue #12 的两个 NES 侧
 > 缺陷（iNES loader 硬拒非 2 幂 PRG / mapper 191、199 未注册灰屏）**均已修复**——
 > ① loader 的 PRG 切片 / 文件边界检查 / hash 改用 **raw** 字节数（**分配与映射仍用舍入后的

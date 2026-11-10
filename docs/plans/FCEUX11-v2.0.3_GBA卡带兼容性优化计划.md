@@ -35,6 +35,13 @@
 > `tofix & 1` 分支是空注释 ⇒ **整张 251 条修正表的 mapper 修正在本仓整体失效**）。
 > ⚠️ **S4 的 A3 决策「hash 用 raw」需要复议**（漏了 hash 同时是修正表的查找键）。
 > ⚠️ **本仓 fork 的上游基线是 FCEUX 2.6.6，不是 1.15**（1.15 是本项目自己的版本线）。
+> **✅ r12/r13（2026-11-11）：S2 止血收口 —— S2-b SWI 兜底落地（SWI 向量 `b .` →
+> `MOVS PC, LR`，未实现 SWI「永久自旋」→「返回 + 生产侧计数记录」；复现器 5 → 3，
+> 根 crate 266/24 → 270/22）；S2-c C++ 侧不崩落地（每帧错误码静默吞掉 → 去重日志）。
+> ⚠️ §3.2「寄存器默认值按 mGBA」口径修正：mGBA 源码不在本机（`Research_only/` 已不存在），
+> 改按 GBATEK SWI ABI 自建依据（§九 r12）。门禁全绿：ctest 36/36、vendor 242、
+> debug 93 / media 52 / formats 153；7 卡基线逐字一致。S3-a 前置 RE 证据表已存
+> `docs/plans/FCEUX11-v2.0.3_S3a前置RE-GBATEK与SWI证据表.md`。**
 > **立项目标**：把「商用手写 GBA 卡带跑不起来」这一类问题，从**靠人看**变成**可复现、可证伪、可回归**。
 > **基线**：`2960998`（v2.0.2 收口批次 r26 之后）· NES 侧 `ctest -LE perf` **36 项全绿** · F11QA 矩阵 **122 total / 112 passed / 10 failed / grade B / `pass_to_fail` 空** · GBA 锁测试 **249** + vendor **242** + debug **93** + media **52**
 > **产出定位**：只立项、排期、定验收；实施按工作项逐个开独立任务，**先 PLAN 后动手**的纪律不变。
@@ -415,7 +422,8 @@ GBATEK 权威（摘录见 §附录 A）：
       其中 **7 条会红**（`--ignored` 集合）+ **2 条绿色回归锁**（常驻）；
 - [ ] `cargo test -p fceux11-rust --no-default-features --features gba --lib`
       **从 249 项增加到 262 项，全绿**（= 249 + **8** 条编码器端到端自检 + **3** 条守卫 + **2** 条绿色回归锁）；
-      另有 **`#[ignore]` 复现器**（r5 时 7 条 ⇒ **r7 后 5 条**：两条 OAM 复现器已转常驻绿锁），
+      另有 **`#[ignore]` 复现器**（r5 时 7 条 ⇒ r7 后 5 条 ⇒ **r12 后 3 条**：
+      两条 OAM（r7）与两条 SWI（r12）复现器已转常驻绿锁），
       在 `-- --ignored` 下运行，**它们必须逐条为红**（红 = 缺陷在场）；
 - [ ] 每条复现器都带 `#[ignore = "S2-x / S3-x: 修复后转常驻锁测试"]` 的**指名归属**；
 - [ ] **每条绿锁今天就是绿的**（EEPROM 协议逐位对 GBATEK、GPIO 机制事实）——
@@ -456,6 +464,13 @@ GBATEK 权威（摘录见 §附录 A）：
 
 ### 3.2 S2-b 未实现 SWI 的兜底
 
+> ✅ **已落地（2026-11-11，r12）**：向量字 = `MOVS PC, LR`（`0xE1B0F00E`），未实现 SWI
+> 返回续接点（ARM/Thumb 双路夹具实证），生产侧 `note_unimplemented_swi` 每号首次日志 +
+> 常驻计数（vendor 自答 6 号不计入）。⚠️ 本节「寄存器返回值按 mGBA 的做法给合理默认」
+> **口径已修正**：mGBA 源码不在本机，改按 GBATEK SWI ABI 自建依据（R2,R4-R14 保持不变
+> ⇒ 全寄存器保留、零编造返回值），见 §九 r12。两条被 §1.2.1 预告的锁测试已改写并更名；
+> 复现器 5 → 3；夹具 9 → 10（新增 Thumb 绿锁）。
+
 - 把 `bios.rs:134` 的 SWI 向量从 `BRANCH_SELF` 改成「**返回 + 记录 SWI 号码**」。
 - ⚠️ **必然要改两条锁测试**：`bios.rs:396-401`、`bios.rs:218-223`
   —— 断言从「park」改成「返回并记录」（§1.2.1 已预警）。
@@ -465,15 +480,24 @@ GBATEK 权威（摘录见 §附录 A）：
 
 ### 3.3 S2-c C++ 侧不崩
 
+> ✅ **已落地（2026-11-11，r13）**：`gba_load.cpp` 每帧步进错误码 → `note_step_error`
+> 去重日志（`FCEU_printf`＝stdout + 消息日志 dock；**刻意避开 `FCEU_PrintError`**——
+> 它下游是弹窗）。不弹窗/不崩/不卸载；同码 streak 首帧报、码变再报、干净帧与新会话清闩。
+> 详见 §九 r13。
+
 - `src/gba_load.cpp` 的每帧步进包一层错误处理：Rust 侧返回错误码时
   **不弹窗、不崩**，只记日志并继续（对齐 AGENTS.md 纪律 6）。
 
 ### 3.4 S2 出口判据
 
-- [ ] **9 条夹具**全部**从「会崩/会卡死」变成「能跑完」**（对应条目逐条打勾）；
-- [ ] `gba_step_frame` 在所有夹具下**不返回 panic**；
-- [ ] 4 张失败卡带本地跑：**不再闪退**（卡死/黑屏允许存在 —— 那是 S3 的事）；
-- [ ] NES 零回归（同上）。
+- [x] **9 条夹具**全部**从「会崩/会卡死」变成「能跑完」**（r12 收口）：会崩/会卡死的四条
+      （swi 自旋 ×2、OAM panic ×2）全部能跑完——swi 两条已转常驻绿锁；其余红复现器
+      不崩不挂（断言的是 S3 待修值）；r12 另增 Thumb 绿锁，夹具 9 → 10；
+- [x] `gba_step_frame` 在所有夹具下**不返回 panic**（r6 catch_unwind 兜底 + r7 OAM 修复 +
+      r12 变异 M1–M4 背书）；
+- [x] 4 张失败卡带本地跑：**不再闪退**（r6/r7/r12 三轮 7 卡基线零 panic；MKSC r56 已可玩；
+      卡死/黑屏仍在——那是 S3 的事）；
+- [x] NES 零回归（r12/r13 终轮：`ctest -LE perf` 36/36；F11QA 矩阵待 push 后 CI 复核）。
 
 ---
 
@@ -799,6 +823,8 @@ curl.exe -x http://127.0.0.1:7897 -o .zcode\gbatek_probe.html https://mgba-emu.g
 
 | r10 | 2026-11-10 | **S4 的 B4 人工步骤已做（业主用 9 张 NES 卡带实测 v2.0.2_hotfix1）+ 上游对照实验完成 ⇒ 定位到两个真实缺陷：hash 作用域与 ROM 修正表写回。** ① **版本口径更正**：本仓 fork 的上游基线是 **FCEUX 2.6.6**（`1c35642:src/version.h` = MAJOR 2 / MINOR 6 / PATCH 6），「FCEUX 1.15」是**本项目自己的版本线**——两者极易混；上游 GitHub 发布只回溯到 2.2.x、1.15 的二进制在 SourceForge（实测 404）⇒ 对照实验取 **2.6.6（精确基线）+ 2.7.0（最新）**。② **对照方法**：三个模拟器同一批 9 张卡、同参数（启动→`SetWindowPos(HWND_TOPMOST)`→等 6 s→抓模拟器窗口→1.5 s 后再抓一次），按**画面区**做 4bit 量化，取「不同颜色数 / 主色占比 / 主色 RGB / 两帧差异率」；⚠️ 本仓 exe **不吃命令行 ROM**（Qt 前端从不调 `Config::_parseArgs`，`_parseArgs` 只属于旧的 SDL 前端）⇒ 改走 GUI 自动化（Alt+F→O→**剪贴板粘贴**路径→Enter，中文路径无法用 SendKeys 直输），已验证真的装载（银白色沙加跑出标题画面）。③ **读数**：**上游 2.6.6 与 2.7.0 对 9 张卡的结论逐字相同**；其中 8 张与本仓一致，**1 张不同** —— 吞食天地2：**上游跑出游戏自己的「吞食天地」LOGO（能用），本仓全灰**。④ **根因（两处，均已实测闭环）**：**(a) hash 作用域** —— 本仓 `fceux11_rust_ines_compute_hash` 收的是 **raw PRG 字节数**（`ines.rs:1016-1018`），而上游 2.6.6 / 2.7.0 都按**舍入 + 0xFF 填充**后的 PRG 缓冲区算（`ines.cpp:957/959`：`md5_update(&md5, ROM, ROM_size << 14)`、`CalcCRC32(0, ROM, ROM_size << 14)`）；`ines-correct.h` 的修正表**以该 CRC 为键** ⇒ **非 2 幂 PRG 的 ROM 必然查不中**（吞食天地2：raw `0x50D82653` 查不到、padded `0x28192599` 命中 `{0x28192599, 198, -1}` —— **它实际是 mapper 198，不是头里写的 4**）。**(b) 修正写回缺失** —— `ines_load.cpp:100` 的 `ines_apply_corrections(const FceuInesCartResult&, …)` 把修正后的 mapper 写进**局部** `parseResult.mapper_no`，`tofix & 1` 分支是**空注释**（`:128`），从未写回 `iNESCart.mapper_number`（`:160` 的局部 `MapperNo` 也不更新）⇒ **整张 251 条修正表的 mapper 修正在本仓整体失效**（镜像 / 电池 / 清 VROM 三类修正是写回了的）。⑤ **与 S4 的关系**：**S4 没有失败** —— 它的两个修复都真实生效（registry 让 3 张 191/199 卡能出画面；loader 让非 2 幂 PRG 卡从「被拒」变成「能装载」），**是 S4 把非 2 幂 ROM 第一次放进流水线，从而暴露了下一层的两个缺陷**；⚠️ **S4 的 A3 决策「hash 用 raw」需要复议**（其依据「对既有 ROM hash 零变化」成立，但**漏了 hash 同时是修正表的查找键**）⇒ 与 §四之二 A3 直接冲突，必须按本条重写。⑥ **其余 8 张**：两种 CRC 均**不在**修正表 ⇒ 无修正可用，行为与上游一致（Q Boy / SD高达外传2 / SD高达外传3 两版 = 上游级缺口；大盗伍佑卫门外传 / 银白色沙加 = 双方都正常；拉迪亚战记 = 本仓比上游多一点活动但仍黑屏；SD高达外传1 = 双方都黑屏）。⑦ **下一步（新工作项 S5）**：① hash 改回「按实际映射缓冲区算」（raw PRG + 0xFF 填充到 2 幂，CHR 同理）以对齐上游表键；② 把 `parseResult.mapper_no` 写回 `iNESCart.mapper_number` 与局部 `MapperNo`；③ 各配一条锁（formats crate 侧断言 padded CRC 与上游一致；C++ 侧断言修正后的 mapper 真的到达 `create_cart_for_mapper`）；④ 用这 9 张卡作**本地取证夹具**回归（卡带不进仓库）。 |
 | r11 | 2026-11-11 | **S5 落地（三个缺陷全修，吞食天地2 跑出与上游一致的游戏标题画面）——门禁全绿，formats 151 → 153。** ① **A1（hash 作用域，Rust）**：`fceux11_rust_ines_compute_hash` 增 `prg_padded_size` / `chr_padded_size` 两个参数，新加 `feed_padded()` 辅助（raw 字节 + `0xFF` 填充到 2 幂，哈希覆盖**实际映射缓冲区**）；同批把 `compute_layout` 的 `prg_size_bytes` 改成**恒为舍入尺寸**（上游的 `ROM_size = uppow2(not_round_size)`，其注释明说映射要求 2 幂）⇒ 映射尺寸与 hash 口径一致。**⚠️ 这一条推翻 S4 的 A3 决策**（详见 r10 与 §四之三 A1 的备注）：A3 的依据「对既有 ROM hash 零变化」成立，但**漏了 hash 同时是修正表 / `SAVIE_WHITELIST` / `CheckBad` / `MasterRomInfo` 的查找键**；**A1/A2 的 raw 切片保留不动**（issue #12 的核心修复不受影响）。② **A2（修正写回，C++）**：`ines_apply_corrections()` 增出参 `corrected_mapper`（此前 `tofix & 1` 分支是**空注释**，修正后的 mapper 烂在局部 `parseResult` 里）⇒ 修正后的号进入 `iNES_Init()` 与 v1.8 cart factory；规则抽成 `ines.h` 的 `FCEU_EffectiveMapperNo()` 以便锁。③ **A3（mapper 198 的 power，C++）**：上游 `Mapper198_Init` 是 `info->Power = M195Power`（把 16 KB WRAM 映到 `$5000` 并装读写 handler），本仓基类只跑 `GenMMC3Power()`（WRAM 在 `$6000`）⇒ 该板**没有 `$5000` 的工作 RAM**；已按 S4 的 B1′ 同一模式加 `Mapper198Cart::on_power()` → `M195Power()`（`M195Power` 去 static）。**其余 16 个同因变体另立项**。④ **锁（+2 Rust、+2 C++）**：Rust 侧把原 A5 锁的 hash 断言改为 padded 口径并加 `assert_ne!(raw hash)`（把「不能算 raw」钉住）、新增「padded CRC `0x28192599` 命中 `{…,198,-1}`」与「修正写进 `parseResult.mapper_no`」两条；C++ 侧（`mapper_load_test`）新增 mapper 198 的 **`$5000` 写回读**（写 `0x5A` 再读回：跑 `M195Power` ⇒ `0x5A`，不跑 ⇒ 开放总线 `0x00`）与「有效 mapper 规则」两条。⑤ **门禁（实测）**：`ctest -LE perf` **36/36**；GBA 根 **266/24**、vendor **242**、debug **93**、media **52** 全绿；formats **151 → 153** 全绿 ⇒ **未碰 GBA 线**。⑥ **回归（本地取证，9 张卡 GUI 自动化实测）**：吞食天地2 **跑出「吞食天地 三国外传 PUSH START BUTTON 豪华中文版」**（上游同卡同画面）⇒ **S5 的目标达成**；9 张里 **8 张与上游 2.6.6 / 2.7.0 行为一致**，剩下 4 张（Q Boy / SD高达外传2 / SD高达外传3 两版）**双方都灰屏** ⇒ **上游级缺口**，非本仓回归，另立项。⑦ **本轮顺带确立的两个可复用事实**：① **本仓 exe 不吃命令行 ROM**（Qt 前端从不调 `Config::_parseArgs`，`_parseArgs` 只属于旧的 SDL 前端）⇒ 自动化必须走 GUI（Alt+F→O→**剪贴板粘贴**路径→Enter；中文路径无法用 SendKeys 直输）；② **上游基线是 FCEUX 2.6.6**，「1.15」是本项目自己的版本线（上游 GitHub 发布只回溯到 2.2.x，1.15 的二进制在 SourceForge 且已 404）。 |
+| r12 | 2026-11-11 | **S2-b 落地——stub BIOS 的 SWI 向量从 `b .` 自旋改为 `MOVS PC, LR`，未实现 SWI 从「机器冻结在 BIOS 0x08」变「返回 + 记录」。** ① **兜底语义（口径修正）**：§3.2 原文「寄存器返回值按 mGBA 的做法给合理默认」**无法按字面执行——mGBA 源码不在本机**（`Research_only/` 目录已不存在，实测）；改按 **GBATEK 自建依据**：SWI 通用 ABI「Outgoing registers R0,R1,R3 are typically containing either garbage, or return value(s). All other registers (R2,R4-R14) are kept unchanged.」（`.zcode/gbatek_plain.txt:192058-192062`）⇒ 调用了未实现调用的游戏本就无权期待返回值，**向量字 = `MOVS PC, LR`（`0xE1B0F00E`）、全寄存器保留、零编造**。② **返回地址证据链**：GBATEK「For Returning from SWI use MOVS PC,R14」`:185672-185674`；ARM 态 LR=PC+4 `:185686`、Thumb 态 LR=PC+2 `:189222` ⇒ LR 恰好停在 SWI 之后那条指令，两种状态都直落续接点；`SUBS PC,LR,#4` 会退回 SWI 自身重入（r5 ⑥(b) 预警的实证确认）。③ **落点**：`bios.rs` 的 `MOVS_PC_LR` 常量（`:115`）进 `build()` 的 0x08 槽位；`BRANCH_SELF` 保留给 abort 向量 0x04/0x0C/0x10/0x14（真异常响亮地停仍是对的）；vendor 侧**零改动**（`operations.rs:121-151` 的 S 位返回路径被 IRQ 返回实际走通，只读核实）。④ **生产侧记录（红线 §六.3）**：`swi/mod.rs` 的 `note_unimplemented_swi`（decline 臂调用）——thread-local `BTreeMap` 每号累计计数、每号只报首次 `eprintln!`（格式 `[gba] swi 0xNN …`），后续静默计数不刷屏；过滤器 `vendor_core_serves` 从 `#[cfg(test)]` 转常驻（vendor 自答的 0x00/0x06-0x08/0x0B/0x0C 不计入）；**未新增 C ABI 导出**（跨出须动 build.rs + ffi.rs + drift guard + 生成头，登记为延后项）。⑤ **锁面**：两条被 §1.2.1 预告的锁按预告改写并更名——`abort_vectors_park_and_the_swi_vector_returns`（原 `unhandled_vectors_park_instead_of_wandering`：abort 向量仍 park、0x08 = MOVS_PC_LR）与 `an_unclaimed_swi_returns_and_is_recorded`（原 `the_stub_does_not_implement_swi`：端到端断言 SWI 0x1A 后机器到 Halt、续接指令真跑、ABI 保留 r4、tallies 记 (0x1A, served=0)、生产计数恰 [(0x1A,1)]）；新增 `the_production_recorder_counts_unimplemented_calls_and_skips_served_ones`；`swi_unimpl_1a`/`swi_unimpl_16` 摘 `#[ignore]` 转常驻绿锁（照 r7 ④ 先例）；新增 Thumb 绿锁（见 ⑦）；REPRODUCERS 5 → 3、夹具 9 → 10。⑥ **变异 M1–M4 逐腿双向可红**（还原刷 mtime）：M1 向量改回 park ⇒ 恰 5 条红；M2 记录器摘掉 ⇒ 恰 2 条红；M3 vendor 过滤摘掉 ⇒ 恰 1 条红；M4 Thumb 编码器 rd 字段挪错 ⇒ 恰 1 条红；各腿其余测试保持绿（各断言各管一段）。⑦ **Thumb 路径完整成立**：夹具 `thumb_swi_unimpl_1a_returns_and_continues_in_thumb`——ARM 入口 BX 进 Thumb，`swi 0x1A` 后 post-call 标记 0xA5 ≠ pre-call 0x5A（只能由异常返回后真继续执行 Thumb 置位），halt 时仍为 Thumb 态（MOVS 从 SPSR 恢复 THUMB 态，GBATEK `:189203-189210` 在 vendor 上实证）。⚠️ **新坑（已写进编码器文档）**：ARM `BX` 基字 bits 7-4 必须是 `0001`（`0xE12FFF10|rm`）——首版写 `0xE12FFF00` 被 vendor 的 `is_msr_flg` 特判劫走解码成 MSR，机器停 0x08、dispatcher 零调用的假象；「文档注释写对位段、常量写错」靠 disasm 通道实证才抓到。⑧ **门禁（终轮复跑）**：根 crate **270 passed / 22 ignored**（266/24 → +2 转正 + 记录器锁 + Thumb 锁；22 = 19 测量工具 + 3 复现器）；复现器域过滤 `--ignored` **0 passed / 3 failed**（eeprom_chip_capacity / flash_status_reg / rom_window_mirror，归属 S3）；vendor **242**（= 未碰 vendor）；debug 93 / media 52 / formats 153 / 两态 `cargo check` 全绿；Release 构建 EXIT=0、`ctest -LE perf` **36/36**；**7 卡 release 基线逐字一致**（6 changing + FireRed FROZEN；零 panic、零 not-implemented 日志、tallies 无 NOT SERVED——兜底路径在 7 卡窗口内未被触发，触发面由 M1–M4 背书）；探针日志存 `.zcode/s2b/baseline_s2b.log`（gitignored）。⑨ **S3-a 前置 RE 同轮完成（只读）**：15 个目标号码逐号证据表（GBATEK 行号逐条、mGBA 列全部 n/a）、**8 条「GBATEK 未指定」清单**（0x1F 公式、0x20–0x24 全部语义、0x19 渐变表、0x1A 写入效果、无参声音 SWI 的指针来源、0x2A 的 36 项函数表等——开工时按纪律 4 停下记录）、0x26 HardReset 的**结构性实现障碍**（dispatch 拿不到整机所有权）、SOUNDBIAS 是 `0x04000088` 不是 `0x04000208`（那是 IME）；证据表存 `docs/plans/FCEUX11-v2.0.3_S3a前置RE-GBATEK与SWI证据表.md`。⑩ 文件面：`bios.rs` / `swi/mod.rs` / `fixtures.rs` / `fixtures/swi.rs` / `fixtures/guards.rs` / `frame.rs`（注释）/ `cartprobe.rs`（判词措辞随行为更新：「CPU parks at BIOS 0x08」的旧表述在本修复后成为虚假陈述）；未碰 `gba_load.cpp`（r13）与 vendor 树。 |
+| r13 | 2026-11-11 | **S2-c 落地——`gba_load.cpp` 每帧步进的错误码从「静默吞掉」改为去重日志（不弹窗/不崩/不卸载）。** ① **现状（只读调查）**：改动前 `gba_step_frame()` 的非零返回被 `if (… != GBA_OK) return;` 完全吞掉——无日志、无弹窗、不崩、不卸载，静默跳过该帧的帧缓冲拉取 / 重绘信号 / 音频排空 / 电池落盘；对照一次性路径（装载 / savestate 读写 / 电池读取）全部已有报告，**规律 = 一次性路径全报告、每帧路径全静默** ⇒ §3.3 要求的「记日志」与红线 2 的容错读数缺失。② **改动（只动 `gba_load.cpp`，4 处）**：会话态去重闩 `g_reportedStepError` + `step_error_name`（6 码全名映射）+ `note_step_error`（同码 streak 只报首帧、码变化即再报、干净帧清闩、`GbaLoad` 新会话清闩——一次 panic 共约 3 行日志，最坏有界）；步进点 rc 入变量、非零 `note_step_error` + return（跳过集与改前逐字一致，电池 dirty 标志不被取走）。③ **日志设施 = `FCEU_printf`**：实现在 core（`fceu.cpp:1132`）、经 driver 回调表分发到 stdout + 消息日志 dock，F11QA 四个只链 core 的可执行文件不受影响（纪律 8）；**刻意不用 `FCEU_PrintError`**——它经 `QueueErrorMsgWindow` 下个 GUI tick 变**弹窗**，正是每帧路径禁止的行为。④ **GBA_ERR_STATE 语义**：日志附一行「the core caught an internal panic and dropped the machine; loading a ROM again is what recovers」——对齐 r6 ⑤ 的恢复机制（机器已丢、毒锁透明恢复、重载即重建），**不发明新恢复动作**；release（`panic="abort"`）下该码不可达，日志注释写明读者是 debug/探针构建。⑤ **边界（如实登记）**：release 生产的真 panic 仍带走进程（C++ 侧无法拦——S2-c 对 release 的真实保障是 S2-a/S2-b 消灭可达 panic，本改动是 unwind 构建的安全网 + 红线 2 可见性）；相邻每帧静默点（`gba_frame_buffer*` / `gba_render_audio` / 电池 flush 两导出）**刻意未包**（step 成功后不可达 + diff 最小，要全覆盖接同一个 `note_step_error` 即可）；`gba_last_error` 是恒返 GBA_OK 的 stub，文本化待其被填充。⑥ **门禁**：与 r12 同轮终验——Release 构建 EXIT=0、`ctest -LE perf` **36/36**；`git diff --numstat` 与真实改动一致、文件保持 CRLF 纯 ASCII。 |
 
 ---
 
