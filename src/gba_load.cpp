@@ -69,6 +69,11 @@ namespace
 	// the only writer of, and a GBA session does not run it.
 	uint16_t g_padState = 0;
 
+	// The error code the per-frame step last reported (v2.0.3 S2-c). Zero when
+	// the last step was clean or no error has been reported this session; set
+	// by `note_step_error`, cleared by the clean-step path and by `GbaLoad`.
+	int32_t g_reportedStepError = 0;
+
 	// Where a GBA ROM's identifying byte lives, and its value. 0xB2 is the
 	// "fixed value" the GBA header must carry for the BIOS to boot the cart;
 	// every retail and homebrew cartridge has it, and no NES/UNIF/FDS/NSF file
@@ -392,6 +397,69 @@ GbaDrawSize fceu11_gba_draw_size(int view_w, int view_h)
 	return size;
 }
 
+namespace
+{
+	/// The C ABI's error-code names, for the log line. Only NO_ROM and STATE
+	/// can actually arrive per frame -- the rest belong to the load and
+	/// savestate paths -- but a name for every code keeps this honest if one
+	/// of them ever shows up here.
+	const char* step_error_name(int32_t rc)
+	{
+		switch (rc)
+		{
+			case GBA_ERR_NO_ROM: return "NO_ROM";
+			case GBA_ERR_BAD_ROM: return "BAD_ROM";
+			case GBA_ERR_BIOS: return "BIOS";
+			case GBA_ERR_UNSUPPORTED: return "UNSUPPORTED";
+			case GBA_ERR_STATE: return "STATE";
+			case GBA_ERR_CAPACITY: return "CAPACITY";
+			default: return "UNKNOWN";
+		}
+	}
+
+	/// Log a per-frame step error, once per streak of the same code
+	/// (v2.0.3 plan section 3.3).
+	///
+	/// A non-zero code from the per-frame step must not pop a dialog, crash
+	/// the emulator or unload the session: log it and go on. Plan section 6.2
+	/// (red line) is the other half -- a fault-tolerance point must stay
+	/// visible, or "no longer crashes" can just mean "the defect moved". Both
+	/// at once means the log is deduped: 59.7275 frames a second would
+	/// otherwise bury everything, so a code reports on the first frame of a
+	/// streak and again only when a different code arrives. A clean frame
+	/// clears the latch, and `GbaLoad` clears it for a new session, so each
+	/// streak reports from its own beginning.
+	///
+	/// `FCEU_printf` rather than `FCEU_PrintError`: the latter ends in
+	/// `consoleWin_t::QueueErrorMsgWindow` (MsgLogViewer.cpp:334) and becomes
+	/// a dialog on the next GUI tick -- precisely what a per-frame path must
+	/// not do. `FCEU_printf` goes to stdout and the message-log dock
+	/// (MsgLogViewer.cpp:318), the same channel the battery flush's
+	/// one-line-a-second notice already uses, and it is implemented in the
+	/// core (`fceu.cpp:1132`), so no driver dependency crosses the link edge
+	/// the F11QA test executables police.
+	void note_step_error(int32_t rc)
+	{
+		if (rc == g_reportedStepError) return;
+		g_reportedStepError = rc;
+		FCEU_printf("GBA: frame step failed with error %d (%s); continuing without this frame.\n",
+		            static_cast<int>(rc), step_error_name(rc));
+		if (rc == GBA_ERR_STATE)
+		{
+			// The core caught a panic and dropped the machine on purpose (the
+			// catch handler in `frame.rs`'s `gba_step_frame`): the state is
+			// torn, every later frame reports NO_ROM, and a fresh
+			// `gba_load_rom` rebuilds from scratch -- which is the whole
+			// recovery, and none of it happens here. In a release build the
+			// core's `panic = "abort"` means this code never arrives (the
+			// unwind never returns), so the reader of this line is a debug or
+			// probe build.
+			FCEU_printf("GBA: the core caught an internal panic and dropped the machine; "
+			            "loading a ROM again is what recovers.\n");
+		}
+	}
+}
+
 void fceu11_gba_step_frame(void)
 {
 	if (!g_gbaActive) return;
@@ -411,7 +479,22 @@ void fceu11_gba_step_frame(void)
 	// `fceux11_core` without the driver, so the unresolved `WriteSound` breaks
 	// every one of them. Audio therefore belongs to stage 3', in the Qt layer,
 	// where the device is; the samples stay in the core's ring until then.
-	if (gba_step_frame() != GBA_OK) return;
+	const int32_t step_rc = gba_step_frame();
+	if (step_rc != GBA_OK)
+	{
+		// v2.0.3 S2-c: an error from the core must not take the emulator down
+		// with it. No dialog, no unloading the session -- log it (deduped) and
+		// go on. The frame pull, the GUI's repaint signal and the battery
+		// flush below are simply skipped, which is what this function has
+		// always done when the step reported a problem; the battery's dirty
+		// flag stays set, so nothing is lost beyond what the rate limit would
+		// have deferred anyway.
+		note_step_error(step_rc);
+		return;
+	}
+	// A clean frame ends any error streak, so a later failure reports again
+	// instead of hiding behind this session's first one.
+	g_reportedStepError = 0;
 
 	// Pull the frame out of the core into our own buffer. `gba_frame_buffer`
 	// is the only way to get at it, and it applies the `BETA` watermark on the
@@ -547,6 +630,11 @@ int GbaLoad(const char* name, FCEUFILE* fp)
 
 	g_gbaActive = true;
 	g_gbaPath = name;
+
+	// A fresh session reports its own first error: clear the per-frame dedup
+	// latch so this cartridge's first failure cannot hide behind the previous
+	// session's last one (v2.0.3 S2-c).
+	g_reportedStepError = 0;
 
 	// The save file, if there is one. Loaded *after* the machine is built so it
 	// lands in a buffer already sized for the detected type.
