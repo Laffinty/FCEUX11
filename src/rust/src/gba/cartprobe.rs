@@ -477,8 +477,10 @@ mod tests {
 
     /// Print what the SWI dispatcher saw. `served` needs interpreting: the
     /// vendored core answers six numbers itself when we decline (plan §1.2.1),
-    /// and after the first truly unserved number the CPU parks at BIOS 0x08,
-    /// so nothing later in the run can even reach the dispatcher.
+    /// and a number nobody implements is no longer a wedge (v2.0.3 S2-b) --
+    /// the stub BIOS's SWI vector returns the machine to the caller, so later
+    /// calls can and do reach the dispatcher. The count of the unserved number
+    /// is how often the game called into a missing implementation.
     fn report_swi_tallies() {
         let tallies = crate::gba::swi::take_swi_tallies();
         if tallies.is_empty() {
@@ -492,7 +494,9 @@ mod tests {
             } else if crate::gba::swi::vendor_core_serves(num) {
                 "declined -- the vendored core services this number itself".to_string()
             } else {
-                "NOT SERVED -- the CPU parks at BIOS 0x08 from the first such call on".to_string()
+                "NOT SERVED -- returned without being serviced (S2-b fallback), \
+                 game keeps running"
+                    .to_string()
             };
             println!(
                 "  {:#04x} {:<22} {:>6} calls  {}",

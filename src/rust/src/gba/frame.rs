@@ -405,10 +405,13 @@ pub extern "C" fn gba_step_frame() -> i32 {
                     panic!("injected frame panic");
                 }
             }
-            // Bounded so a machine wedged before it ever reaches VBlank -- a
-            // game looping on an unclaimed SWI, say -- returns instead of
-            // hanging the emulator. The bound is far above a real frame: one
-            // GBA frame is 280,896 cycles.
+            // Bounded so that no guest program -- however wedged -- can hang
+            // the emulator: if VBlank never arrives, the loop still returns
+            // after this many cycles. The bound is far above a real frame:
+            // one GBA frame is 280,896 cycles. (A machine looping on an
+            // unclaimed SWI used to be the example here; since v2.0.3 S2-b
+            // that call returns instead of wedging, and the bound now only
+            // covers guests that stop VBlank from ever arriving.)
             const CYCLE_LIMIT: u64 = 16 * 280_896;
             let mut cycles = 0u64;
             while cycles < CYCLE_LIMIT {

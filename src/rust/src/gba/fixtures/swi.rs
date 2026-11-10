@@ -1,20 +1,26 @@
 //! The SWI fixtures — S1-a, defect domain **unimplemented BIOS SWI**.
 //!
-//! | fixture | what it drives | belongs to |
-//! |---|---|---|
-//! | `swi_unimpl_1a` | ARM code executes `SWI 0x1A` (SoundDriverInit) | S2-b |
-//! | `swi_unimpl_16` | ARM code executes `SWI 0x16` (Diff8BitUnFilterWram) | S2-b + S3-a |
+//! | fixture | what it drives | belongs to | status |
+//! |---|---|---|---|
+//! | `swi_unimpl_1a` | ARM code executes `SWI 0x1A` (SoundDriverInit) | S2-b | 常驻绿锁（S2-b 转正） |
+//! | `swi_unimpl_16` | ARM code executes `SWI 0x16` (Diff8BitUnFilterWram) | S2-b + S3-a | 常驻绿锁（S2-b 转正；S3-a 补实现时此锁继续背书「返回且继续」不回归） |
+//! | `thumb_swi_unimpl_1a` | Thumb 代码执行 `SWI 0x1A` | S2-b | 常驻绿锁（S2-b 新增） |
 //!
-//! # The defect (v2.0.3 plan §1.2.1)
+//! # The defect, and what S2-b did about it (v2.0.3 plan §1.2.1 / §3.2)
 //!
 //! `dispatch` only claims 16 SWI numbers. A number it does not claim is
 //! declined by the core, the CPU takes the real exception path, and the
-//! program counter lands on `0x08` — the stub BIOS's SWI vector, which is
-//! `BRANCH_SELF` (`bios.rs:97`) — so the machine **spins forever**.
+//! program counter lands on `0x08` — the stub BIOS's SWI vector. The vector
+//! used to be `BRANCH_SELF` (`b .`), so the machine **spun forever** on the
+//! first unimplemented call.
 //!
-//! The fixture therefore asserts the **target** behaviour: the SWI returns,
-//! the program keeps running, and the reading says which number was not
-//! implemented. Today that is false, which is why the reproducer is red.
+//! S2-b turned that vector into a `MOVS PC, LR` return trampoline
+//! (`bios.rs`): the machine comes back from the call, registers untouched,
+//! and `swi::note_unimplemented_swi` records the number. This is a
+//! **degradation, not a fix** — the call still does nothing; only S3-a's
+//! implementations give it semantics. The fixtures here assert the
+//! **fallback contract**: the call returns, the program keeps running, and
+//! the number is readable. The S3-a work must keep these green.
 //!
 //! # The mechanism, step by step
 //!
@@ -23,19 +29,15 @@
 //! 2. `handle_exception` reads the number out of the instruction word —
 //!    bits 16-23 (`arm7tdmi.rs:696-699`) — and asks the dispatcher first
 //!    (`arm7tdmi.rs:703` → `handle_swi_hle` → `arm7tdmi.rs:1138-1142`).
-//! 3. `dispatch` declines the number (`swi/mod.rs:111-119`, the
-//!    `None | Some(_)` arm), so the exception really happens: the CPU
-//!    switches to Supervisor mode and jumps to `0x08`
-//!    (`arm7tdmi.rs:205-211`).
-//! 4. `0x08` holds `BRANCH_SELF` (`bios.rs:131-134`), so the machine spins
-//!    there forever.
-//!
-//! # The two lock tests that pin the defect in place
-//!
-//! `bios.rs:219-223` (`unhandled_vectors_park_instead_of_wandering`) and
-//! `bios.rs:396-401` (`the_stub_does_not_implement_swi`) both assert that
-//! the SWI vector is `BRANCH_SELF`. Fixing this defect therefore means
-//! changing those two tests — the plan says so in §1.2.1 and §3.2.
+//! 3. `dispatch` declines the number (`swi/mod.rs`, the `None | Some(_)`
+//!    arm; `note_unimplemented_swi` records it), so the exception really
+//!    happens: the CPU switches to Supervisor mode and jumps to `0x08`
+//!    (`arm7tdmi.rs:205-211`), with `LR` already pointing at the
+//!    instruction after the `SWI`.
+//! 4. `0x08` holds `MOVS PC, LR` — GBATEK: "For Returning from SWI use
+//!    MOVS PC,R14" (`.zcode/gbatek_plain.txt:185672-185674`) — which
+//!    restores the caller's CPSR (and THUMB state) from `SPSR_svc` and
+//!    lands on that instruction. Execution continues.
 //!
 //! # How the fixture observes "the machine did not park"
 //!
@@ -59,9 +61,11 @@
 //! SWI number"; plan §"S2-b 的兜底必须让未实现号码可见"). The fixture
 //! therefore records it: it wraps production's own hook with a recorder
 //! that notes every number and then delegates to the production
-//! dispatcher unchanged (`swi/mod.rs:53`). The number is then checked
-//! against the repository's SWI table (`swi/mod.rs:620-665`), which is
-//! where the readable name comes from.
+//! dispatcher unchanged (`swi/mod.rs`). The number is then checked
+//! against the repository's SWI table (`swi/mod.rs`), which is where the
+//! readable name comes from. Production's own recorder
+//! (`note_unimplemented_swi`) is exercised by the locks in `bios.rs` and
+//! `swi/mod.rs`; the fixtures keep the dispatcher-level record.
 //!
 //! The wrapper is installed *around* the production hook, not instead of
 //! it: `install_swi_hook` runs first and its hook is what the recorder
@@ -70,11 +74,10 @@
 //! # Why this file brings its own machine
 //!
 //! The public base's `Fixture` installs production's hook and then hides
-//! the core (`fixtures.rs:342-357`), so a test cannot see which SWI
-//! numbers the dispatcher was asked about — and that number is the thing
-//! the fallback has to make visible. This file therefore builds the
-//! machine itself, with the same pairing `Fixture::new` uses, and adds
-//! the recorder.
+//! the core (`fixtures.rs`), so a test cannot see which SWI numbers the
+//! dispatcher was asked about — and that number is the thing the fallback
+//! has to make visible. This file therefore builds the machine itself,
+//! with the same pairing `Fixture::new` uses, and adds the recorder.
 //!
 //! **Recommendation for the common base:** give `Fixture` a way to
 //! install a recording hook (or to hand out the core), so this file does
@@ -89,27 +92,31 @@
 //! * `:184980-184993` — the GBA reads the **most significant 8 bits of
 //!   the 24-bit comment field** of the `SWI` opcode, i.e. bits 16-23 —
 //!   the same field the core reads (`arm7tdmi.rs:696-699`).
+//! * `:189203-189210` — "as called from THUMB mode, it'll also restore
+//!   THUMB mode", and `:189222` — Thumb entry saves `R14_svc = PC+2`.
 //!
 //! Note the spelling: GBATEK calls `0x16` "Diff8bitUnFilterWrite8bit";
 //! the repository's table calls it `Diff8BitUnFilterWram`
-//! (`swi/mod.rs:643`). Same number, same BIOS call.
+//! (`swi/mod.rs`). Same number, same BIOS call.
 //!
 //! # Contract
 //!
 //! * One fixture per defect. Never mix two defects in one fixture.
 //! * The assertion writes the **target** behaviour, never the defect's
 //!   current behaviour (writing the defect would lock it in as expected).
-//! * Every reproducer carries `#[ignore = "S2-b: 修复后转常驻锁测试"]` with
-//!   the owning work item named.
+//! * Reproducers that are still red carry `#[ignore]` with the owning work
+//!   item named; once their work item lands they are promoted to resident
+//!   green locks (`oam.rs` on S2-a, this file on S2-b) and the guards'
+//!   `REPRODUCERS` set shrinks with them.
 //! * Bit-level formats come from the GBATEK snapshot
 //!   (`.zcode/gbatek_plain.txt`), never from memory.
 //! * Expected values are assembled from fields, not hand-written literals.
 
 use gba_core::cpu::arm7tdmi::{Arm7tdmi, SwiHook};
-use gba_core::cpu::psr::Psr;
+use gba_core::cpu::psr::{CpuState, Psr};
 use gba_core::gba::Gba;
 
-use super::{mov_imm, swi, Cartridge, BUDGET, HALT};
+use super::{mov_imm, orr_imm, swi, Cartridge, BUDGET, HALT};
 
 /// The register the instruction after the SWI writes.
 ///
@@ -123,6 +130,51 @@ const MARKER_REGISTER: usize = 5;
 /// the result: the same literal written twice is two literals that can
 /// drift apart.
 const MARKER: u32 = 0x5A;
+
+// ---- Thumb encoders (S2-b's Thumb fixture) ---------------------------------
+//
+// Same discipline as `fixtures.rs`'s ARM encoders: fields, not literals, and
+// each layout pinned to the vendored decoder that executes it plus the GBATEK
+// snapshot that documents it.
+
+/// Thumb `SWI n` — the number in bits 7-0.
+///
+/// The vendor decodes `get_bits(8..=15) == 0b1101_1111` as `Instruction::Swi`
+/// (`thumb/instruction.rs:174-175`); the core then recovers the number from
+/// the **byte at the halfword's address** (`arm7tdmi.rs:691-694`), which on
+/// this little-endian bus is exactly the low byte of the encoding.
+const fn thumb_swi(n: u32) -> u16 {
+    assert!(n < 0x100, "the Thumb SWI immediate is 8 bits");
+    0xDF00 | n as u16
+}
+
+/// Thumb `MOV rd, #imm8` — format 3, the "move/compare/add/subtract
+/// immediate" group: bits 15-13 = `001`, bits 12-11 = `00` (the vendor maps
+/// operation `0` to `Mov`, `flags.rs:108-118`), bits 10-8 = rd, bits 7-0 =
+/// imm8 (`thumb/instruction.rs:298-303`).
+///
+/// `rd` is the 3-bit low register file (`r0`-`r7`); `imm` must be an 8-bit
+/// value, and anything wider is an error rather than a truncation.
+const fn thumb_mov_imm(rd: u32, imm: u16) -> u16 {
+    assert!(rd < 8, "the Thumb low register file is r0-r7");
+    assert!(imm < 0x100, "format 3 carries an 8-bit immediate");
+    (0b001 << 13) | (0b00 << 11) | ((rd as u16) << 8) | imm
+}
+
+/// ARM `BX rm` — the same word shape as the boot code's `BX r2` (`bios.rs`
+/// `BX_R2 = 0xE12FFF12`): `cond 0001 0010 1111 1111 1111 0001 Rm`, the
+/// register in bits 3-0. Note bits 7-4 are `0001`, not zero: with them clear
+/// the word no longer matches the BX pattern and the vendor decodes it as an
+/// `MSR` flags transfer instead — the first draft of this encoder did
+/// exactly that, and the Thumb fixture parked at BIOS 0x08 with the
+/// dispatcher never consulted.
+///
+/// Bit 0 of the register's *value* selects Thumb on the branch; the
+/// halfword-aligned target address and the state-selecting bit are set by
+/// the caller separately (see [`Cartridge::thumb_base`]).
+const fn bx_reg(rm: u32) -> u32 {
+    0xE12F_FF10 | (rm & 0x0F)
+}
 
 // The SWI numbers the core handed to the dispatcher, and the production
 // hook the recorder delegates to.
@@ -158,10 +210,12 @@ struct Machine {
 }
 
 impl Machine {
-    /// Build the machine for `body`.
-    fn for_body(body: &[u32]) -> Self {
-        let mut cartridge = Cartridge::new();
-        cartridge.code(body);
+    /// Build the machine for an already-assembled cartridge.
+    ///
+    /// The recorder wraps the production hook, so the machine under test is
+    /// exactly the production one; the ARM-entry fixtures go through
+    /// [`Machine::for_body`], the Thumb fixture brings its own cartridge.
+    fn for_cartridge(cartridge: &Cartridge) -> Self {
         let rom = cartridge.build();
 
         let mut gba = Gba::new(crate::gba::bios::stub(), &rom);
@@ -178,6 +232,13 @@ impl Machine {
         SEEN_SWIS.with(|seen| seen.borrow_mut().clear());
 
         Self { gba }
+    }
+
+    /// Build the machine for `body`.
+    fn for_body(body: &[u32]) -> Self {
+        let mut cartridge = Cartridge::new();
+        cartridge.code(body);
+        Self::for_cartridge(&cartridge)
     }
 
     /// Step until the machine halts, or the budget runs out.
@@ -205,19 +266,30 @@ impl Machine {
     fn seen_swis(&self) -> Vec<u32> {
         SEEN_SWIS.with(|seen| seen.borrow().clone())
     }
+
+    /// Whether the CPU is (still) in Thumb state.
+    fn in_thumb(&self) -> bool {
+        self.gba.cpu.cpsr.cpu_state() == CpuState::Thumb
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{mov_imm, swi, Machine, BUDGET, HALT, MARKER, MARKER_REGISTER};
+    use super::{
+        bx_reg, mov_imm, swi, thumb_mov_imm, thumb_swi, Cartridge, Machine, BUDGET, HALT, MARKER,
+        MARKER_REGISTER,
+    };
     use crate::gba::swi::Swi;
 
     /// `SWI 0x1A` (SoundDriverInit) is not implemented: the machine must come
     /// back from the call and keep running.
     ///
     /// GBATEK `:192256`: `1Ah  -    -    -    -    SoundDriverInit`.
+    ///
+    /// Resident since S2-b (v2.0.3, promoted from a red reproducer): the
+    /// vector returns, the program continues. S3-a's implementation must
+    /// keep this green while adding the call's actual semantics.
     #[test]
-    #[ignore = "S2-b: 修复后转常驻锁测试"]
     fn swi_unimpl_1a() {
         unimplemented_swi_keeps_running(Swi::SoundDriverInit);
     }
@@ -226,10 +298,92 @@ mod tests {
     /// behaviour, and the number the fallback has to report is this one.
     ///
     /// GBATEK `:192251`: `16h  -    16h  -    16h  Diff8bitUnFilterWrite8bit ;"Wram"`.
+    ///
+    /// Resident since S2-b (promoted from a red reproducer, alongside
+    /// `swi_unimpl_1a`). This is also the number S3-a implements first, so
+    /// this lock doubles as the "returning must not regress" guard for that
+    /// work.
     #[test]
-    #[ignore = "S2-b / S3-a: 修复后转常驻锁测试"]
     fn swi_unimpl_16() {
         unimplemented_swi_keeps_running(Swi::Diff8BitUnFilterWram);
+    }
+
+    /// The same call, issued from **Thumb** state.
+    ///
+    /// The exception path has two halves that the ARM fixtures cannot see:
+    /// entry saves `R14_svc = PC+2` in Thumb (GBATEK `:189222`, vs `PC+4`
+    /// in ARM, `:185686`), and the `MOVS PC, LR` trampoline must restore
+    /// THUMB mode on the way out (GBATEK `:189203-189210`: "as called from
+    /// THUMB mode, it'll also restore THUMB mode"). If the return landed
+    /// anywhere else, or came back in ARM state, the halfword after the
+    /// call would decode as the wrong instruction — so a *different*
+    /// post-call marker (not the pre-call one) is what proves the round
+    /// trip: it can only be set by really executing Thumb code after the
+    /// unimplemented call returned.
+    ///
+    /// The program:
+    ///
+    /// ```text
+    ///     mov r5, #0x5A       ; Thumb, pre-call marker
+    ///     swi 0x1A            ; the call under test, from Thumb
+    ///     mov r5, #0xA5       ; Thumb, post-call marker: proves Thumb resumed
+    ///     swi 0x02            ; Halt terminator (an implemented call)
+    /// ```
+    ///
+    /// entered through an ARM `BX` with bit 0 set (`fixtures.rs`
+    /// `Cartridge::thumb_code`).
+    #[test]
+    fn thumb_swi_unimpl_1a_returns_and_continues_in_thumb() {
+        const PRE: u16 = 0x5A;
+        const POST: u16 = 0xA5;
+
+        let mut cartridge = Cartridge::new();
+        // ARM entry: build the Thumb entry address with bit 0 set, then
+        // branch-exchange into it. `0x08000000` is `0x08` rotated right 8
+        // (`fixtures.rs::mov_imm`), `|1` turns it into the state-selecting
+        // value, and the ORR carries the low byte.
+        let thumb_base = cartridge.thumb_base() + 12; // after the three ARM words below
+        cartridge.code(&[
+            mov_imm(0, 0x0800_0000),
+            super::orr_imm(0, 0, ((thumb_base | 1) & 0xFF) as u32),
+            bx_reg(0),
+        ]);
+        assert_eq!(
+            cartridge.thumb_base(),
+            thumb_base,
+            "the Thumb body must sit exactly where the BX points"
+        );
+        cartridge.thumb_code(&[
+            thumb_mov_imm(5, PRE),
+            thumb_swi(Swi::SoundDriverInit as u32),
+            thumb_mov_imm(5, POST),
+            thumb_swi(HALT),
+        ]);
+
+        let mut machine = Machine::for_cartridge(&cartridge);
+        let reached_halt = machine.run_to_halt(BUDGET);
+
+        assert!(
+            machine.seen_swis().contains(&(Swi::SoundDriverInit as u32)),
+            "SWI 0x1A issued from Thumb never reached the SWI dispatcher"
+        );
+        assert!(
+            reached_halt,
+            "the Thumb program never reached its Halt: the SWI either parked \
+             the machine at BIOS 0x08 or the return went somewhere else"
+        );
+        assert_eq!(
+            machine.reg(5),
+            u32::from(POST),
+            "the Thumb instruction after the unimplemented SWI never ran: the \
+             exception return did not land back in Thumb state (or did not \
+             land at all)"
+        );
+        assert!(
+            machine.in_thumb(),
+            "the machine must still be in Thumb state after the round trip \
+             through the ARM exception vector"
+        );
     }
 
     /// The body both reproducers share.

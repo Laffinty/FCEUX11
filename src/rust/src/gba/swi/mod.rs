@@ -123,9 +123,26 @@ fn dispatch_inner(cpu: &mut Arm7tdmi, swi_num: u32, old_cpsr: Psr, return_addr: 
             true
         }
         None | Some(_) => {
+            // v2.0.3 S2-b: the decline no longer parks the machine -- the
+            // stub BIOS's SWI vector returns to the caller -- so this arm is
+            // the only place a call nobody services is ever seen. Record it
+            // (production, deduplicated) before the trace line; the red line
+            // in plan §六.3 is that a missing implementation must stay
+            // visible or S3-a has no list of what is left.
+            note_unimplemented_swi(swi_num);
             if tracing_enabled() {
                 match swi {
-                    Some(s) => eprintln!("[gba] swi {swi_num:#04x} {}: not implemented", s.name()),
+                    Some(s) => {
+                        if vendor_core_serves(swi_num) {
+                            eprintln!(
+                                "[gba] swi {swi_num:#04x} {}: declined, the vendored core \
+                                 services this number itself",
+                                s.name()
+                            );
+                        } else {
+                            eprintln!("[gba] swi {swi_num:#04x} {}: not implemented", s.name());
+                        }
+                    }
                     None => eprintln!("[gba] swi {swi_num:#04x}: outside 0x00-0x2A"),
                 }
             }
@@ -596,6 +613,73 @@ fn tracing_enabled() -> bool {
     TRACE_SWI.load(std::sync::atomic::Ordering::Relaxed)
 }
 
+// The v2.0.3 S2-b production recorder for calls nobody services: the number,
+// and how many times it has been declined.
+//
+// The stub BIOS's SWI vector returns instead of parking (v2.0.3 S2-b), so an
+// unimplemented BIOS call no longer wedges the machine -- which also means
+// nothing on the machine side shows that anything happened. Plan red line
+// §六.3: a missing implementation must stay visible, or S3-a has no list of
+// what is left to implement. This is that visibility: one stderr line the
+// first time each number is declined, then silent counting.
+//
+// Thread-local like the test tallies below: `dispatch` runs on the one
+// emulation thread (the §4.1 contract), and a per-thread map keeps the test
+// harness's parallel machines from answering each other's questions.
+thread_local! {
+    static UNIMPLEMENTED_SWI: std::cell::RefCell<std::collections::BTreeMap<u32, u64>> =
+        std::cell::RefCell::new(std::collections::BTreeMap::new());
+}
+
+/// Record a declined SWI, reporting each number once.
+///
+/// Called from [`dispatch_inner`]'s decline arm -- the only place a call
+/// nobody services is ever seen. Numbers the vendored core services itself
+/// (`0x00`, `0x06-0x08`, `0x0B`, `0x0C`) are **not** recorded: the core's own
+/// `match` runs them and the machine continues normally, so counting them
+/// would put implemented calls on the "still missing" list.
+///
+/// The first occurrence of each number logs to stderr, unconditionally --
+/// gated behind the trace flag it would never be seen by a shipping build,
+/// which is exactly the build that runs the commercial cartridges S3-a is
+/// for. Later occurrences only advance the count.
+fn note_unimplemented_swi(swi_num: u32) {
+    if vendor_core_serves(swi_num) {
+        return;
+    }
+    let first = UNIMPLEMENTED_SWI.with(|map| {
+        let mut map = map.borrow_mut();
+        let entry = map.entry(swi_num).or_insert(0);
+        *entry += 1;
+        *entry == 1
+    });
+    if first {
+        let name = match Swi::from_raw(swi_num) {
+            Some(swi) => swi.name(),
+            None => "outside 0x00-0x2A",
+        };
+        eprintln!(
+            "[gba] swi {swi_num:#04x} {name}: not implemented, returning without \
+             servicing it (S2-b fallback; further calls are counted, not logged)"
+        );
+    }
+}
+
+/// The recorded counts since process start, drained: `(number, calls)`.
+///
+/// Test-side read of [`note_unimplemented_swi`]'s map, for the locks that pin
+/// the S2-b visibility (plan red line §六.3). The record itself is compiled
+/// into every build; only this reader is test-only, because production has
+/// no caller for it yet -- exposing it across the C ABI would mean new
+/// exports, which is out of S2-b's scope.
+#[cfg(test)]
+pub(crate) fn unimplemented_swi_counts() -> Vec<(u32, u64)> {
+    UNIMPLEMENTED_SWI
+        .with(|map| std::mem::take(&mut *map.borrow_mut()))
+        .into_iter()
+        .collect()
+}
+
 // Records the number the core last handed to `dispatch`.
 //
 // The core reaches us through a raw function pointer, so there is no other
@@ -626,9 +710,10 @@ fn take_last_dispatch() -> Option<u32> {
 /// Per-number call tallies since the last drain, as `(calls, served calls)`.
 ///
 /// `served = false` covers two different things -- a number in `0x00-0x2A`
-/// that only the vendored core implements (it will still run), and a number
-/// nobody implements (the CPU parks at BIOS 0x08). [`vendor_core_serves`]
-/// tells the two apart. Thread-local like [`LAST_DISPATCH`]: the test harness
+/// that only the vendored core implements (it runs them itself), and a number
+/// nobody implements (S2-b: the stub BIOS's SWI vector returns the machine to
+/// the caller without servicing the call). [`vendor_core_serves`] tells the
+/// two apart. Thread-local like [`LAST_DISPATCH`]: the test harness
 /// runs tests in parallel and one test's tallies must not answer another's
 /// question.
 #[cfg(test)]
@@ -677,8 +762,9 @@ pub fn swi_name(swi_num: u32) -> String {
 /// (`arm7tdmi.rs` `handle_swi_hle`, plan §1.2.1): `0x00`, `0x06-0x08`, `0x0B`,
 /// `0x0C`. For these a declined dispatch is **not** "unimplemented" -- the
 /// core's own `match` handles them -- so `served = false` in a tally must not
-/// be read as a missing implementation.
-#[cfg(test)]
+/// be read as a missing implementation, and [`note_unimplemented_swi`] must
+/// not count them. Readable outside tests since S2-b: the production recorder
+/// needs the same distinction the probes report.
 pub fn vendor_core_serves(swi_num: u32) -> bool {
     matches!(swi_num, 0x00 | 0x06 | 0x07 | 0x08 | 0x0B | 0x0C)
 }
@@ -687,8 +773,10 @@ pub fn vendor_core_serves(swi_num: u32) -> bool {
 ///
 /// 0x00-0x2A is the range the GBA BIOS documents. Anything outside it is
 /// undefined; the core returns `false` for those, which drops the CPU into
-/// the exception vector -- with a stub BIOS loaded that is an unimplemented
-/// vector, so SWI coverage is not optional (plan section 5.3).
+/// the exception vector -- which, since v2.0.3 S2-b, returns to the caller
+/// as a no-op instead of parking (`bios.rs` SWI vector). Coverage is still
+/// not optional: an uncovered number costs the game its call's effect, and
+/// only `note_unimplemented_swi`'s log says so.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum Swi {
@@ -1018,6 +1106,34 @@ mod tests {
             pending_intr_groups(&mut gba.cpu),
             0,
             "declining must not conjure an interrupt group"
+        );
+    }
+
+    /// The S2-b production recorder must count calls nobody services -- that
+    /// list is what S3-a works from (plan red line §六.3) -- and must keep
+    /// implemented numbers off it: a number the vendored core services is not
+    /// missing, and a number we claim never reaches the decline arm.
+    #[test]
+    fn the_production_recorder_counts_unimplemented_calls_and_skips_served_ones() {
+        let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
+        let cpsr = gba.cpu.cpsr;
+
+        // 0x1A (SoundDriverInit): neither we nor the core implements it --
+        // counted, once per call, every call.
+        assert!(!dispatch(&mut gba.cpu, 0x1A, cpsr, ROM_BASE));
+        assert!(!dispatch(&mut gba.cpu, 0x1A, cpsr, ROM_BASE));
+        // 0x06 (Div): we decline, but the vendored core services it itself --
+        // a working call, not a missing one. Not counted.
+        assert!(!dispatch(&mut gba.cpu, 0x06, cpsr, ROM_BASE));
+        // 0x02 (Halt): we claim it outright. Not a decline at all. (Dispatched
+        // last so its halt does not shadow the calls above.)
+        assert!(dispatch(&mut gba.cpu, Swi::Halt as u32, cpsr, ROM_BASE));
+
+        assert_eq!(
+            super::unimplemented_swi_counts(),
+            vec![(0x1A, 2)],
+            "the recorder must count exactly the calls nobody services, with the \
+             full per-number tally"
         );
     }
 

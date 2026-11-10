@@ -256,6 +256,7 @@ pub const fn mov_reg(rd: u32, rm: u32) -> u32 {
 pub struct Cartridge {
     rom: Vec<u8>,
     body: Vec<u32>,
+    thumb_body: Vec<u16>,
 }
 
 impl Cartridge {
@@ -265,13 +266,35 @@ impl Cartridge {
         let mut rom = vec![0u8; ROM_LEN];
         // Main unit code 0x00 marks a GBA cartridge.
         rom[0xB3] = 0x00;
-        Self { rom, body: Vec::new() }
+        Self { rom, body: Vec::new(), thumb_body: Vec::new() }
     }
 
     /// Append ARM words to the program body.
     pub fn code(&mut self, words: &[u32]) -> &mut Self {
         self.body.extend_from_slice(words);
         self
+    }
+
+    /// Append Thumb halfwords to the program body, after any ARM words.
+    ///
+    /// Thumb code never starts on its own: the machine boots in ARM state and
+    /// the BIOS hands control to an ARM branch, so the body's ARM words must
+    /// switch state first -- an `ARM BX` to [`Cartridge::thumb_base`] with bit
+    /// 0 set, which is what makes the target address decode as Thumb.
+    pub fn thumb_code(&mut self, halfwords: &[u16]) -> &mut Self {
+        self.thumb_body.extend_from_slice(halfwords);
+        self
+    }
+
+    /// Where the Thumb halfwords run (they follow the ARM words).
+    ///
+    /// Bit 0 is **not** set here: the caller ORs it in on the `BX` value --
+    /// the address the code sits at and the value that selects Thumb state
+    /// are two different things, and keeping them apart is what keeps the
+    /// halfwords word-aligned.
+    #[must_use]
+    pub fn thumb_base(&self) -> u32 {
+        CODE_BASE + (self.body.len() * 4) as u32
     }
 
     /// Put ASCII at `offset` — used for the cartridge-type markers
@@ -308,11 +331,16 @@ impl Cartridge {
         let word_offset = (CODE_BASE - (ROM_BASE + 8)) >> 2;
         rom[0..4].copy_from_slice(&(0xEA00_0000 | word_offset).to_le_bytes());
 
-        let end = CODE_OFFSET + self.body.len() * 4;
+        let end = CODE_OFFSET + self.body.len() * 4 + self.thumb_body.len() * 2;
         assert!(end <= rom.len(), "the program does not fit in the image");
         for (i, word) in self.body.iter().enumerate() {
             let at = CODE_OFFSET + i * 4;
             rom[at..at + 4].copy_from_slice(&word.to_le_bytes());
+        }
+        let thumb_at = CODE_OFFSET + self.body.len() * 4;
+        for (i, halfword) in self.thumb_body.iter().enumerate() {
+            let at = thumb_at + i * 2;
+            rom[at..at + 2].copy_from_slice(&halfword.to_le_bytes());
         }
         rom
     }
