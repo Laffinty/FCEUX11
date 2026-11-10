@@ -52,13 +52,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   （未注册 ⇒ `create_cart_for_mapper` 返回 nullptr ⇒ `g_cart` 停在 no-op 占位卡），现在有 3 张
   能出画面；② 吞食天地2 是 mapper 4 + **非 2 幂 PRG（40 库 = 640 KB）**，修复前装载器按舍入后的
   1 MB 做边界检查 ⇒ **直接被拒**（"Unknown ROM file format"），现在能装载并运行。
-  ⇒ **剩余 5 张的失败不属 S4 范围**：本仓的 mapper 191/199 实现与**上游 FCEUX 1.15 逐行等价**
-  （`GenMMC3_Init` 参数、`cwrap`/`pwrap`/`mwrap`、`M199Power` 语义、MMC3 写派发全部一致），
-  失败属**上游级缺口 / 逐游戏差异**，另立项。候选根因（**尚未实测，不作结论**）：
-  ① mapper 199 的 DBZ 扩展在个别卡上不够（对应 #7 的「画面部分错乱」）；
-  ② mapper 4 的 PRG 掩码被硬编码为 512 KB（`GenMMC3_Init(info, 512, …)` ⇒ `PRGmask8[0] = 63`），
-  640 KB 的卡最上 128 KB **不可达**（上游同样如此，非本次引入）；
-  ③ 存档 / IO / IRQ 时序类差异（对应 #2 的「LOGO 后黑屏」）。
+  ⇒ **剩余 5 张里只有 1 张是本仓独有问题**（其余 4 张与上游 FCEUX 2.6.6 / 2.7.0 行为一致，
+  属上游级缺口）：吞食天地2 —— 上游能跑出游戏自己的「吞食天地」LOGO，**本 hotfix 全灰**。
+  **根因已定位（本 hotfix 未修）**：① **hash 作用域**：本仓装载器按 **raw PRG 字节**算
+  CRC32/MD5，而上游与 `ines-correct.h` 修正表的键都是按**舍入 + 0xFF 填充**后的 PRG 缓冲区算的
+  ⇒ 该 ROM 的 raw CRC `0x50D82653` 查不到、padded CRC `0x28192599` 命中
+  `{0x28192599, 198, -1}`（**它实际是 mapper 198，不是头里写的 4**）；② **修正写回缺失**：
+  `ines_apply_corrections()` 把修正后的 mapper 写进**局部** `parseResult.mapper_no`，
+  `tofix & 1` 分支是空注释，从未写回 `iNESCart.mapper_number` ⇒ **整张 251 条修正表的
+  mapper 修正在本仓整体失效**。两项均属 v2.0.3 新工作项（S5）范围。
+  ⚠️ 上一版此处曾写「mapper 4 的 PRG 掩码硬编码 512 KB，上游同样如此」——**该说法已被本次
+  上游对照推翻**：上游能出 LOGO 的原因是它按 CRC 把这张卡改判成了 mapper 198。
 - **F11QA 矩阵（`pass_to_fail = 0` / grade ≥ B）待 push 后由 CI 复核**（本地只有
   `ctest -LE perf` 这个近似门禁）。
 - **本 hotfix 未修（同因、另立项）**：已注册但带自定义 power 的 17 个 MMC3 变体
