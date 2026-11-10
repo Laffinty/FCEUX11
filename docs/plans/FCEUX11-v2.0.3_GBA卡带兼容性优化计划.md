@@ -22,6 +22,9 @@
 > 转常驻绿锁（根 crate **266 / 24**），复现器 7 → 5，vendor **242** 不变、ctest **36/36**、
 > 7 卡基线零回归；ATTRIBUTION §3.2.12（第 28 处、第 6 个源文件）；变异两腿双向可红；
 > Lock B 改造为**注入式机制锁**（业主裁决），S1-b 的 OAM 触发器随修复退役。**
+> **📋 r8（2026-11-10）：业主裁决扩围 —— GitHub issue #12 的两个 NES 侧缺陷核实属实（只读 RE），
+> 作为 **S4 · FC 侧修复批次** 并入本计划（§四之二）。**本轮只写文档不动代码**，下一轮编码作业
+> 按 S4 节直接开工。formats crate 门禁已实测登记（**150 项全绿**，AGENTS.md 门禁节同步）。**
 > **动 GBA 兼容性代码前先读 §一.2.2 开头的「更正」小节**——原文清单里 13 条有 11 条不可达，
 > **真正可达的只有 OAM 的两条**（shape=3 与 gfx mode=3）。
 > **立项目标**：把「商用手写 GBA 卡带跑不起来」这一类问题，从**靠人看**变成**可复现、可证伪、可回归**。
@@ -43,6 +46,12 @@
 
 1. **不碰 NES 侧任何行为**。本轮所有代码改动只落在 GBA 侧
    （`src/rust/src/gba/`、`src/rust/crates/gba-core/`、`src/gba_load.cpp`）。
+   ⚠️ **r8 业主裁决（2026-11-10）**：GitHub issue #12 的两个 NES 侧缺陷（iNES loader 硬拒
+   非 2 幂 PRG / mapper 191、199 未注册）**核实属实并纳入本计划**，见 §四之二 S4——
+   本条口径**不再绝对**：GBA 侧文件域仍按本条执行；FC 侧仅限 S4 明确列出的文件
+   （`src/rust/crates/fceux11-formats/`、`src/ines_load.cpp`、`tests/f11qa/boards/`、
+   `tests/fixtures/`、`src/boards/mmc3.cpp`、`src/boards/mmc3_variants_carts.h`），
+   且 NES 零回归门禁（不变式 1）对 S4 改动**加倍适用**。
 2. **不把 7 张商业卡带放进仓库**（业主裁决 2026-11-08）。它们只作**本地取证**用，
    仓库内的判据一律换成**自建合成 ROM**。
 3. **不做 GBA 精度对齐**（本轮是**能不能跑**，不是**跑得准不准**）。精度另立项。
@@ -532,6 +541,88 @@ GBATEK 权威（摘录见 §附录 A）：
 
 ---
 
+## 四之二、S4 · FC 侧修复批次（r8 业主裁决扩围，**待编码**）
+
+> **批次名称（= GitHub issue #12 标题，逐字）**：
+> **「fix iNES loader rejects non-power-of-2 PRG ROMs; mappers 191/199 missing from MapperEntry registry (grey screen)」**
+> 来源：GitHub issue #12（报告者 chenkohan，2026-11 报告，涉及 v2.0.1 Windows 版；
+> 业主已回复并索取 ROM 用于验证）。**2026-11-10 完成只读核实与预研（本节的全部 file:line
+> 都是当日实测），两缺陷均属实**；业主裁决：与 GBA 三段式并行，文件域互斥、随时可插。
+> **本节是自足实施计划——下一轮编码作业按此开工，不需重新取证。**
+> ⚠️ 提交信息里请引用批次名称与 issue #12。
+
+### S4.0 事实底座（2026-11-10 只读核实，全部 file:line 实测）
+
+**Bug 1 · iNES loader 硬拒非 2 幂 PRG**（复现 ROM 形态：iNES 1.0，PRG 12×16KB、CHR 16×8KB、
+mapper 191、文件 327696 字节，头完全自洽）：
+
+| 环节 | 实测位置 | 事实 |
+|---|---|---|
+| PRG 尺寸舍入 | `fceux11-formats/src/cart.rs:90` | `rom_size_16kb = uppow2(12) = 16`（`rom_size_raw = 12` 同结构体保留） |
+| 布局取舍入数 | `fceux11-formats/src/ines.rs:721-731` | `NOT_POWER2 = [53, 198, 228, 547]`（`ines/ines_data.rs:206`）**不含 191** ⇒ `round=true` ⇒ `prg_size_bytes = 16 << 14 = 262144` |
+| 硬切片 + 硬拒绝 | `fceux11-formats/src/ines.rs:961-978` | `:963` PRG 文件边界检查与切片用**舍入后**尺寸 ⇒ 吞掉 CHR 前 64KB；`:972` CHR 越界 `262160+131072=393232 > 327696` ⇒ `return false`。**即便文件够大，PRG 切片也会把 CHR 错切进 PRG**（报告者指出的正确性隐患成立） |
+| C++ 映射 | `src/ines_load.cpp:148-149` | false → `LOADER_INVALID_FORMAT` ⇒ 用户看到「Unknown ROM file format」 |
+| C++ 消费链（预研） | `src/ines_load.cpp:171-186` | **已经是**「`FCEU_malloc(cart.prg_size)`（舍入）+ `memset 0xFF` + `memcpy(ROM, cart.prg_data, cart.prg_size)`」形态——memcpy 源是 Rust 返回的**文件内视图**，PRG 改用 raw 尺寸放行后若 memcpy 仍拷舍入数字节会**越过 memstream 缓冲区越界读** ⇒ 修复必须同步改 memcpy 尺寸 |
+| 上游（fork 原版）行为 | fork 初始提交 `1c35642` 的 `src/ines.cpp:869-954` | 无任何文件尺寸硬校验：`malloc(舍入)`+`memset 0xFF`+`FCEU_fread` **不检查短读** ⇒ 装载永不拒绝（这就是「上游能跑」的机制）。⚠️ 两处细节与 issue 表述的偏差（不影响结论）：原版 round 分支 `fread` 的也是舍入数，靠不查短读存活；「expected = 读 raw」是**比原版更正确**的修法而非还原原版 |
+
+**Bug 2 · mapper 191/199 未注册 → 灰屏**：
+
+| 环节 | 实测位置 | 事实 |
+|---|---|---|
+| 注册表缺席 | `src/boards/mmc3.cpp`（`MapperEntry{...}` 全列） | 实际注册 25 个变体（4,12,37,44,45,47,49,52,**76**,114,115,116,118,119,165,192,194,195,198,205,245,249,250,254,406）——**191、199 均不在**（issue 清单少列 76，无实质影响） |
+| 有实现没注册 | `Mapper191_Init` = `mmc3.cpp:1017`；`Mapper199_Init` = `src/boards/199.cpp:83`（上游同构，DBZ 系列注释在文件头） | 191：`GenMMC3_Init(256,256,8,battery)` + `CHRRAMSIZE=2048` + `M191CW: setchr1r((V&0x80)>>3,...)`——issue 描述**逐字属实**；199：`CHRRAMSIZE=8192`、`(V<8)?0x10:0x00` 选 CHR-RAM、`EXPREGS`+`M199PW` 扩展 PRG（issue 的「sub-regs 0x0A/0x0B」未逐字核到，落地时顺手核对） |
+| bmap 行号 | `src/ines_bmap.h:221`（191）/ `:229`（199） | 与 issue 引用精确吻合；legacy `iNES_Init`（`ines_init.cpp:29-74`）扫 `bmap[]` ⇒ **legacy Init 确实会跑** |
+| 灰屏机制 | `src/cart_class.cpp:53` + `:23-27` | `create_cart_for_mapper` 未命中注册表 → nullptr → **`g_cart` 停在 `CartPlaceholder`（全 no-op）** ⇒ v1.8 管线手里是空 cart ⇒ 灰屏。旁证：195（已注册，`Mapper195Cart`）能渲染 |
+| 根因定性 | `src/cart_class.cpp:49` + `src/boards/registry.h` | 注册表迁移目标「all 171 by Phase H」**未完成**——191/199 是缺口，不是有意排除 |
+| 兄弟工厂形态 | `src/boards/mmc3_variants_carts.h:44+` | 每个变体 = **一行式** `class MapperNNNCart : public Mmc3BaseCart {}` + `mmc3.cpp` 一条 `MapperEntry{N, "名字", &MapperNNN_Init, [](Bus&){...}}`——S4-b 体量小、先例充分 |
+
+### S4-a · loader 修复（设计已定，照做即可）
+
+**语义**：**分配与映射保持舍入尺寸**（`SetupCartPRGMapping` 要求 2 幂，上游注释在 fork 原版
+`ines.cpp:873-875`），**文件边界检查、指针推进、文件拷贝一律用 raw 尺寸**，尾部由既有的
+`memset 0xFF` 填充。**hash 用 raw 文件字节**——决策依据：现有可装载 ROM 里 pow2 卡
+raw==rounded、`NOT_POWER2` 四 mapper 本来就是 raw ⇒ **对既有 ROM hash 零变化**；新放行的
+非 2 幂卡无历史 hash 包袱。**FFI 结构零变更**（`FceuInesCartResult` 已有 `rom_size_raw`，
+C++ 侧 `ines_load.cpp:158` 已在读）。
+
+| # | 改动 | 位置 |
+|---|---|---|
+| A1 | PRG 文件边界检查与切片改 raw：`offset + (prg_banks_raw << 14) > file_len` 才拒绝；指针/offset 按 raw 推进 | `ines.rs:961-967`（`layout.prg_banks_raw` 已存在，`:696`） |
+| A2 | CHR 的 offset 由此自然变小（不再被舍入 PRG 吞掉）；CHR 边界检查逻辑不动 | `ines.rs:969-978` |
+| A3 | hash 的 PRG 尺寸参数改 raw 字节（CHR 不动） | `ines.rs:986-994`（`fceux11_rust_ines_compute_hash` 调用点） |
+| A4 | C++ memcpy 尺寸改 raw：`memcpy(ROM, cart.prg_data, (size_t)cart.rom_size_raw << 14)`；`memset 0xFF` 与 `SetupCartPRGMapping` 保持舍入尺寸**不动** | `src/ines_load.cpp:180`（:176 的 memset、:186 的 mapping 不动） |
+| A5 | **锁测试（formats crate 内）**：合成 header（PRG 12 银行 + CHR 16 银行 + mapper 191）断言装载成功、PRG 尾部填充 0xFF、CHR 切片正确、hash 可算；变异验证 = 边界检查改回舍入 ⇒ 红 | `fceux11-formats/src/ines.rs` `#[cfg(test)]` |
+| A6 | **ctest 级端到端锁**：`generate_test_roms.py` 增合成 fixture（非 2 幂 PRG + mapper 191），`mapper_load_test.cpp` 的 `tests[]` 增一行断言装载成功且 `mappernum==191`（pre-fix 该 fixture 装载返回 null ⇒ 红） | `tests/fixtures/generate_test_roms.py`、`tests/f11qa/boards/mapper_load_test.cpp`（kgmqa-016） |
+
+**登记为观察项（本轮不修）**：CHR 同构缺陷——`vrom_size_8kb` 同样被 `uppow2` 且无 raw
+对应字段（`cart.rs:94-95`），非 2 幂 CHR 会被硬拒/错切（issue 未涉及）。真实用例出现再立项，
+**宁窄勿宽**（同一教训：不为不可达路径扩改动面）。
+
+### S4-b · 注册 191/199（照兄弟形态）
+
+| # | 改动 | 位置 |
+|---|---|---|
+| B1 | `class Mapper191Cart : public Mmc3BaseCart {}` + `class Mapper199Cart : public Mmc3BaseCart {}`（一行式，同 `Mapper195Cart`）；`mmc3_variants_carts.h` 头注释的映射表与「24 variants」计数同步更新 | `src/boards/mmc3_variants_carts.h` |
+| B2 | 两条 `MapperEntryRegister`（191 "TW MMC3+VRAM Rev. A" 用 bmap 同名风格、199 "Waixing DBZ variant"，名字落地时对齐现有条目风格） | `src/boards/mmc3.cpp`（紧跟 198 的条目） |
+| B3 | **锁测试**：`mapper_load_test.cpp` 增 `find_mapper(191)/find_mapper(199)` 非空断言（该测试已链 core 库，`boards/registry.h` 直接可用）；变异 = 摘掉一条注册 ⇒ 红 | `tests/f11qa/boards/mapper_load_test.cpp` |
+| B4 | 端到端灰屏消验：用 issue 作者提供的真 ROM（业主已索取，**ROM 不入库**——收到后放桌面测试区，参照 `*.gba` 先例考虑给 `.gitignore` 加 `*.nes`）人工确认出画面；本项是**人工步骤**，不进门禁 | 本地 |
+
+### S4 出口判据
+
+- [ ] A1-A4 落地；issue 的复现 ROM 形态（合成 12+16+191）装载成功且画面可用（B4）；
+- [ ] **`cargo test -p fceux11-formats --lib` 全绿**（当前基线 **150 项**，2026-11-10 实测）——
+      ⚠️ **该命令在 S4 之前不存在于任何门禁**（纪律 10 活例），AGENTS.md 门禁节已同步登记，
+      以后任何 formats 改动都要跑它；
+- [ ] A5/A6/B3 三条锁**变异双向可红**（还原腿刷 mtime）；
+- [ ] `mapper_load_test`（kgmqa-016）扩展后仍绿；**NES 零回归加倍适用**：
+      `ctest -LE perf` 全绿 + F11QA `pass_to_fail=0` + grade ≥ B + 金标三件套零漂移；
+- [ ] GBA 门禁不受伤（S4 文件域与 GBA 零交集，GBA 计数应逐字不变：根 266/24、vendor 242）；
+- [ ] `fceux11_rust.h` / 符号面零变化（S4-a 不动 FFI 结构——若实现时发现必须加字段，
+      停下来按 AGENTS.md 坑 9/坑 10 的流程走）；
+- [ ] 变更记 §九（r9 起）+ issue #12 回复验证结果。
+
+---
+
 ## 五、阶段编排与依赖
 
 ```
@@ -557,6 +648,9 @@ S3 修根因（可多路并行，文件域互斥）
 
 **并行切分按文件域**：`swi/` 一路、`lcd/` 一路、`internal_memory.rs` 一路（内部再串行）。
 **探针与夹具（S1）独立成路**，可与 S2/S3 的准备并行。
+**S4（FC 侧，r8 扩围）独立成路**——文件域（`fceux11-formats` / `ines_load.cpp` /
+`boards/` / `tests/f11qa`）与 GBA 线**零交集**，可与 S2-b/S3 任意并行或穿插；唯一共享资源
+是构建与门禁（不与构建/测试并行跑的老规矩不变）。
 
 ---
 
@@ -589,6 +683,8 @@ S3 修根因（可多路并行，文件域互斥）
       **卡带不进仓库**，仓库内判据一律是夹具
 - [ ] `cartprobe` 的 verdict 判词**已修正**，不再输出误导性表述
 - [ ] vendor 树改动**全部登记进 `ATTRIBUTION.md`**
+- [ ] **S4（FC 侧，r8 扩围）**：loader 修复 + 191/199 注册落地，S4 出口判据（§四之二）全勾；
+      issue #12 报告者验证闭环
 - [ ] 已知限制**如实写进发版说明**：本轮只解决「能跑」，**不声称 GBA 精度已达标**；
       未实现的 SWI、容错点、未复现的症状逐条列出
 - [ ] ⚠️ **仍需人工**：4 张卡带的**最终画面观感**（有没有音乐、动画对不对）——
@@ -609,6 +705,9 @@ $env:PATH="D:\Project\FCEUX11\vcpkg_installed\x64-windows\bin;$env:PATH"
 # GBA 锁测试（含新增夹具）
 cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p fceux11-rust --no-default-features --features gba --lib
 cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p gba-core --lib
+
+# FC loader/formats crate（r8 登记的新门禁——S4 之前无任何门禁跑它；基线 150 项）
+cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p fceux11-formats --lib
 
 # 夹具生成（新增后）
 python tests\fixtures\generate_test_roms.py
@@ -638,6 +737,7 @@ curl.exe -x http://127.0.0.1:7897 -o .zcode\gbatek_probe.html https://mgba-emu.g
 | r5 | 2026-11-09 | **S1-a 完成 Step 0 余账 + Step 2/3/4/5/6 —— 9 条夹具与 3 条守卫落地，7 条复现器逐条为红，门禁命中 262；同时更正三处计划口径。** ① **Step 0 余账销清**：附录 A 补 **A.4（EEPROM 命令协议 `:8710-8786`）/ A.5（EEPROM 寻址与容量 `:8661-8706`）**（照抄原文、带行号）；新增 `tools/fetch_gbatek.ps1`（抓 HTML → 转纯文本，**逐字节复现**现有快照 ⇒ 附录 A 的行号引用在重抓后仍成立；错误路径实测：代理不可达 / HTTP 404 / 超时均 exit 3）。⚠️ **未销清**：§一.5 要求的 **GPIO/RTC 两章摘录（A.6）仍缺** ⇒ 该行动项未完全收口。② **Step 2**：9 条夹具按**缺陷域**拆成 `src/rust/src/gba/fixtures/{swi,oam,backup,rom}.rs`（公共底座留在 `fixtures.rs`）⇒ 文件域互斥、可并行；**7 条会红 + 2 条绿锁**，每条做过**双向变异验证**（变异腿 + 还原腿，还原后刷新 mtime）。③ **Step 3**：3 条常驻守卫 `fixtures/guards.rs`（G1 孤儿 `#[ignore]` / G2 夹具集合完整性 / G4 复现器存在性与归属）。④ **Step 4**：`.gitignore` 加 `*.gba`（**无例外**）⇒ 商业卡带机械地进不了仓库。⑤ **读数**：根 crate **262 passed / 26 ignored**（= 249 + 8 G3 + 2 绿锁 + 3 守卫）；**7 条复现器逐条为红**（`0 passed; 7 failed`）；`gba-core` **242** / `debug` **93** / `media` **52** 全绿；`ctest -LE perf` **36/36**。⚠️ **复现器必须带夹具域过滤**（`… --lib gba::fixtures:: -- --ignored`），不带过滤会拉进 19 个需要真卡带的测量工具。⑥ **三处口径更正（由本轮取证得出）**：**(a) §四 S3-b 第 2 条「`0x0E000006/7` 按 GBATEK 的状态位定义返回」不成立** —— GBATEK 快照全文 grep `E000006` **零命中**，GBATEK 的 flash 轮询是**回读比较**（`:8981` "wait until [E00xxxxh]=dat"）⇒ **GBATEK 没有 flash 状态寄存器**；S3-b 开工前须另找权威来源或用真卡带重新推导（现有夹具断言的是**本计划**给的 `0x0E000006/7` + ready=bit0）。**(b) §1.2.1 的兜底配方要改**：vendor 的 LR 约定与真机差 4 ⇒ SWI 向量若照抄 IRQ 向量的 `SUBS PC, LR, #4` 会**退回 SWI 自身重入**，正确的向量字是 **`MOVS PC, LR`**。**(c) 0x16 的命名三处不同**（GBATEK `Diff8bitUnFilterWrite8bit` / 仓库 `Diff8BitUnFilterWram` / 计划 `Diff8bitUnFilterWram`），号码相同。⑦ **计数口径**：夹具是 **9 条**（7 红 + 2 绿），**不是**「8 条（7 会红 + 2 绿锁）」⇒ 7 + 2 = 9；**门禁计数 262 不受影响**（绿锁只算 2 条常驻）。⑧ **两个坑**：① 变异验证的**还原腿会假红**（还原源文件不更新 mtime ⇒ cargo 跳过重建 ⇒ 跑的是上一轮变异版的二进制）；② **多个 worker 并发改同一个 vendor 文件会互撞** ⇒ 共享 vendor 树的变异验证必须串行或用隔离副本。⑨ **未动任何生产代码**（vendor 树零改动，逐文件哈希核对）。 |
 | r6 | 2026-11-10 | **S1-b 探针改造完成——§2.3 六项全部落地，新增 2 条常驻锁（根 crate 262 → 264 / 26 ignored），复现器 7 条仍逐条红；三个实现层新事实（工具链 ×2、并发 ×1），其中一个是全 suite 挂起级死锁的根因。改动只落在 `cartprobe.rs` / `frame.rs` / `swi/mod.rs` 三个文件；fixtures/ 与 vendor 树零改动。** ① **§2.3 六项**：(a) cartprobe verdict **通道化**——`describe_timing(channel, timing)`：DMA1/2 时序 3 标「sound FIFO，核心已服务」、DMA3 标「video capture —— never fired」、DMA0 标 prohibited；verdict 行按通道分别判，逐通道「STILL ENABLED」读数保留；(b) `swi/mod.rs` `dispatch` 拆为薄壳 + `dispatch_inner`，壳记录 `(号码, 是否认领)` 进 **`#[cfg(test)]`** thread-local 计数表（`take_swi_tallies` 排空 + `swi_name` / `vendor_core_serves` 判读辅助；vendor 自答集 {0x00,0x06–0x08,0x0B,0x0C}）——**release 生产零开销**（C3 同口径）；cartprobe 每卡打印「踩了哪些号码、谁服务、第一个未实现号之后 CPU 停在 0x08 所以之后的 SWI 不可能发生」；(c) `gba_step_frame` 外层 `catch_unwind` ⇒ 命中返回 **GBA_ERR_STATE**（**不新增错误码**——新码要动 build.rs，超出授权；语义对：机器已不可信），读数经 panic hook 记录；(d) 输入注入 `GBA_PROBE_INPUT="帧:键;…"`（1 基于测量窗、全状态语义、解析错即 panic 不静默）+ `GBA_PROBE_ONLY` 文件名过滤；(e) 窗口可配 `GBA_PROBE_FRAMES`/`GBA_PROBE_WARMUP`（默认 180/60 = 原 240）与 `GBA_PROBE_STUCK_FRAMES`（默认 30），verdict 新增「PC 连续 N 帧不变」读数（逐帧 modal PC 比对，报**终局**连击、不报历史最大）；(f) `probe_what_one_frame_changes` **忙等开窗**——halt 等不到时降级为 PC 采样稳定判定 + 按指令数开窗（FireRed 忙等从此可开窗）。② **两条常驻锁（264 = 262 + 2）**：`special_timing_wording_is_channel_aware`（cartprobe，钉 §1.3 判词措辞）与 `a_core_panic_in_step_frame_is_caught_and_readable`（frame.rs，断言**完整恢复周期**：返回 STATE / 读数含 "Prohibited ObjShape" / 下一帧 NO_ROM / **毒锁下重载成功且新机器跑通** / unload）。触发程序用 fixtures **公开**积木复刻 oam 夹具（attr0 = 0xC001 引自 `fixtures/oam.rs:109-110`；fixtures/ 未动）。③ **变异三腿双向可红**：腿 1 describe_timing 改回通道盲 ⇒ Lock A 红；腿 2 catch 改 `resume_unwind` ⇒ **0xC0000409 fail-fast**（panic 穿越 `extern "C"` 帧被判 foreign unwind 直接 abort——**生产「闪退」机制的活体演示**，AGENTS.md 纪律 6 的实证）；腿 3 摘掉 catch 处理器的机器丢弃 ⇒ 「torn machine must be gone, got 5」红。三腿还原后**刷 mtime** 复绿。④ **工具链事实 ×2（实测，有读数）**：(a) **`cargo test --release` 仍是 unwind**——`[profile.release] panic="abort"` 对测试目标不生效（仓库外微型实验实证）⇒ 探针/锁在 `--release` 取证跑法下 catch_unwind 与 panic hook **都工作**；⇒ **fixtures/oam.rs 注释「release 下 catch_unwind 无法挽救」被否证**（该文件本轮不动，仅在此记录；也意味着 OAM 复现器将来可在 --release 下跑）。(b) **格式化 panic 的 payload 拿不到字符串**——rustc 1.96 上 `Result::unwrap` 对 `Err(&'static str)` 的 panic，`is::<&str>()` 与 `is::<String>()` **双双为 false**（type_id 诊断实测）⇒ 读数必须走 **panic hook** 的 `PanicHookInfo::payload_as_str()`（fixtures/oam.rs 的 `payload_message` 有同一盲区，其 message 恒为 "<non-string panic payload>"、靠 location 工作——该文件本轮不动）。⑤ **并发事实 ×1（挂起级）**：**match scrutinee 自死锁**——`match m.lock() { Err(_) => m.lock() }` 里 scrutinee 临时 `Result`（**内含已持有的 guard**）存活到整个 match 结束 ⇒ Err 臂内对同一互斥量再 lock = 自己等自己。初版 with_machine 的毒锁恢复正中此坑：Lock B 第二次 step_frame 挂死 ⇒ `exclusively` 的 TEST_LOCK 永久被占 ⇒ 全套件其后 12+ 个 exclusively 测试排队挂起（首次全量门禁 60+ 秒无响应的根因）；这也解释了**旧代码 `try_lock` 恢复为何是死代码**（try_lock 同时被「毒」与「scrutinee 自持」双重挡死，r5 之前从未有人踩到）。修复 = **毒锁透明恢复**（`into_inner` 无条件恢复并使用；毒对进程终身有效，std 无 unpoison），撕毁态的丢弃收敛到 catch 处理器这个**唯一捕获点**；`set_machine` / `set_machine_unload` 同步恢复（否则毒锁后机器永久无法重载——初版 `if let Ok(...)` 在毒锁下静默不做事）。⑥ **门禁读数**：根 crate **264 passed / 26 ignored**（9.7 s）；复现器（`gba::fixtures::` 域过滤 + `--ignored`）**0 passed / 7 failed**；vendor **242** / debug **93** / media **52** 全绿；`ctest -LE perf` **36/36**（Release 全链重链，`-j 1`，BUILD_EXIT=0、零 LNK1104）。⑦ **卡带实测（本地取证，不进仓库）**：**7 张卡基线（默认 240 帧窗口）零 panic、零 NOT-SERVED SWI**——未实现 SWI 与 OAM panic 在开机窗口内都不触发，与「4 张失败卡的故障点在更深处」一致；判词无误导措辞（Dragon Ball 的 DMA1/2 FIFO 行正确标注 serviced）。画像：Dragon Ball/Minish Cap/Mario Kart 各自稳定在片头循环 PC（`0x08115ad0` 连击 135 帧 / `0x080b1500` 连击 180 帧 / `0x0806138c` 连击 176 帧）= **都在等输入**；FireRed「picture FROZEN」复现 §1.2.3 忙等画像；Kirby/NFS/SMA2 正常跑。**Dragon Ball 注入两轮（Start/A，300 帧 / 600 帧连打）**：**游戏对输入有响应**（每次有效按键后 30 帧内画面变化，600 帧 185 个不同帧哈希、预算零耗尽、零 panic、零未实现 SWI）——**「按键后卡死」在本时程/键位下未复现**；差异留给 S3-b/S3-c 用同一工具追（首要嫌疑：菜单后的存档通路 = §1.2.4 E2/E3 的 EEPROM_V124）。⑧ **生产 release 行为不变的边界**：`panic="abort"` 下 catch_unwind 不可能返回（abort 前原 diag hook 照记），本轮 catch/恢复只在 unwind 可用的构建（cargo test 全系、debug）改变行为——「panic 带走进程」变「错误码 + stderr 读数」。⑨ **bat 编码坑（补录）**：`.bat` 里写中文路径（`v2.0.3实测依据`）会被 cmd 按 OEM 码页读成乱码 ⇒ 探针目录/过滤/注入等含非 ASCII 的环境变量一律**从 bash 侧传入**（Git Bash 正确转 UTF-16），bat 内不放 `set` 行。AGENTS.md 已同步（v2.0.3 进度块 + 计数 + scrutinee 自死锁登记）。 |
 | r7 | 2026-11-10 | **S2-a 落地——vendor 核的两个可达 panic 点改为「精灵禁用」，商业卡的「闪退」根因（§1.2.2）消除；OAM 两条复现器转常驻绿锁。** ① **范围按 r2 收窄（业主裁决）**：只修 `object_attributes.rs` 的两条可达 panic——attr0 **shape = 3**（原 `:265` `.unwrap()`）与 **gfx mode = 3**（原 `:144` `unreachable!()`）；§3.1 表其余条目（bus.rs / internal_memory.rs / PLD）r2 已证不可达，**不动**——为不可达路径改容错无法用变异证明价值，只会膨胀 vendor 补丁面。② **修法**：`GfxMode::try_from` 对禁止值返回 `Err("Prohibited GfxMode")`（`4 => Err` 死分支并入）；`ObjAttribute0::try_from` 对 shape/gfx 的 `Err` 映射到 vendor 既有的 **`ObjMode::Disabled`** 表示（shape 占位 `Square`）——`process_sprites_scanline` 与 `process_winobj_sprites_scanline` 本来就 `continue` 跳过它（`layer_obj.rs:234-236/520-525`），可观测行为与真机完全一致（精灵不显示、帧继续）；字段零新增 ⇒ serde 无影响；真内部不变量（字段宽度不可能的值）保留 panic（§3.1 纪律）。③ **登记**：ATTRIBUTION **§3.2.12**（#30，vendor 补丁 **27 → 28 处、5 → 6 个源文件**，`object_attributes.rs` 入列）；AGENTS.md vendor 表加一行。④ **复现器转常驻**：`oam_bad_shape` / `oam_gfx_mode3` 摘 `#[ignore]`（断言本来就是目标行为，`assert_treated_as_disabled` 的双对照设计——显式禁用对照必须不可见 + 合法对照必须画出——修复后直接成立）；guards 的 `REPRODUCERS` **7 → 5**（G1/G2/G4 逻辑不动）；oam.rs 文档补记。⑤ **Lock B 处置（业主裁决：注入式机制锁）**：S2-a 修掉触发器后原锁必然转红 ⇒ 重构为 `a_frame_panic_is_caught_and_the_machine_recovers`——`#[cfg(test)]` thread-local `INJECT_FRAME_PANIC` 注入标志，在 `gba_step_frame` 的 machine body **内部**（vendor panic 同一条 unwind 路径、机器锁同样在持）触发 `panic!("injected frame panic")`，非测试构建编译期消失、release 零痕迹；断言链不变（STATE / 读数 / NO_ROM / 毒锁下重载成功且新机器跑通）；「不再 panic」这半边由两条常驻 oam 锁负责——机制锁与行为锁各管一段，互不重复。⑥ **门禁读数**：根 crate **266 passed / 24 ignored**（264 + 2 转正 − 2 ignore）；复现器 `gba::fixtures::` 域过滤 `--ignored` **0 passed / 5 failed**（仍逐条红）；vendor **242**（上游测试无扰）/ debug **93** / media **52** 全绿；`ctest -LE perf` **36/36**（BUILD_EXIT=0）。⑦ **变异两腿双向可红（单字段、单锁定位）**：腿 1 shape 的 Err 映射改回 `panic!` ⇒ `oam_bad_shape` 红（panic 被 `catch_panic_reading` 转成 reading，不炸进程）；腿 2 gfx 的 Err 映射改成「只回 Normal、不置 Disabled」⇒ `oam_gfx_mode3` 红（双对照逮住「画出来了」）；两腿还原后刷 mtime 复绿。⑧ **卡带复跑**：7 张基线（release，240 帧）verdict 与 r6 完全一致（6 changing + FireRed FROZEN 忙等画像）、**零 panic、零未实现 SWI**——S2-a 在本窗口无行为回归；其对商业卡的真实收益由两条常驻 oam 锁背书（窗口内本就无 panic 触发，观测面不变）。⑨ 文件面：`object_attributes.rs` / `ATTRIBUTION.md` / `fixtures/oam.rs` / `fixtures/guards.rs` / `frame.rs` + 计划与 AGENTS.md；**未碰** `bios.rs` / `swi/` / `gba_load.cpp`。下一步：S2-b（SWI 兜底）——先例预警见 §1.2.1（必改 `bios.rs:396-401` / `bios.rs:218-223` 两条锁）与 r5 ⑥(b)（向量字必须 `MOVS PC, LR`）。 |
+| r8 | 2026-11-10 | **业主裁决扩围：GitHub issue #12 的两个 NES 侧缺陷并入本计划为 §四之二「S4 · FC 侧修复批次」——本轮只写文档、不动任何代码，下一轮编码作业按 S4 节直接开工。** ① **只读核实（当日完成，S4.0 的全部 file:line 为实测）**：两缺陷**均属实**——Bug 1（iNES loader 对非 2 幂 PRG 先舍入后切片 ⇒ 硬拒 + 潜在 CHR 错切）机制链逐环核实（`cart.rs:90` / `ines.rs:721-731` / `ines.rs:961-978` / `ines_load.cpp:148-149`），C++ 消费链预研发现 **`ines_load.cpp:171-186` 已是 rounded-padded 拷贝形态 ⇒ 修 Rust 切片后 C++ memcpy 必须同步改 raw 字节数，否则越界读 memstream 缓冲区**；Bug 2（mapper 191/199 未注册 → 灰屏）核实注册表 25 项确无 191/199、legacy Init 会跑但 `g_cart` 停在 `CartPlaceholder`、根因是 registry 迁移（目标 all 171）未完成、兄弟形态是一行式 Cart 子类。**两处与 issue 表述的偏差如实记录**（原版 round 分支 fread 也用舍入数靠不查短读存活，故「读 raw」是比原版更正确的修法；issue 清单少列 mapper 76）。② **S4 设计已定稿在 §四之二**：A1-A6（loader raw 切片 + hash 用 raw 的决策依据 + formats 锁 + ctest fixture 锁）、B1-B4（191/199 注册 + registry 断言锁 + 真 ROM 人工验灰屏）、**CHR 同构缺口登记为观察项不修**、**FFI 结构零变更**（`rom_size_raw` 已在 `FceuInesCartResult` 且 C++ 已在读）。③ **门禁登记（纪律 10 活例）**：`fceux11-formats` crate 此前**不在任何门禁命令里**——本轮实测 `cargo test -p fceux11-formats --lib` **150 项全绿**，命令登记进 AGENTS.md 门禁节与本计划 §八；`mapper_load_test`（kgmqa-016）确认可扩展（8 个合成 fixture 遍历装载）。④ **范围口径**：§〇 范围外第 1 条加 r8 注——GBA 文件域口径不变，FC 侧仅限 S4 列出的文件，NES 零回归门禁对 S4 **加倍适用**；S4 文件域与 GBA 线零交集（§五 编排已加独立支线），可与 S2-b/S3 任意并行。⑤ **验证依赖**：issue 作者的真 ROM（业主已邮件索取）——**ROM 不入库**，收到放桌面测试区，编码时按 `*.gba` 先例考虑给 `.gitignore` 加 `*.nes`。 |
 
 ---
 

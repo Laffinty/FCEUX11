@@ -146,6 +146,15 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 > 同一条 unwind 路径，release 编译期消失）；断言链不变（STATE / 读数 / NO_ROM /
 > 毒锁下重载成功）。变异两腿双向可红（shape 映射改回 panic ⇒ oam_bad_shape 红；
 > gfx 映射「只回 Normal 不置 Disabled」⇒ oam_gfx_mode3 红）。
+>
+> 📋 **S4 · FC 侧修复批次已立项（2026-11-10，v2.0.3 r8，只写文档未动代码）**：GitHub
+> issue #12 的两个 NES 侧缺陷（iNES loader 硬拒非 2 幂 PRG / mapper 191、199 未注册灰屏）
+> 只读核实**均属实**，业主裁决扩围并入 v2.0.3，计划与全部实测 file:line 见
+> 计划书 **§四之二**——**下一轮编码作业读该节直接开工，不需重新取证**。文件域
+> （`fceux11-formats` / `ines_load.cpp` / `boards/` / `tests/f11qa`）与 GBA 线零交集，
+> 可与 S2-b/S3 并行；NES 零回归门禁对 S4 **加倍适用**。⚠️ **`fceux11-formats`
+> 此前不在任何门禁里**（纪律 10 活例）——`cargo test -p fceux11-formats --lib`
+> **150 项**已实测并登记进门禁节，动该 crate 必跑。
 
 > ⚠️ **不变式 1 的判据是 F11QA 矩阵 `108P/12F`**，本机跑的是它的**本地近似**
 > `ctest`。**本地确定性门禁 = `ctest -LE perf`（36 项，须全绿；计数随新增测试增长，
@@ -314,6 +323,10 @@ cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo tes
 # **一次都不会跑**，且没有任何一层报警（A5 G3 的绝对金标准向量锁就在 media 里）。
 cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p fceux11-debug --lib"
 cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p fceux11-media"
+# **FC loader/formats crate（r8 补录，2026-11-10）**：此前的门禁清单漏了它——
+# `fceux11-formats` 的 150 项测试**一次都没被任何命令跑过**（纪律 10 的活例）。
+# v2.0.3 S4（FC 侧修复批次）要动 iNES loader，这条是它的门禁；基线 **150 项全绿**。
+cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p fceux11-formats --lib"
 
 # 两态 feature 检查（第二态同时复核不变式 8：关 feature 时 vendor 树退出编译图）
 cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo check --workspace --no-default-features"
