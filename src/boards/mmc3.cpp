@@ -1073,7 +1073,17 @@ static void M195CW(uint32 A, uint8 V) {
 		setchr1r(0, A, V);
 }
 
-static void M195Power(void) {
+// Mapper 195's power function.  Not static: mapper 198 uses it too (upstream
+// wires `info->Power = M195Power` for both), and the v1.8 Cart subclass
+// (fceu11::Mapper198Cart) has to call it directly -- the loader routes the
+// power cycle through CartInfo_PowerForward -> cart_obj->on_power(), so the
+// legacy `info->Power` assignment never runs.
+//
+// It matters for 198 (TW MMC3+VRAM Rev. E): M195Power restores the 16 KiB
+// WRAM window at $5000 (the power cycle's ResetCartMapping wipes the
+// mapping that GenMMC3_Init installed) and installs its read/write handlers.
+// Without it the board has no WRAM at $5000 and the cartridge cannot run.
+void M195Power(void) {
 	GenMMC3Power();
 	setprg4r(0x10, 0x5000, 2);
 	SetWriteHandler(0x5000, 0x5fff, CartBW);
@@ -1534,6 +1544,10 @@ void Mapper406_Init(CartInfo *info) {
 // before it can ever run.
 extern void M199Power(void);
 
+// Mapper 198 shares mapper 195's power function (see boards/mmc3.cpp's
+// M195Power comment): it restores the WRAM window at $5000.
+extern void M195Power(void);
+
 namespace fceu11 {
 
 void Mmc3Cart::on_power() noexcept {
@@ -1595,6 +1609,14 @@ std::vector<uint8_t> Mmc3Cart::save_mapper_state() const noexcept {
 // power function at GenMMC3Power, which is what Mmc3BaseCart calls.
 void Mapper199Cart::on_power() noexcept {
 	M199Power();
+}
+
+// v2.0.3 S5-A3: mapper 198 (TW MMC3+VRAM Rev. E) runs mapper 195's power
+// function upstream.  The base class would only call GenMMC3Power(), which
+// leaves the board without the 16 KiB WRAM window at $5000 -- the cartridge
+// loads but cannot run.
+void Mapper198Cart::on_power() noexcept {
+	M195Power();
 }
 
 namespace {

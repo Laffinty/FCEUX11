@@ -55,7 +55,17 @@ class Mapper192Cart : public Mmc3BaseCart { public: explicit Mapper192Cart(Bus& 
 class Mapper191Cart : public Mmc3BaseCart { public: explicit Mapper191Cart(Bus& bus) noexcept : Mmc3BaseCart(bus) {} };
 class Mapper194Cart : public Mmc3BaseCart { public: explicit Mapper194Cart(Bus& bus) noexcept : Mmc3BaseCart(bus) {} };
 class Mapper195Cart : public Mmc3BaseCart { public: explicit Mapper195Cart(Bus& bus) noexcept : Mmc3BaseCart(bus) {} };
-class Mapper198Cart : public Mmc3BaseCart { public: explicit Mapper198Cart(Bus& bus) noexcept : Mmc3BaseCart(bus) {} };
+class Mapper198Cart : public Mmc3BaseCart {
+public:
+    explicit Mapper198Cart(Bus& bus) noexcept : Mmc3BaseCart(bus) {}
+    // Mapper 198 uses mapper 195's power function (upstream:
+    // `info->Power = M195Power`), which restores the 16 KiB WRAM window at
+    // $5000 and installs its read/write handlers.  The base class's
+    // GenMMC3Power() does neither, so the board would come up without WRAM.
+    // See the header comment above for why the legacy `info->Power`
+    // assignment cannot be relied on.
+    void on_power() noexcept override;
+};
 class Mapper199Cart : public Mmc3BaseCart {
 public:
     explicit Mapper199Cart(Bus& bus) noexcept : Mmc3BaseCart(bus) {}

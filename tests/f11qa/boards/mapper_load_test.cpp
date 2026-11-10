@@ -99,6 +99,58 @@ static bool check_non_power2_prg(const char* path) {
     return ok;
 }
 
+// v2.0.3 S5-A3: mapper 198 (TW MMC3+VRAM Rev. E) runs mapper 195's power
+// function upstream -- `info->Power = M195Power` -- which maps the board's
+// 16 KiB WRAM at $5000 and installs its read/write handlers.  The generic
+// GenMMC3Power() maps the WRAM at $6000 instead, so $5000 stays unmapped and
+// the cartridge has no work RAM there.
+//
+// Lock: write a byte to $5000 and read it back.  With M195Power running it
+// lands in the WRAM; without it the write is dropped (open bus) and the read
+// comes back as 0x00.
+static bool check_mapper198_power(const char* path) {
+    FCEUGI* gi = fceu11::LoadGame(path, 1, true);
+    if (!gi) {
+        printf("FAIL: %s did not load\n", path);
+        return false;
+    }
+    if (gi->mappernum != 198) {
+        printf("FAIL: %s loaded as mapper %d\n", path, gi->mappernum);
+        fceu11::CloseGame();
+        return false;
+    }
+    X6502_DMW(0x5000, 0x5A);
+    const uint8_t readback = X6502_DMR(0x5000);
+    printf("      WRAM[0x5000] readback = 0x%02X\n", readback);
+    fceu11::CloseGame();
+    if (readback != 0x5A) {
+        printf("FAIL: %s: $5000 is not writable -- mapper 198's own power "
+               "function (M195Power) did not run\n", path);
+        return false;
+    }
+    return true;
+}
+
+// v2.0.3 S5-A2: the rule that carries the CRC-based ROM correction into the
+// mapper number the loader uses.  The corrected mapper has to reach
+// `iNES_Init()` and the v1.8 cart factory; before this rule existed the
+// correction was computed and then dropped (the whole 251-entry table was
+// inert for mapper corrections).
+static bool check_effective_mapper_rule() {
+    bool ok = true;
+    // 吞食天地2: header says mapper 4, upstream's table says 198.
+    if (FCEU_EffectiveMapperNo(4, 198) != 198) {
+        printf("FAIL: a mapper correction must win over the header's mapper\n");
+        ok = false;
+    }
+    // No correction for this ROM -> the header's mapper stands.
+    if (FCEU_EffectiveMapperNo(4, -1) != 4) {
+        printf("FAIL: without a correction the header's mapper must stand\n");
+        ok = false;
+    }
+    return ok;
+}
+
 int main() {
     setvbuf(stdout, NULL, _IONBF, 0);
     printf("=== Mapper Load Test ===\n\n");
@@ -175,6 +227,24 @@ int main() {
     // Mapper 199 has to load, and its own power function has to run.
     printf("[extra] Checking mapper 199's power function ... ");
     if (check_mapper199_power("fixtures/mapper_mapper199.nes")) {
+        printf("OK\n");
+    } else {
+        failed = true;
+    }
+
+    // v2.0.3 S5-A3: mapper 198 runs mapper 195's power function upstream, and
+    // that is what puts the board's WRAM at $5000.
+    printf("[extra] Checking mapper 198's power function ... ");
+    if (check_mapper198_power("fixtures/mapper_mapper198.nes")) {
+        printf("OK\n");
+    } else {
+        failed = true;
+    }
+
+    // v2.0.3 S5-A2: the CRC-based ROM-correction table has to be able to
+    // replace the header's mapper.
+    printf("[extra] Checking the CRC-correction mapper rule ... ");
+    if (check_effective_mapper_rule()) {
         printf("OK\n");
     } else {
         failed = true;
