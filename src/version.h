@@ -61,21 +61,30 @@
 // profiler 开关、lua memory 导出）、C 线（GBA 帧导出与 savestate 编码加速），
 // 外加 D1 专线的中断模型基础设施与两轮 S2.5。NES 侧基线 F11QA 矩阵
 // 122 项 / grade B 不变。成果逐条见 CHANGELOG 2.0.2 与计划 §十 r1–r26。
+//
+// v2.0.2_hotfix1（2026-11-10）— v2.0.2 的 hotfix 发布：
+// 内容 = v2.0.2 的全部成果 + v2.0.3 线的 **S4 · FC 侧修复批次**
+// （GitHub issue #12：iNES loader 硬拒非 2 幂 PRG、mapper 191/199 未注册灰屏）
+// + GBA 侧 S1-a/S1-b/S2-a 的在途成果（GBA 仍是 Alpha，长期不阻塞本体发版）。
+//
+// ⚠️ **数值口径不动**：`FCEU_VERSION_NUMERIC` 仍为 20202 —— 它进 FCSX 电影模式
+// 存档头（`state.cpp:397`）与录像头（`movie_record.cpp:591`），改了会让
+// v2.0.2 产出的存档/录像与本版**互读失败**。hotfix 编号只由 `FCEU_HOTFIX_TAG` 承载。
 inline constexpr int FCEU_VERSION_MAJOR = 2;
 inline constexpr int FCEU_VERSION_MINOR = 0;
 inline constexpr int FCEU_VERSION_PATCH = 2;
-inline constexpr int FCEU_VERSION_TWEAK = 0;
+inline constexpr int FCEU_VERSION_TWEAK = 1;	// hotfix 计数；**不参与** NUMERIC
 
 inline constexpr int FCEU_VERSION_NUMERIC = (FCEU_VERSION_MAJOR * 10000) + (FCEU_VERSION_MINOR * 100) + FCEU_VERSION_PATCH;
 inline constexpr int FCEU_VERSION_MAJOR_DECODE(int x) { return x / 10000; }
 inline constexpr int FCEU_VERSION_MINOR_DECODE(int x) { return (x / 100) % 100; }
 inline constexpr int FCEU_VERSION_PATCH_DECODE(int x) { return x % 100; }
 
-// v2.0.2 release — no hotfix tag.
-#define FCEU_HOTFIX_TAG ""
+// v2.0.2_hotfix1
+#define FCEU_HOTFIX_TAG "_hotfix1"
 
-#define FCEU_VERSION_STRING "2.0.2 " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
-#define FCEU_DISPLAY_VERSION "v2.0.2"
+#define FCEU_VERSION_STRING "2.0.2" FCEU_HOTFIX_TAG " " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
+#define FCEU_DISPLAY_VERSION "v2.0.2" FCEU_HOTFIX_TAG
 #define FCEU_NAME_AND_VERSION FCEU_NAME " " FCEU_DISPLAY_VERSION
 
 // FCEUX11 Contributors — Derivative work based on FCEUX

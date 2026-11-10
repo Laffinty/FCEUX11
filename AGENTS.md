@@ -269,6 +269,34 @@ v2.0 GBA 计划建设期已收口归档（r57 用户裁决）。剩余长尾全�
    且基线为 `false`** ⇒ 修它们**不改 grade、不改 pass_to_fail**，判红体系上零收益。
    这是「收益不大就不做」这条裁决的**硬依据**，下次评估精度项前先查这一列。
 
+## v2.0.2_hotfix1 发版（2026-11-10）
+
+> **v2.0.3 线尚未收口，但本体先发一个 hotfix**：业主裁决「S4 收尾 + GBA 侧在途工作
+> 不影响 GBA 正常功能 ⇒ 可正常发布」。发版内容 = **v2.0.2 全部成果** +
+> **S4 · FC 侧修复批次**（GitHub issue #12）+ GBA 侧 S1-a/S1-b/S2-a 的在途成果。
+
+1. **版本口径**：`src/version.h` 的 `FCEU_HOTFIX_TAG` = `"_hotfix1"`，
+   `FCEU_DISPLAY_VERSION` = `v2.0.2_hotfix1`。⚠️ **数值口径不动**
+   （`FCEU_VERSION_NUMERIC` 仍 `20202`、`FCEU_VERSION_TWEAK` 不参与计算）——
+   那个数进 FCSX 电影模式存档头（`state.cpp:397`）与录像头（`movie_record.cpp:591`），
+   改了会让 v2.0.2 的存档/录像与本版**互读失败**。
+   ⚠️ `CMakeLists.txt` 的 `project(FCEUX11 VERSION 2.0.2)` **故意不动** ——
+   CMake 的 `VERSION` 只吃数字段，装不下 `_hotfix1` 后缀。
+2. **本次发版对 GBA 侧的影响面**（v2.0.3 未完成部分是否影响正常功能）：
+   ① S1-a 的夹具与守卫全在 `#[cfg(test)]` ⇒ **发布版零开销**；② S1-b 的探针改造
+   （SWI 陷阱记录 / panic 捕获 / 输入注入）里**记数与注入器是 `#[cfg(test)]`**，
+   生产路径只多了一层 `catch_unwind` 包装 —— release 是 `panic = "abort"`，
+   **catch 不可能触发，行为与改前逐字相同**；③ S2-a 是**行为变更**（OAM 禁止值
+   ⇒ 精灵禁用），它修的正是闪退根因 ⇒ 严格改善。
+   ⇒ **结论：GBA 侧在途工作不改变 GBA 正常功能。**
+3. **发版时随包登记的已知限制**（CHANGELOG `[2.0.2_hotfix1]` 段同款）：
+   GBA 仍是 Alpha（SWI `0x16–0x2A` 未实现、EEPROM 型号/容量未建模、Flash 状态寄存器
+   不存在、ROM 窗口不镜像、GPIO/RTC 未做）· 4 张失败卡带未逐张复核 · S4 的人工步骤
+   （真 ROM 未入库）未做 · F11QA 矩阵待 push 后 CI 复核 · **17 个带自定义 power 的
+   MMC3 变体与 199 同因但未修**（只修了 199）。
+4. ⚠️ **发版不等于打 tag**：本地 `add`+`commit` 照做，**push / tag / 建分支一律等
+   业主明确指示**。
+
 ## S3-3 实施时踩到的三件事（给下一个接手的人）
 
 1. **`FCEUSS_Save` / `FCEUSS_Load` 是所有即时存档入口的唯一收敛点**：10 个槽位、

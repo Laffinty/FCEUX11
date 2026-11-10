@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.2_hotfix1] - 2026-11-10
+
+> v2.0.2 的 hotfix 发布。**数值版本口径不动**（`FCEU_VERSION_NUMERIC` 仍为 `20202`
+> —— 它进 FCSX 电影模式存档头 `state.cpp:397` 与录像头 `movie_record.cpp:591`）
+> ⇒ **v2.0.2 产出的即时存档 / 录像与本版互读不受影响**；hotfix 编号只由
+> `src/version.h` 的 `FCEU_HOTFIX_TAG`（`_hotfix1`）承载。
+> 内容 = **v2.0.2 的全部成果** + v2.0.3 线的 **S4 · FC 侧修复批次**（GitHub issue #12）
+> + GBA 侧 S1-a / S1-b / S2-a 的在途成果。
+
+### Fixed — issue #12 的两个 NES 侧缺陷（v2.0.3 · S4 · FC 侧修复批次）
+
+- **iNES loader 不再硬拒非 2 幂 PRG 的 ROM**：PRG 的文件边界检查、指针推进与 MD5/CRC32
+  全部改用 **raw** 字节数（`rom_size_raw << 14`）；分配与映射仍用舍入后的 2 幂尺寸
+  （`SetupCartPRGMapping` 的要求）。此前 12 银行 PRG 的卡会被当成 16 银行 ⇒ 吞掉 CHR 的
+  前 64 KiB ⇒ 再以「文件太短」硬拒 ⇒ 用户看到「Unknown ROM file format」。
+- **mapper 191 / 199 进 registry**：两者本来就有实现（`bmap[]` 走 legacy 路径），但 v1.8 的
+  `MapperEntry` 注册表里没有 ⇒ `g_cart` 停在 no-op 占位卡 ⇒ power 周期不跑 ⇒ 灰屏。
+- **mapper 199 走自己的 power 函数**：v1.15 B.1 把 MMC3 变体的 power 统一成基类的
+  `GenMMC3Power()`，但 199 有自己的 `M199Power`（播种 DBZ 扩展寄存器 + 装 `0x8001` 写处理器）
+  ⇒ `Mapper199Cart` 覆写 `on_power()` 调它（`M199Power` 已从 `static` 放开）。
+
+### Added — GBA 侧在途成果（随本次一并发布；GBA 长期 Alpha，不阻塞本体发版）
+
+- **S2-a：vendor 核两个可达 panic 点改为「精灵禁用」** —— OAM attr0 的 shape = 3 /
+  gfx mode = 3 是真机的**禁止值**，vendor 原先在渲染中途 panic，而 release 是
+  `panic = "abort"` ⇒ 进程闪退；现按真机语义映射为「精灵不显示」
+  （与 obj mode = 2 的既有处理一致）。
+- **S1-a：9 条最小可复现夹具 + 3 条守卫** —— 全在 `#[cfg(test)]` 下 ⇒ **发布版零开销**。
+- **S1-b：探针改造** —— SWI 陷阱记录 / `gba_step_frame` panic 捕获 / 输入注入
+  （`GBA_PROBE_INPUT`、`GBA_PROBE_ONLY`）/ 长窗口与「PC 连续 N 帧不变」可配 /
+  `probe_what_one_frame_changes` 忙等开窗。默认路径不变。
+
+### Known limitations — 如实登记（发布说明口径）
+
+- **GBA 仍是 Alpha**：本轮只解决「能跑」，**不声称 GBA 精度已达标**。仍未实现：
+  BIOS SWI `0x16–0x2A`、存档芯片型号/容量建模（`.srm` 对 EEPROM 卡恒为 32 KiB）、
+  Flash 状态寄存器、ROM 窗口镜像、GPIO/RTC 探测——均属 v2.0.3 计划 S3 段。
+- **4 张失败卡带尚未逐张复核通过**（Mario Kart / Dragon Ball / Minish Cap / FireRed）；
+  机器判据只能证明「不崩、不卡、能出画面」，**画面观感仍待人工确认**。
+- **S4 的人工步骤未做**：issue #12 报告者的真 ROM 未入库，出画面的观感待人工。
+- **F11QA 矩阵（`pass_to_fail = 0` / grade ≥ B）待 push 后由 CI 复核**（本地只有
+  `ctest -LE perf` 这个近似门禁）。
+- **本 hotfix 未修（同因、另立项）**：已注册但带自定义 power 的 17 个 MMC3 变体
+  （12/37/44/45/47/49/52/114/115/165/195/205/245/249/250/254/406）同样只跑
+  `GenMMC3Power()`，它们自己的 `MxxPower` 从不执行 —— 与 199 同因，本轮只修了 199。
+
 ## [Unreleased] — v2.0.3 GBA 卡带兼容性线
 
 ### Added — S1 可复现门禁落地（S1-a，最小可复现夹具）

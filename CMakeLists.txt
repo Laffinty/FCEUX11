@@ -13,6 +13,10 @@ if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
     endif()
 endif()
 
+# NOTE: the shipping version label lives in `src/version.h` (`FCEU_DISPLAY_VERSION`
+# / `FCEU_HOTFIX_TAG`). CMake's `VERSION` argument accepts numeric components only,
+# so the hotfix suffix ("_hotfix1") cannot be spelled here — this line tracks the
+# *numeric* base (2.0.2) and is deliberately left untouched by hotfix releases.
 project(FCEUX11 VERSION 2.0.2 LANGUAGES CXX C)
 
 # v0.2.1: Enforce MSVC toolchain; MinGW-w64 / MSYS2 support removed.
