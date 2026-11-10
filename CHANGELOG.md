@@ -62,6 +62,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > 本轮**未动任何生产代码**（夹具全在 `#[cfg(test)]` 下；vendor 树零改动，已逐文件哈希核对）。
 
+### Fixed — S4 · FC 侧修复批次（GitHub issue #12：iNES loader 拒非 2 幂 PRG；mapper 191/199 灰屏）
+
+- **iNES loader 不再硬拒非 2 幂 PRG 的 ROM**：PRG 的文件边界检查、指针推进与 MD5/CRC32
+  全部改用 **raw** 字节数（`rom_size_raw << 14`）；分配与映射仍用舍入后的 2 幂尺寸
+  （`SetupCartPRGMapping` 的要求）。此前 12 银行 PRG 的卡会被当成 16 银行 ⇒ 吞掉 CHR 的
+  前 64 KiB ⇒ 再以「文件太短」硬拒 ⇒ 用户看到「Unknown ROM file format」。
+- **mapper 191 / 199 进 registry**：两者本来就有实现（`bmap[]` 走 legacy 路径），但 v1.8 的
+  `MapperEntry` 注册表里没有 ⇒ `g_cart` 停在 no-op 占位卡 ⇒ power 周期不跑 ⇒ 灰屏。
+- **mapper 199 走自己的 power 函数**：v1.15 B.1 把 MMC3 变体的 power 统一成基类的
+  `GenMMC3Power()`，但 199 有自己的 `M199Power`（播种 DBZ 扩展寄存器 + 装 `0x8001` 写处理器）
+  ⇒ `Mapper199Cart` 覆写 `on_power()` 调它（`M199Power` 已从 `static` 放开）。
+
+### Added — S4 的门禁
+
+- **formats crate 锁** `a_non_power_of_two_prg_rom_loads_with_raw_slices`：合成 12+16+191 的
+  327696 字节镜像，断言装载成功、CHR 起点在 raw PRG 末端（而非舍入末端）、hash 覆盖 raw PRG
+  （基线 **150 → 151**）。
+- **ctest 级端到端锁**：新增 `tests/fixtures/mapper_mmc3_191_nonpow2.nes`（与 issue 复现 ROM 同形），
+  `mapper_load_test` 增 registry 断言、191 装载行、**字节级 PRG 断言**（`0x8000` 是文件 PRG、
+  `0xC000/0xE000` 是 0xFF 填充 ⇒ CHR 没被吞进 PRG）与 **199 的 EXPREGS 断言**。
+- **5 腿变异验证逐条双向可红**（还原腿刷 mtime）：Rust 切片 / Rust hash / C++ memcpy /
+  摘掉 191 注册 / 199 的 power 换成 `GenMMC3Power()`。
+
+### Notes
+
+- **`prg_size` 的语义没变，`prg_data` 的保证变窄了**：非 2 幂 PRG 时 `prg_data` 只有 raw 那么多
+  字节有效，而 `prg_size` 仍是舍入后的分配/映射尺寸 ⇒ C++ 侧拷贝长度取 `min(raw, prg_size)`
+  （同时避开「256 银行 ROM 的 raw 计数为 0」与「NOT_POWER2 mapper 的 `prg_size` 为 0」两个坑）。
+- **未做**：B4 的人工步骤（真 ROM 未到，出画面的观感待人工）；F11QA 矩阵待 push 后由 CI 复核。
+- **新发现、未修**：已注册的**带自定义 power 的 MMC3 变体**（12/37/44/45/47/49/52/114/115/165/
+  195/205/245/249/250/254/406 等）同样只跑 `GenMMC3Power()`，它们自己的 `MxxPower` 从不执行
+  （与 199 同因）⇒ 单独立项。
+
 ## [2.0.2] - 2026-11-08
 
 本版以 **DEBUG 与性能优化** 为主线：NES 侧把调试门控、APU 帧计数器、PPU 扫描线与

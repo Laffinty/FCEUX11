@@ -355,11 +355,40 @@ def generate_apu_square_rom():
     print(f"Generated {path} (NROM, AC square wave, {len(header) + len(prg)} bytes)")
 
 
+def generate_non_power2_prg_rom():
+    """A ROM whose PRG size is not a power of two (GitHub issue #12).
+
+    PRG 12 x 16 KiB + CHR 16 x 8 KiB + mapper 191 -- the shape the issue
+    reporter's cartridge had.  The old loader rounded the PRG size up to 16
+    banks, so it expected 64 KiB more PRG than the file had: the first
+    64 KiB of CHR got swallowed into the PRG slice and the file was then
+    rejected for being too short.
+
+    PRG and CHR are both 0xEA (NOP) sleds, and the PRG tail past the
+    file's 12 banks is padded with 0xFF by the loader -- so the mapper
+    load test can tell "the PRG was copied" from "the PRG swallowed the
+    CHR" by looking at what the emulator has at 0xC000.
+    """
+    path = os.path.join(SCRIPT_DIR, "mapper_mmc3_191_nonpow2.nes")
+    header = bytearray(make_ines_header(191))
+    header[4] = 12  # PRG banks of 16 KiB -- deliberately not a power of two
+    header[5] = 16  # CHR banks of 8 KiB
+    prg = bytes([0xEA] * (12 * 16384))
+    chr = bytes([0xEA] * (16 * 8192))
+    with open(path, "wb") as f:
+        f.write(bytes(header))
+        f.write(prg)
+        f.write(chr)
+    print(f"Generated {path} (mapper 191, non-power-of-2 PRG, "
+          f"{16 + 12 * 16384 + 16 * 8192} bytes)")
+
+
 def main():
     generate_ines_roms()
     generate_fds()
     generate_nsf()
     generate_apu_square_rom()
+    generate_non_power2_prg_rom()
     print("\nAll fixtures generated.")
 
 

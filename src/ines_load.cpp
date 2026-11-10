@@ -179,13 +179,29 @@ int iNESLoadCore(const char *name, FCEUFILE *fp, CartInfo& iNESCart, FceuMallocP
 	// FCEU_LoadGameVirtual cleanup) when the OS refuses the request.
 	// Surface a clean error instead so the GUI can show a dialog and
 	// the user can free memory before retrying.
+	// The PRG bytes the file actually carries, as opposed to the rounded-up
+	// size we allocate and map.  `rom_size_raw` is the header's bank count
+	// before rounding; iNES 1.0 encodes 256 banks as 0, and `rom_size_16kb`
+	// already carries the resolved 256, so fall back to it in that case.
+	// This mirrors the Rust side's raw-byte count (fceux11_rust_ines_load).
+	// Copying the rounded size instead would read the first 64 KiB of CHR as
+	// if it were PRG on a 12-bank cart (GitHub issue #12).
+	const size_t prg_file_bytes =
+		(size_t)(cart.rom_size_raw ? cart.rom_size_raw : cart.rom_size_16kb) << 14;
+	// Never copy more than the buffer holds.  For a NOT_POWER2 mapper (53,
+	// 198, 228, 547) whose header says 256 banks, `prg_size` computes to 0
+	// -- a pre-existing quirk of the layout computation -- and the raw count
+	// would overrun the buffer.
+	const size_t prg_copy_bytes =
+		prg_file_bytes < (size_t)cart.prg_size ? prg_file_bytes : (size_t)cart.prg_size;
+
 	ROM = (uint8*)FCEU_malloc(cart.prg_size);
 	if (!ROM) {
 		FCEU_PrintError("Unable to allocate PRG-ROM buffer.");
 		return LOADER_HANDLED_ERROR;
 	}
 	memset(ROM, 0xFF, cart.prg_size);
-	memcpy(ROM, cart.prg_data, cart.prg_size);
+	memcpy(ROM, cart.prg_data, prg_copy_bytes);
 
 	// Copy CHR-ROM to emulator-owned memory
 	if (cart.chr_size > 0) {

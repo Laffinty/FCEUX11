@@ -28,6 +28,7 @@
 #include "../ppu.h"
 #include "../unif.h"
 #include "mmc3.h"
+#include "../ines.h"     // Mapper191_Init / Mapper199_Init declarations
 
 #include <cstdarg>
 #include <cstdio>
@@ -1526,6 +1527,13 @@ void Mapper406_Init(CartInfo *info) {
 #include "boards/registry.h"
 #include "simple_carts.h"          // v1.8 Phase E.2 step 9.4
 
+// Mapper 199's power function lives in boards/199.cpp.  It has to be
+// reachable from here because the loader routes the power cycle through
+// CartInfo_PowerForward -> cart_obj->on_power(), so the legacy
+// `info->Power = M199Power` assignment inside Mapper199_Init is overwritten
+// before it can ever run.
+extern void M199Power(void);
+
 namespace fceu11 {
 
 void Mmc3Cart::on_power() noexcept {
@@ -1576,6 +1584,17 @@ std::vector<uint8_t> Mmc3Cart::save_mapper_state() const noexcept {
 	pack_u8(out, mmc3opts);
 	pack_u8(out, kt_extra);
 	return out;  // 17 bytes
+}
+
+// Mapper 199 (Waixing DBZ variant) has a power function of its own:
+// M199Power() seeds the DBZ expanded registers (EXPREGS) and installs the
+// 0x8001 write handler on top of GenMMC3Power().  The legacy path ran it
+// through `info->Power = M199Power`, but the loader overwrites info->Power
+// with CartInfo_PowerForward before the power cycle, so the v1.8 Cart has
+// to call it directly.  Mapper 191 needs no such thing: its Init left the
+// power function at GenMMC3Power, which is what Mmc3BaseCart calls.
+void Mapper199Cart::on_power() noexcept {
+	M199Power();
 }
 
 namespace {
@@ -1663,6 +1682,17 @@ static MapperEntryRegister kMapper195Register{
 static MapperEntryRegister kMapper198Register{
     MapperEntry{198, "MMC3 BMC Pirate 198", &Mapper198_Init,
         [](Bus& bus) { return std::make_unique<Mapper198Cart>(bus); }}
+};
+// GitHub issue #12: both of these had an implementation (bmap[] ran them
+// through the legacy path) but no registry entry, so the v1.8 pipeline
+// kept g_cart on the no-op placeholder and the ROM came up grey.
+static MapperEntryRegister kMapper191Register{
+    MapperEntry{191, "TW MMC3+VRAM Rev. A", &Mapper191_Init,
+        [](Bus& bus) { return std::make_unique<Mapper191Cart>(bus); }}
+};
+static MapperEntryRegister kMapper199Register{
+    MapperEntry{199, "Waixing DBZ variant", &Mapper199_Init,
+        [](Bus& bus) { return std::make_unique<Mapper199Cart>(bus); }}
 };
 static MapperEntryRegister kMapper205Register{
     MapperEntry{205, "MMC3 BMC Pirate 205", &Mapper205_Init,
