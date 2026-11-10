@@ -44,7 +44,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Flash 状态寄存器、ROM 窗口镜像、GPIO/RTC 探测——均属 v2.0.3 计划 S3 段。
 - **4 张失败卡带尚未逐张复核通过**（Mario Kart / Dragon Ball / Minish Cap / FireRed）；
   机器判据只能证明「不崩、不卡、能出画面」，**画面观感仍待人工确认**。
-- **S4 的人工步骤未做**：issue #12 报告者的真 ROM 未入库，出画面的观感待人工。
+- **S4 的人工步骤（B4）已做，结果如实登记**（2026-11-10，业主用 9 张卡带实测本 hotfix）：
+  9 张里 **2 张完全正常**（大盗伍佑卫门外传 / 银白色沙加）、**1 张能启动但画面部分错乱**
+  （拉迪亚战记）、**1 张能跑出 LOGO 画面后转黑屏**（SD高达外传1）、**5 张仍灰屏**
+  （Q Boy / SD高达外传2 / SD高达外传3 两版 / 吞食天地2）。
+  ⇒ **S4 的两个修复都真实生效**：① 191/199 进 registry 之前，这 8 张 191/199 卡**必然灰屏**
+  （未注册 ⇒ `create_cart_for_mapper` 返回 nullptr ⇒ `g_cart` 停在 no-op 占位卡），现在有 3 张
+  能出画面；② 吞食天地2 是 mapper 4 + **非 2 幂 PRG（40 库 = 640 KB）**，修复前装载器按舍入后的
+  1 MB 做边界检查 ⇒ **直接被拒**（"Unknown ROM file format"），现在能装载并运行。
+  ⇒ **剩余 5 张的失败不属 S4 范围**：本仓的 mapper 191/199 实现与**上游 FCEUX 1.15 逐行等价**
+  （`GenMMC3_Init` 参数、`cwrap`/`pwrap`/`mwrap`、`M199Power` 语义、MMC3 写派发全部一致），
+  失败属**上游级缺口 / 逐游戏差异**，另立项。候选根因（**尚未实测，不作结论**）：
+  ① mapper 199 的 DBZ 扩展在个别卡上不够（对应 #7 的「画面部分错乱」）；
+  ② mapper 4 的 PRG 掩码被硬编码为 512 KB（`GenMMC3_Init(info, 512, …)` ⇒ `PRGmask8[0] = 63`），
+  640 KB 的卡最上 128 KB **不可达**（上游同样如此，非本次引入）；
+  ③ 存档 / IO / IRQ 时序类差异（对应 #2 的「LOGO 后黑屏」）。
 - **F11QA 矩阵（`pass_to_fail = 0` / grade ≥ B）待 push 后由 CI 复核**（本地只有
   `ctest -LE perf` 这个近似门禁）。
 - **本 hotfix 未修（同因、另立项）**：已注册但带自定义 power 的 17 个 MMC3 变体
