@@ -96,6 +96,10 @@ const fn mov_r0_imm(imm: u32) -> u32 {
 
 /// The 12-bit immediate field for `value`, if it has one.
 ///
+/// Visible to the crate because the S1-a fixture builder encodes the same
+/// class of immediate (see `gba::fixtures`), and **two implementations of a
+/// rotated-immediate rule would drift**.
+///
 /// The ARM data-processing immediate is an 8-bit constant plus a 4-bit count
 /// of **even right rotations**: `value == constant.rotate_right(2 * rotate)`.
 ///
@@ -106,7 +110,7 @@ const fn mov_r0_imm(imm: u32) -> u32 {
 /// ```text
 /// value = constant ROR (2 * rotate)   =>   constant = value ROL (2 * rotate)
 /// ```
-const fn immediate_field(value: u32) -> Option<u32> {
+pub(crate) const fn immediate_field(value: u32) -> Option<u32> {
     let mut rotate = 0u32;
     while rotate < 16 {
         // `value == constant ROR (2 * rotate)`, so the constant is the value

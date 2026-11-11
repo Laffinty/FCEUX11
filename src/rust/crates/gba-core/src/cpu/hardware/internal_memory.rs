@@ -89,12 +89,24 @@ impl BackupType {
     }
 
     /// Size in bytes of the backing buffer for this type.
+    ///
+    /// v2.0.3 S3-b (E2): an EEPROM starts at its smallest real size, 512 B
+    /// (GBATEK `:8665`, and mGBA defaults autodetect to `SAVEDATA_EEPROM512`,
+    /// `savedata.c:291-315`), and grows on demand up to the 8 KB the 14-bit
+    /// address width implies ([`Self::ensure_eeprom_capacity`], GBATEK
+    /// `:8669`). A cartridge never announces its capacity: GBATEK `:8521`
+    /// gives the whole family one ID entry, "EEPROM_Vnnn EEPROM 512 bytes or
+    /// 8 Kbytes (4Kbit or 64Kbit)", where `nnn` is the library version — so
+    /// there is no size to read out at construction time.
     const fn buffer_size(self) -> usize {
         match self {
             Self::Flash64 => 0x1_0000,  // 64 KB
             Self::Flash128 => 0x2_0000, // 128 KB
-            // SRAM is 32 KB; None/Eeprom keep a small unused buffer.
-            Self::Sram | Self::None | Self::Eeprom => 0x8000,
+            // SRAM is 32 KB; None keeps a small unused buffer.
+            Self::Sram | Self::None => 0x8000,
+            // The EEPROM's floor; a command that reaches past it grows the
+            // buffer, up to the ceiling in `ensure_eeprom_capacity`.
+            Self::Eeprom => 0x0200,
         }
     }
 
@@ -277,7 +289,22 @@ impl InternalMemory {
 
     /// Load a battery save file into the save memory, truncating or leaving the
     /// tail untouched if the sizes differ.
+    ///
+    /// v2.0.3 S3-b (E2): an EEPROM buffer starts at 512 B, so a battery file
+    /// written under the old flat-32 KB model is longer than the buffer. Grow
+    /// to the file length first — capped at the EEPROM ceiling — before
+    /// copying, the way mGBA only ever grows its save file upward
+    /// (`savedata.c:308-315`). The EEPROM's own writes can never land past
+    /// 8 KB (`eeprom_block_offset` masks every transfer to 64/1024 blocks × 8
+    /// bytes), so a legacy file's first 8 KB holds everything a real transfer
+    /// ever wrote and the tail — all `0xFF` on any build that could produce
+    /// one — is dropped, once, at this load; the next flush writes the file
+    /// back at the buffer's size.
     pub fn load_battery(&mut self, data: &[u8]) {
+        const EEPROM_MAX: usize = 0x2000; // 8 KB — GBATEK :8669
+        if self.backup_type == BackupType::Eeprom && data.len() > self.sram.len() {
+            self.sram.resize(data.len().min(EEPROM_MAX), 0xFF);
+        }
         let len = data.len().min(self.sram.len());
         self.sram[..len].copy_from_slice(&data[..len]);
     }
@@ -438,7 +465,27 @@ impl InternalMemory {
                         self.rom[offset + 2],
                         self.rom[offset + 3],
                     ]))
+                } else if offset >= self.rom.len() {
+                    // Entirely past the image the GamePak answers open bus: the
+                    // 16-bit bus carries the lower half of the halfword address
+                    // on AD0-15, so every 16-bit slot returns its own
+                    // "(Address/2) AND FFFFh" (GBATEK :14029-:14030) — and a
+                    // word read is TWO of those slots back to back (:1396-1400,
+                    // :196503-196504; mGBA `memory.c:405-415`), not four bytes
+                    // off an 8-bit bus.
+                    // (v2.0.3 S3-d, W5b. The bus-level answer was already this
+                    // shape through the four-byte fallback; answering here
+                    // keeps the fast path from deferring what it can compute.)
+                    #[allow(clippy::cast_possible_truncation)]
+                    {
+                        let low = ((offset >> 1) & 0xFFFF) as u32;
+                        let high = (((offset + 2) >> 1) & 0xFFFF) as u32;
+                        Some(low | high << 16)
+                    }
                 } else {
+                    // Straddling the image's end: defer to the byte path,
+                    // which answers in-image bytes from the image and the
+                    // rest from the open-bus formula.
                     None
                 }
             }
@@ -580,6 +627,7 @@ impl InternalMemory {
             let width: usize = if buffer.len() >= 17 { 14 } else { 6 };
             let addr = bits_to_addr(&buffer[2..2 + width]);
             let base = Self::eeprom_block_offset(addr, width);
+            self.ensure_eeprom_capacity(base + 8);
 
             // Output is 4 ignored zero bits followed by 64 data bits, MSB first.
             self.eeprom_out = Vec::with_capacity(68);
@@ -594,6 +642,7 @@ impl InternalMemory {
             let width: usize = if buffer.len() >= 81 { 14 } else { 6 };
             let addr = bits_to_addr(&buffer[2..2 + width]);
             let base = Self::eeprom_block_offset(addr, width);
+            self.ensure_eeprom_capacity(base + 8);
 
             let data = &buffer[2 + width..2 + width + 64];
             for (i, byte) in data.chunks(8).enumerate() {
@@ -611,6 +660,25 @@ impl InternalMemory {
     const fn eeprom_block_offset(addr: usize, width: usize) -> usize {
         let blocks = if width == 14 { 1024 } else { 64 };
         (addr % blocks) * 8
+    }
+
+    /// Grow the EEPROM buffer the first time a command reaches past it.
+    ///
+    /// v2.0.3 S3-b (E2). The chip starts at 512 B ([`BackupType::buffer_size`])
+    /// and a real one is 512 B or 8 KB: GBATEK `:8665`/`:8669`, with the 14-bit
+    /// address width spanning 0-3FFh = 1024 blocks × 8 bytes = 8 KB
+    /// (`:8705-8706`). The capacity is not readable from the cartridge, so it is
+    /// grown on demand the way mGBA's `_ensureEeprom` does (`savedata.c:471-489`):
+    /// keep what is already there and fill the tail with the erased value 0xFF,
+    /// growing only, never shrinking. The growth goes straight to the 0x2000
+    /// ceiling rather than stepping through powers of two — `eeprom_block_offset`
+    /// masks every transfer into 0..0x2000, so `needed` never exceeds it, and a
+    /// buffer that is already larger (a legacy 32 KB battery file) is left alone.
+    fn ensure_eeprom_capacity(&mut self, needed: usize) {
+        const EEPROM_MAX: usize = 0x2000; // 8 KB — GBATEK :8669
+        if self.backup_type == BackupType::Eeprom && needed > self.sram.len() {
+            self.sram.resize(EEPROM_MAX, 0xFF);
+        }
     }
 
     #[must_use]
@@ -1092,5 +1160,225 @@ mod tests {
     #[test]
     fn eeprom_14bit_write_then_read_round_trips() {
         eeprom_round_trip(14, 500);
+    }
+
+    // ---- EEPROM dynamic capacity (v2.0.3 S3-b, E2) --------------------------
+    //
+    // The chip is 512 B or 8 KB (GBATEK :8665/:8669) and the ID string carries
+    // a library version, not a capacity (GBATEK :8521), so the buffer starts
+    // at the floor and grows to the ceiling on demand. The expectations here
+    // are assembled field by field — capacity literals from GBATEK's own
+    // 0200h/2000h, data placement from the address/width contract — never by
+    // calling the implementation.
+
+    /// A fresh EEPROM machine at the model's floor size (512 B).
+    fn eeprom_at_floor() -> InternalMemory {
+        InternalMemory {
+            backup_type: BackupType::Eeprom,
+            sram: vec![0xFF; 0x0200],
+            ..Default::default()
+        }
+    }
+
+    /// Clock one full EEPROM command through the chip's own entry points.
+    ///
+    /// `write = true` sends GBATEK's write request ("2 bits 10, n bits
+    /// address, 64 bits data, 1 bit 0", `:8772-8775`) and reports whether the
+    /// chip says Ready; `write = false` sends the read request (`:8721-8723`)
+    /// and returns the 64 data bits, MSB first (`:8750-8751`).
+    #[allow(clippy::cast_possible_truncation)]
+    fn eeprom_command(
+        im: &mut InternalMemory,
+        width: usize,
+        addr: usize,
+        write: bool,
+        data: u64,
+    ) -> u64 {
+        let push_addr = |cmd: &mut Vec<u8>| {
+            for i in (0..width).rev() {
+                cmd.push(((addr >> i) & 1) as u8);
+            }
+        };
+        let mut cmd = vec![1u8, u8::from(!write)];
+        push_addr(&mut cmd);
+        if write {
+            for i in (0..64).rev() {
+                cmd.push(((data >> i) & 1) as u8);
+            }
+        }
+        cmd.push(0);
+        for b in cmd {
+            im.eeprom_write(u16::from(b));
+        }
+        if write {
+            // A read after the stop bit commits the programming; the chip
+            // answers Ready (GBATEK :8783-8786).
+            assert_eq!(im.eeprom_read(), 1, "the chip must report Ready after a write");
+            0
+        } else {
+            // 68 bits out: the first four are ignored, the next 64 are the
+            // data, MSB first (GBATEK :8750-8751).
+            let out: Vec<u16> = (0..68).map(|_| im.eeprom_read()).collect();
+            let mut got = 0u64;
+            for bit in &out[4..68] {
+                got = (got << 1) | u64::from(*bit);
+            }
+            got
+        }
+    }
+
+    #[test]
+    fn eeprom_starts_at_its_smallest_chip_size() {
+        let bios = [0u8; 0x4000];
+        let im = InternalMemory::new(bios, b"EEPROM_V124\0\0\0\0\0");
+        // GBATEK :8665/:8669: the chip is 0200h or 2000h bytes, and the ID
+        // string cannot say which (":8521"), so construction takes the floor.
+        assert_eq!(im.sram.len(), 0x0200, "an EEPROM cart starts at the 512 B floor");
+        // The flat types keep their sizes; only the EEPROM changed.
+        let sram_cart = InternalMemory::new(bios, b"SRAM_V\0\0");
+        assert_eq!(sram_cart.sram.len(), 0x8000);
+    }
+
+    #[test]
+    fn eeprom_grows_to_the_8k_ceiling_and_keeps_what_it_had() {
+        let mut im = eeprom_at_floor();
+        // A pre-existing save in the low half, so "grow keeps the old bytes"
+        // is observable rather than assumed. 0xFF is never produced (the fill
+        // value would be indistinguishable from it).
+        let old: Vec<u8> = (0..0x200).map(|i| (i % 251) as u8).collect();
+        im.sram.copy_from_slice(&old);
+
+        const DATA: u64 = 0x0102_0304_0506_0708;
+        eeprom_command(&mut im, 14, 0x3FF, true, DATA);
+
+        assert_eq!(im.sram.len(), 0x2000, "the buffer grew to the 8 KB ceiling");
+        // The block landed where the 14-bit address says (1023 × 8 = 8184),
+        // MSB first, and nothing else moved.
+        assert_eq!(
+            &im.sram[0x1FF8..0x2000],
+            &DATA.to_be_bytes(),
+            "the written block must sit at the addressed offset"
+        );
+        assert!(
+            im.sram[..0x200]
+                .iter()
+                .zip(&old)
+                .all(|(got, want)| got == want),
+            "the old contents must survive the growth"
+        );
+        assert!(
+            im.sram[0x200..0x1FF8].iter().all(|&b| b == 0xFF),
+            "the grown tail is the erased value, not zeros"
+        );
+
+        // And the grown region is addressable from the read path too.
+        let read_back = eeprom_command(&mut im, 14, 0x3FF, false, 0);
+        assert_eq!(read_back, DATA, "the grown block reads back what was written");
+    }
+
+    #[test]
+    fn six_bit_transfers_never_grow_the_buffer() {
+        let mut im = eeprom_at_floor();
+        const DATA: u64 = 0xA1B2_C3D4_E5F6_0718;
+        // Address 63 is the last 6-bit block (64 blocks × 8 bytes = 512 B):
+        // its transfer fills the buffer exactly, so growth here would be the
+        // defect, and the erased fill would hide a smaller floor.
+        eeprom_command(&mut im, 6, 63, true, DATA);
+        assert_eq!(im.sram.len(), 0x200, "a 6-bit transfer must not grow the buffer");
+        assert_eq!(
+            &im.sram[504..512],
+            &DATA.to_be_bytes(),
+            "the block landed at the last 6-bit offset"
+        );
+        let read_back = eeprom_command(&mut im, 6, 63, false, 0);
+        assert_eq!(read_back, DATA);
+    }
+
+    #[test]
+    fn a_legacy_battery_file_grows_the_buffer_instead_of_being_cut() {
+        // A legacy `.srm`: the old model's EEPROM buffer was a flat 0x8000, so
+        // that is the file size every pre-dynamic build wrote. Its first 8 KB
+        // carries a recognisable save; the tail was unreachable by the old
+        // model's own masking (`eeprom_block_offset` caps the data at 8 KB),
+        // so it is 0xFF in every file a real build ever produced.
+        let mut file = vec![0u8; 0x8000];
+        for (i, byte) in file.iter_mut().take(0x2000).enumerate() {
+            *byte = (i % 253 + 1) as u8;
+        }
+        file[0x2000..].fill(0xFF);
+
+        let mut im = eeprom_at_floor();
+        im.load_battery(&file);
+        assert_eq!(
+            im.sram.len(),
+            0x2000,
+            "the buffer grew to what the file holds, up to the EEPROM ceiling"
+        );
+        assert_eq!(
+            &im.sram[..0x2000],
+            &file[..0x2000],
+            "the save's first 8 KB migrated byte for byte"
+        );
+
+        // A file at an in-between size grows to exactly the file — a fresh
+        // machine, because a load never shrinks a buffer that is already
+        // bigger.
+        let mut small = vec![0u8; 600];
+        for (i, byte) in small.iter_mut().enumerate() {
+            *byte = (i % 254 + 1) as u8;
+        }
+        let mut fresh = eeprom_at_floor();
+        fresh.load_battery(&small);
+        assert_eq!(fresh.sram.len(), 600, "the buffer grew to the file's length");
+        assert_eq!(&fresh.sram[..600], &small[..], "the file landed byte for byte");
+    }
+
+    // ---- ROM open bus past the image (v2.0.3 S3-d, W5b) ---------------------
+
+    #[test]
+    fn rom_open_bus_word_reads_are_halfword_pairs() {
+        // GBATEK :14029-:14030: past the image every 16-bit slot answers its
+        // own "(Address/2) AND FFFFh"; a word read is two of those slots back
+        // to back (:1396-1400, :196503-196504). The expected values come from
+        // the GBATEK formula written out here, never from the implementation.
+        let im = InternalMemory {
+            rom: vec![0x55; 0x200],
+            ..Default::default()
+        };
+        let slot = |window_offset: usize| -> u32 { ((window_offset >> 1) & 0xFFFF) as u32 };
+
+        // One whole (tiny) image past the end, word-aligned: slots 0x0120 and
+        // 0x0121, i.e. the 0x0121_0120 shape.
+        let offset = 0x240usize;
+        assert_ne!(offset, 0x200, "the probe offset must sit past the image");
+        let expected = slot(offset) | slot(offset + 2) << 16;
+        assert_eq!(
+            expected, 0x0121_0120,
+            "the formula must give the halfword-pair shape, or the fixture's \
+             arithmetic has drifted from GBATEK"
+        );
+        assert_eq!(
+            im.try_read_word(0x0800_0000 + offset),
+            Some(expected),
+            "a word read past the image is two open-bus slots, not four bytes"
+        );
+
+        // The halfword fast path defers past the image; the two bytes its
+        // bus-level fallback composes are the slot's own low and high bytes.
+        assert_eq!(
+            im.try_read_half_word(0x0800_0000 + offset),
+            None,
+            "the halfword fast path defers past the image"
+        );
+        assert_eq!(
+            im.read_at(0x0800_0000 + offset),
+            slot(offset) as u8,
+            "the even byte past the image is the slot's low byte"
+        );
+        assert_eq!(
+            im.read_at(0x0800_0000 + offset + 1),
+            (slot(offset) >> 8) as u8,
+            "the odd byte past the image is the slot's high byte"
+        );
     }
 }

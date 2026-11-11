@@ -62,6 +62,14 @@ pub const IF: u32 = 0x0400_0202;
 pub const WAITCNT: u32 = 0x0400_0204;
 /// Interrupt Master Enable, `04000208h`.
 pub const IME: u32 = 0x0400_0208;
+/// DISPCNT, `04000000h`. The reset writes it unconditionally -- see the
+/// module comment in the parent's [`super::serve_register_ram_reset`].
+pub const DISPCNT: u32 = 0x0400_0000;
+/// DISPCNT bit 7, Forced Blank (GBATEK `:1920`: "1=Allow FAST access to
+/// VRAM,Palette,OAM" -- and `:1972`: it makes the video controller display
+/// white). The value the reset writes to [`DISPCNT`], per GBATEK
+/// `:193540-193541` ("DISPCNT=0080h").
+pub const FORCED_BLANK: u16 = 0x0080;
 
 /// A memory region to zero, as a half-open address range.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -154,8 +162,8 @@ impl RamResetRequest {
 mod tests {
     use super::{
         ClearRegion, RamResetRequest, CLEAR_EWRAM, CLEAR_IWRAM, CLEAR_OAM, CLEAR_PALETTE,
-        CLEAR_VRAM, IE, IF, IME, IMPLEMENTED_MASK, PRESERVED_TAIL, RESET_IO, RESET_SIO,
-        RESET_SOUND, WAITCNT,
+        CLEAR_VRAM, DISPCNT, FORCED_BLANK, IE, IF, IME, IMPLEMENTED_MASK, PRESERVED_TAIL,
+        RESET_IO, RESET_SIO, RESET_SOUND, WAITCNT,
     };
 
     /// Build `r0` from named bits, the way a caller does. Never a hand-written
@@ -297,6 +305,11 @@ mod tests {
         assert_eq!(IE, 0x0400_0200);
         assert_eq!(WAITCNT, 0x0400_0204);
         assert_eq!(IME, 0x0400_0208);
+
+        // The unconditional forced blank (GBATEK `:193540-193541`): the
+        // register address and the exact halfword the BIOS writes.
+        assert_eq!(DISPCNT, 0x0400_0000);
+        assert_eq!(FORCED_BLANK, 0x0080);
     }
 
     /// Bits 5 and 6 are accepted and deliberately do nothing. The test exists

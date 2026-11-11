@@ -97,7 +97,15 @@ static void ines_log_info(const FceuInesCartResult& cart, int round, uint32 not_
 }
 
 // Helper: apply corrections and check for bad ROM
-static int ines_apply_corrections(const FceuInesCartResult& cart, uint64 partialmd5) {
+//
+// v2.0.3 S5-A2: the corrected **mapper** used to be dropped on the floor —
+// `parseResult` is local to this function and the `tofix & 1` branch was an
+// empty comment, so `iNES_Init(MapperNo)` and `create_cart_for_mapper()` both
+// kept the *header's* mapper.  The whole 251-entry ROM-correction table
+// (`src/ines-correct.h`) was therefore inert for mapper corrections (mirror /
+// battery / clear-VROM corrections did propagate).  The effective mapper is
+// now returned to the caller, which carries it over.
+static int ines_apply_corrections(const FceuInesCartResult& cart, uint64 partialmd5, int& corrected_mapper) {
 	FceuInesHInfoResult hinfo;
 	FceuMasterRomInfoResult masterInfo;
 	int32 tofix = 0;
@@ -125,7 +133,11 @@ static int ines_apply_corrections(const FceuInesCartResult& cart, uint64 partial
 	parseResult.tv_system = cart.tv_system;
 
 	tofix = fceux11_rust_ines_apply_corrections(&parseResult, &hinfo, partialmd5, VROM_size > 0);
-	if (tofix & 1) { /* MapperNo updated via parseResult */ }
+	if (tofix & 1) {
+		// v2.0.3 S5-A2: carry the corrected mapper out (it used to stay in
+		// this function's local `parseResult` and be dropped).
+		corrected_mapper = static_cast<int>(parseResult.mapper_no);
+	}
 	if (tofix & 2) Mirroring = parseResult.mirroring;
 	if (tofix & 4) head.ROM_type |= 2;
 	// v1.13 Purify F2b: VROM is allocated with FCEU_malloc() (line 181); use matching FCEU_free()
@@ -179,13 +191,29 @@ int iNESLoadCore(const char *name, FCEUFILE *fp, CartInfo& iNESCart, FceuMallocP
 	// FCEU_LoadGameVirtual cleanup) when the OS refuses the request.
 	// Surface a clean error instead so the GUI can show a dialog and
 	// the user can free memory before retrying.
+	// The PRG bytes the file actually carries, as opposed to the rounded-up
+	// size we allocate and map.  `rom_size_raw` is the header's bank count
+	// before rounding; iNES 1.0 encodes 256 banks as 0, and `rom_size_16kb`
+	// already carries the resolved 256, so fall back to it in that case.
+	// This mirrors the Rust side's raw-byte count (fceux11_rust_ines_load).
+	// Copying the rounded size instead would read the first 64 KiB of CHR as
+	// if it were PRG on a 12-bank cart (GitHub issue #12).
+	const size_t prg_file_bytes =
+		(size_t)(cart.rom_size_raw ? cart.rom_size_raw : cart.rom_size_16kb) << 14;
+	// Never copy more than the buffer holds.  For a NOT_POWER2 mapper (53,
+	// 198, 228, 547) whose header says 256 banks, `prg_size` computes to 0
+	// -- a pre-existing quirk of the layout computation -- and the raw count
+	// would overrun the buffer.
+	const size_t prg_copy_bytes =
+		prg_file_bytes < (size_t)cart.prg_size ? prg_file_bytes : (size_t)cart.prg_size;
+
 	ROM = (uint8*)FCEU_malloc(cart.prg_size);
 	if (!ROM) {
 		FCEU_PrintError("Unable to allocate PRG-ROM buffer.");
 		return LOADER_HANDLED_ERROR;
 	}
 	memset(ROM, 0xFF, cart.prg_size);
-	memcpy(ROM, cart.prg_data, cart.prg_size);
+	memcpy(ROM, cart.prg_data, prg_copy_bytes);
 
 	// Copy CHR-ROM to emulator-owned memory
 	if (cart.chr_size > 0) {
@@ -242,7 +270,21 @@ int iNESLoadCore(const char *name, FCEUFILE *fp, CartInfo& iNESCart, FceuMallocP
 	// Apply corrections
 	SetInput();
 	if (iNES2) SetInputNes20(0);
-	ines_apply_corrections(cart, partialmd5);
+	// v2.0.3 S5-A2: the CRC-based ROM-correction table may replace the
+	// header's mapper (upstream's `ines-correct.h` does this for 251 ROMs).
+	// The corrected number has to reach `iNES_Init()` (which sets
+	// `iNESCart.mapper_number`) and the v1.8 cart factory, or the whole
+	// table stays inert for mapper corrections.
+	int corrected_mapper = -1;
+	ines_apply_corrections(cart, partialmd5, corrected_mapper);
+	const int effective_mapper = FCEU_EffectiveMapperNo(MapperNo, corrected_mapper);
+	if (effective_mapper != MapperNo) {
+		MapperNo = effective_mapper;
+		GameInfo->mappernum = MapperNo;
+		// `round` stays as computed from the header's mapper: upstream computes
+		// it before the CRC correction too, and it only feeds the log line.
+		FCEU_printf(" Mapper corrected by CRC table: %d\n", MapperNo);
+	}
 
 	if (VROM_size)
 		SetupCartCHRMapping(0, VROM, VROM_size * 0x2000, 0);

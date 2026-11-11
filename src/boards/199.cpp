@@ -66,7 +66,13 @@ static DECLFW(M199Write) {
 		MMC3_IRQWrite(A, V);
 }
 
-static void M199Power(void) {
+// Mapper 199's power function.  Not static: the v1.8 Cart subclass
+// (fceu11::Mapper199Cart) calls it directly, because the loader routes the
+// power cycle through CartInfo_PowerForward -> cart_obj->on_power(), so the
+// legacy `info->Power = M199Power` assignment in Mapper199_Init never runs.
+// Without this call the DBZ expanded registers stay at zero and the
+// 0xC000/0xE000 windows point at PRG bank 0.
+void M199Power(void) {
 	EXPREGS[0] = ~1;
 	EXPREGS[1] = ~0;
 	EXPREGS[2] = 1;

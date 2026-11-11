@@ -5,6 +5,330 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.2_hotfix1] - 2026-11-10
+
+> v2.0.2 的 hotfix 发布。**数值版本口径不动**（`FCEU_VERSION_NUMERIC` 仍为 `20202`
+> —— 它进 FCSX 电影模式存档头 `state.cpp:397` 与录像头 `movie_record.cpp:591`）
+> ⇒ **v2.0.2 产出的即时存档 / 录像与本版互读不受影响**；hotfix 编号只由
+> `src/version.h` 的 `FCEU_HOTFIX_TAG`（`_hotfix1`）承载。
+> 内容 = **v2.0.2 的全部成果** + v2.0.3 线的 **S4 · FC 侧修复批次**（GitHub issue #12）
+> + GBA 侧 S1-a / S1-b / S2-a 的在途成果。
+
+### Fixed — issue #12 的两个 NES 侧缺陷（v2.0.3 · S4 · FC 侧修复批次）
+
+- **iNES loader 不再硬拒非 2 幂 PRG 的 ROM**：PRG 的文件边界检查、指针推进与 MD5/CRC32
+  全部改用 **raw** 字节数（`rom_size_raw << 14`）；分配与映射仍用舍入后的 2 幂尺寸
+  （`SetupCartPRGMapping` 的要求）。此前 12 银行 PRG 的卡会被当成 16 银行 ⇒ 吞掉 CHR 的
+  前 64 KiB ⇒ 再以「文件太短」硬拒 ⇒ 用户看到「Unknown ROM file format」。
+- **mapper 191 / 199 进 registry**：两者本来就有实现（`bmap[]` 走 legacy 路径），但 v1.8 的
+  `MapperEntry` 注册表里没有 ⇒ `g_cart` 停在 no-op 占位卡 ⇒ power 周期不跑 ⇒ 灰屏。
+- **mapper 199 走自己的 power 函数**：v1.15 B.1 把 MMC3 变体的 power 统一成基类的
+  `GenMMC3Power()`，但 199 有自己的 `M199Power`（播种 DBZ 扩展寄存器 + 装 `0x8001` 写处理器）
+  ⇒ `Mapper199Cart` 覆写 `on_power()` 调它（`M199Power` 已从 `static` 放开）。
+
+### Added — GBA 侧在途成果（随本次一并发布；GBA 长期 Alpha，不阻塞本体发版）
+
+- **S2-a：vendor 核两个可达 panic 点改为「精灵禁用」** —— OAM attr0 的 shape = 3 /
+  gfx mode = 3 是真机的**禁止值**，vendor 原先在渲染中途 panic，而 release 是
+  `panic = "abort"` ⇒ 进程闪退；现按真机语义映射为「精灵不显示」
+  （与 obj mode = 2 的既有处理一致）。
+- **S1-a：9 条最小可复现夹具 + 3 条守卫** —— 全在 `#[cfg(test)]` 下 ⇒ **发布版零开销**。
+- **S1-b：探针改造** —— SWI 陷阱记录 / `gba_step_frame` panic 捕获 / 输入注入
+  （`GBA_PROBE_INPUT`、`GBA_PROBE_ONLY`）/ 长窗口与「PC 连续 N 帧不变」可配 /
+  `probe_what_one_frame_changes` 忙等开窗。默认路径不变。
+
+### Known limitations — 如实登记（发布说明口径）
+
+- **GBA 仍是 Alpha**：本轮只解决「能跑」，**不声称 GBA 精度已达标**。仍未实现：
+  BIOS SWI `0x16–0x2A`、存档芯片型号/容量建模（`.srm` 对 EEPROM 卡恒为 32 KiB）、
+  Flash 状态寄存器、ROM 窗口镜像、GPIO/RTC 探测——均属 v2.0.3 计划 S3 段。
+- **4 张失败卡带尚未逐张复核通过**（Mario Kart / Dragon Ball / Minish Cap / FireRed）；
+  机器判据只能证明「不崩、不卡、能出画面」，**画面观感仍待人工确认**。
+- **S4 的人工步骤（B4）已做 + 上游对照实验完成**（2026-11-10，业主用 9 张 NES 卡带实测本 hotfix，
+  并与**上游 FCEUX 2.6.6 / 2.7.0** 做同参数对照——启动→置顶→抓模拟器窗口→1.5 s 后再抓一次，
+  按画面区做像素统计）：
+  - 9 张里 **2 张完全正常**（大盗伍佑卫门外传 / 银白色沙加）、**1 张能启动但画面部分错乱**
+    （拉迪亚战记）、**1 张能跑出 LOGO 画面后转黑屏**（SD高达外传1）、**5 张仍灰屏**
+    （Q Boy / SD高达外传2 / SD高达外传3 两版 / 吞食天地2）。
+  - ⇒ **S4 的两个修复都真实生效**：① 191/199 进 registry 之前，这 8 张 191/199 卡**必然灰屏**
+    （未注册 ⇒ `create_cart_for_mapper` 返回 nullptr ⇒ `g_cart` 停在 no-op 占位卡），现在有 3 张
+    能出画面；② 吞食天地2 是 mapper 4 + **非 2 幂 PRG（40 库 = 640 KB）**，修复前装载器按舍入后的
+    1 MB 做边界检查 ⇒ **直接被拒**（"Unknown ROM file format"），现在能装载并运行。
+  - ⇒ **对照实验查出三个本仓真实缺陷（本次 hotfix 已修，见 v2.0.3 计划 §四之三 S5）**：
+    ① **hash 作用域**——本仓按 **raw PRG** 算 CRC32/MD5，而上游与 `ines-correct.h` 修正表都按
+    **舍入 + 0xFF 填充**后的缓冲区算 ⇒ 非 2 幂 PRG 的 ROM **必然查不中**修正表（吞食天地2：
+    raw CRC `0x50D82653` 查不到、padded CRC `0x28192599` 命中 `{0x28192599, 198, -1}`
+    —— **它实际是 mapper 198，不是头里写的 4**）；② **修正写回缺失**——`ines_apply_corrections()` 把
+    修正后的 mapper 写进**局部** `parseResult.mapper_no`，`tofix & 1` 分支是**空注释** ⇒
+    **整张 251 条修正表的 mapper 修正在本仓整体失效**（镜像/电池/清 VROM 三类修正是写回了的）；
+    ③ **mapper 198 必须跑自己的 power 函数**（上游 `info->Power = M195Power`，负责把 16 KB WRAM
+    映到 $5000），本仓基类只跑 `GenMMC3Power()` ⇒ 该板没有 $5000 的工作 RAM。
+  - ⇒ **修完后的实测**：吞食天地2 **跑出与上游一致的游戏标题画面**（「吞食天地 三国外传
+    PUSH START BUTTON 豪华中文版」）；9 张里 **8 张与上游 2.6.6 / 2.7.0 行为一致**，剩下 4 张
+    （Q Boy / SD高达外传2 / SD高达外传3 两版）**双方都灰屏** ⇒ 属**上游级缺口**，非本仓回归。
+  - ⚠️ **口径更正**：本仓 fork 的上游基线是 **FCEUX 2.6.6**（`1c35642:src/version.h` = 2/6/6），
+    **「1.15」是本项目自己的版本线**——两者极易混，别再混。
+  - ⚠️ 上一版此处曾写「mapper 4 的 PRG 掩码硬编码 512 KB，上游同样如此」——**该说法已被对照实验推翻**：
+    上游能出画面的原因是它按 CRC 把这张卡改判成了 mapper 198。
+- **F11QA 矩阵（`pass_to_fail = 0` / grade ≥ B）待 push 后由 CI 复核**（本地只有
+  `ctest -LE perf` 这个近似门禁）。
+- **本 hotfix 未修（同因、另立项）**：已注册但带自定义 power 的 MMC3 变体里，**mapper 198 已随 S5 修好**，
+  其余 16 个（12/37/44/45/47/49/52/114/115/165/195/205/245/249/250/254/406）仍只跑
+  `GenMMC3Power()`，它们自己的 `MxxPower` 从不执行 —— 本轮只修了 198 与 199。
+
+## [Unreleased] — v2.0.3 GBA 卡带兼容性线
+
+### Added — S1 可复现门禁落地（S1-a，最小可复现夹具）
+
+- **9 条最小可复现夹具**（**7 条会红**的复现器 + **2 条绿锁**），按缺陷域分四个文件：
+  `src/rust/src/gba/fixtures/{swi,oam,backup,rom}.rs`（公共底座在 `fixtures.rs`）。
+  载体是 **Rust 内建**（现场拼出卡带镜像），**不产生任何二进制入库**；`.gitignore`
+  已加 `*.gba`（**无例外**）⇒ 商业卡带机械地进不了仓库。
+  - `swi_unimpl_1a` / `swi_unimpl_16`（S2-b / S3-a）：未实现的 BIOS SWI 落到 stub 的
+    `b .` 向量 ⇒ 永久自旋。
+  - `oam_bad_shape` / `oam_gfx_mode3`（S2-a）：OAM attr0 的 shape = 3 / gfx mode = 3
+    ⇒ vendor 核在**渲染中途** panic（`object_attributes.rs:265` / `:144`），
+    `panic = "abort"` ⇒ 进程闪退。夹具断言的是**「精灵按禁用处理」**（禁止精灵的
+    渲染帧与显式禁用精灵**逐字节相同**），不是「不会 panic」。
+  - `eeprom_chip_capacity` / `flash_status_reg`（S3-b）：`.srm` 恒 32768（芯片型号丢失）
+    / Flash 状态寄存器不存在。
+  - `rom_window_mirror`（S3-d）：超容量地址回**开放总线垃圾**而非镜像卡带。
+  - `gpio_read_before_write` / `eeprom_protocol_lock`（绿锁）：GBATEK 未定义
+    「未写入前读 GPIO」⇒ 锁现状；EEPROM 命令协议 vendor 与 GBATEK 逐位一致 ⇒ 锁协议。
+- **3 条常驻守卫**（`fixtures/guards.rs`）：G1 孤儿 `#[ignore]`（原因串必须指名工作项）/
+  G2 夹具集合完整性 / G4 复现器存在性与归属 ⇒ 防「ignore 腐烂」「夹具被删」
+  「红夹具被摘掉 `#[ignore]` 变成常驻绿锁」。
+- **GBA 锁测试 249 → 262**（+8 条编码器端到端自检 + 2 条绿锁 + 3 条守卫），
+  **26 ignored**（19 个测量工具 + **7 条复现器**，后者在 `--ignored` 下**逐条为红**）。
+- **GBATEK 取证可重跑**：`tools/fetch_gbatek.ps1` 抓取并转纯文本，**逐字节复现**现有
+  快照 ⇒ 计划里那些行号引用在重抓后依然成立；附录 A 补 **A.4（EEPROM 命令协议）**
+  与 **A.5（EEPROM 寻址与容量）**（照抄原文，带行号）。
+
+### Fixed — 编码器自检的「无牙门禁」（变异验证查出）
+
+- 8 条 G3 编码器自检首轮**测出 3 条盲区**（自己的编码器被改坏却照样全绿）：
+  `g3_orr_imm`（用的立即数根本不需要旋转）、`g3_strh`（存的值高半字为 0 ⇒ `STR` 与
+  `STRH` 写出的字节完全相同）、`g3_ldrh`（源字高半字为 0 + 内存往返抹掉差异）。
+  ⇒ 改用需要旋转的立即数 / **预置哨兵 `0xDEAD_BEEF`** / 源字改 `0xC5C5C500`，
+  并把断言从「内存往返」改为**读寄存器**。修后矩阵 **8/8 的目标都能红**，6/8 行
+  只红目标。
+
+### Changed — 计划口径的三处更正（由本轮取证得出）
+
+- ⚠️ **E3（Flash 状态寄存器）没有权威依据**：GBATEK 快照全文 grep `E000006` **零命中**，
+  GBATEK 的 flash 轮询是**回读比较**（`:8981`）⇒ 计划 §1.2.4 那句「按 GBATEK 的状态位
+  定义返回」**不成立**，S3-b 开工前须另找来源或用真卡带重新推导。
+- ⚠️ **vendor 的 LR 约定与真机差 4** ⇒ SWI 向量若照抄 IRQ 向量的 `SUBS PC, LR, #4`
+  会退回 SWI 自身重入；正确的向量字是 **`MOVS PC, LR`**（S2-b 的现成结论）。
+- ⚠️ **0x16 的命名三处不同**（GBATEK `Diff8bitUnFilterWrite8bit` / 仓库
+  `Diff8BitUnFilterWram` / 计划 `Diff8bitUnFilterWram`）—— 号码相同。
+- 计数口径：夹具是 **9 条**（7 红 + 2 绿），不是文档里写的「8 条」；门禁计数 262 不受影响。
+
+### Notes — 两个坑（已记入计划与 AGENTS.md）
+
+- **变异验证的还原腿会假红**：还原源文件不更新 mtime ⇒ cargo 判定「无需重建」⇒ 跑的是
+  上一轮变异版的二进制 ⇒ 还原处必须刷新 mtime。
+- **多个 worker 并发改同一个 vendor 文件会互撞**（一次把 vendor 自己的两条开放总线断言
+  弄红）⇒ 共享 vendor 树的变异验证必须串行或用隔离副本。
+
+> 本轮**未动任何生产代码**（夹具全在 `#[cfg(test)]` 下；vendor 树零改动，已逐文件哈希核对）。
+
+### Fixed — S2-b 未实现 BIOS SWI 的兜底（stub 向量不再 `b .` 自旋）
+
+- **症状**：未被认领的 BIOS SWI 落到 stub BIOS 的 0x08 向量，而那个向量是 `b .`
+  （`BRANCH_SELF`）⇒ CPU **永久自旋在 BIOS 0x08**。症状即「按了按钮就卡死」
+  （MKSC 的白屏卡死属此类）。
+- **修法**：0x08 向量字从 `b .` 改为 **`MOVS PC, LR`**（`0xE1B0F00E`）⇒ 未实现 SWI
+  从「机器冻结」变成「**返回续接点 + 记录号码**」。
+  - 依据：GBATEK「For Returning from SWI use `MOVS PC,R14`」；ARM 态 `LR = PC+4`、
+    Thumb 态 `LR = PC+2` ⇒ LR 恰好停在 SWI 之后那条指令（ARM / Thumb 双路夹具实证）。
+  - ⚠️ **不用 `SUBS PC, LR, #4`**（IRQ 向量的写法）：那会退回 SWI 自身重入。
+  - abort 向量（0x04 / 0x0C / 0x10 / 0x14）**仍 park** —— 那是真异常，响亮地停是对的。
+- **兜底语义（口径修正）**：按 GBATEK 的 SWI ABI「R2, R4–R14 保持不变」⇒
+  **全寄存器保留、零编造返回值**。⚠️ 计划原先写的「按 mGBA 的做法给合理默认」**无法执行**
+  —— mGBA 源码不在本机 ⇒ 改按 GBATEK 自建依据。
+- **生产侧记录（红线 §六.3）**：`swi/mod.rs` 的 `note_unimplemented_swi` —— 每个号码
+  **首次** `eprintln!`（`[gba] swi 0xNN …`）+ 常驻计数（thread-local `BTreeMap`），
+  后续静默计数不刷屏；vendor 核心自答的 6 个号（0x00 / 0x06–0x08 / 0x0B / 0x0C）不计入。
+  ⇒ 「还差哪些 SWI」从此有一份可直接读的清单（S3-a 的施工单）。
+- **锁面**：两条被 §1.2.1 预告的锁按预告改写并更名 ——
+  `abort_vectors_park_and_the_swi_vector_returns`（abort 向量仍 park、0x08 = MOVS_PC_LR）、
+  `an_unclaimed_swi_returns_and_is_recorded`（端到端断言 SWI 0x1A 后机器到 Halt、
+  续接指令真跑、ABI 保留 r4、tallies 记 `(0x1A, served=0)`、生产计数恰 `[(0x1A,1)]`）；
+  新增 `the_production_recorder_counts_unimplemented_calls_and_skips_served_ones`
+  与 Thumb 绿锁 `thumb_swi_unimpl_1a_returns_and_continues_in_thumb`。
+- **计数**：GBA 锁测试 **266/24 → 270/22**；复现器 **5 → 3**；夹具 **9 → 10**。
+- **变异 M1–M4 逐腿双向可红**（还原腿刷 mtime）：向量改回 park ⇒ 恰 5 条红；
+  摘掉记录器 ⇒ 恰 2 条红；摘掉 vendor 过滤 ⇒ 恰 1 条红；Thumb 编码器 rd 字段挪错 ⇒ 恰 1 条红。
+- **vendor 树零改动**（改动只在 `src/rust/src/gba/`）。
+
+### Fixed — S2-c C++ 侧不再静默吞掉每帧错误码
+
+- **症状**：`gba_step_frame()` 的非零返回被 `if (… != GBA_OK) return;` **完全吞掉** ——
+  无日志、无弹窗、不崩、不卸载 ⇒ 静默跳过该帧的帧缓冲拉取 / 重绘信号 / 音频排空 / 电池落盘。
+  对照：装载 / savestate 读写 / 电池读取等**一次性路径全都有报告**
+  ⇒ 规律 =「一次性路径全报告、每帧路径全静默」。
+- **修法**（只动 `src/gba_load.cpp`，4 处）：会话态去重闩 `g_reportedStepError`
+  + `step_error_name`（6 码全名映射）+ `note_step_error`
+  —— 同码 streak **只报首帧**、码变化即再报、干净帧清闩、`GbaLoad` 新会话清闩
+  ⇒ 一次 panic 约 3 行日志，最坏有界。
+- **日志设施 = `FCEU_printf`**（core 的 `fceu.cpp:1132`，经 driver 回调表分发到
+  stdout + 消息日志 dock）。⚠️ **刻意不用 `FCEU_PrintError`** —— 它下游是
+  `QueueErrorMsgWindow` ⇒ 下个 GUI tick 变**弹窗**，正是每帧路径禁止的行为。
+- **`GBA_ERR_STATE` 语义**：日志附一句「core 捕到内部 panic 并丢弃了机器；重新装载 ROM
+  即恢复」—— 对齐 r6 的恢复机制（机器已丢、毒锁透明恢复、重载即重建），**不发明新恢复动作**。
+- ⚠️ **边界（如实登记）**：release 生产的真 panic 仍带走进程（C++ 侧无法拦）
+  ⇒ **S2-c 对 release 的真实保障是 S2-a / S2-b 消灭可达 panic**，本改动是 unwind 构建的
+  安全网 + 容错读数的可见性；相邻每帧静默点（`gba_frame_buffer*` / `gba_render_audio` /
+  电池 flush 两个导出）**刻意未包**（step 成功后不可达，diff 最小）。
+
+### Added — S2 收口后的门禁读数（2026-11-11 实测）
+
+- `ctest -LE perf` **36/36 全绿**（Release 构建 EXIT=0）。
+- GBA 根 crate **270 passed / 22 ignored**（22 = 19 个测量工具 + **3 条红复现器**，
+  在 `--lib gba::fixtures:: -- --ignored` 下**逐条为红**）；vendor **242** / debug **93** /
+  media **52** / formats **153** 全绿。
+- ⚠️ **F11QA 矩阵（`pass_to_fail = 0` / grade ≥ B）待 push 后由 CI 复核**
+  （本地只有 `ctest` 这个近似门禁）。
+
+### Added — S3-a 第一批：BIOS SWI `0x16` / `0x17` / `0x18`（diff unfilter）
+
+- **症状**：这三个 BIOS 调用此前**没有实现** ⇒ 落到 stub 的 SWI 向量 ⇒ 机器「返回但不干活」
+  （S2-b 起不再自旋，但功能是空的）。商用卡用它们加载差分/压缩数据 ⇒ 拿到的数据是错的。
+- **修法**：新增 bus-free 模块 `src/rust/src/gba/swi/unfilter.rs`（解码核）
+  + `swi/mod.rs` 的 `serve_diff_unfilter`（接线）：
+  - `0x16` `Diff8bitUnFilterWrite8bit`（"Wram"）：**8 位单元**，逐**字节**写；
+  - `0x17` `Diff8bitUnFilterWrite16bit`（"Vram"）：**8 位单元**，逐**半字**写（两个解码字节一个半字）；
+  - `0x18` `Diff16bitUnFilter`：**16 位单元**，逐**半字**写。
+- **依据（不凭记忆写位级格式）**：
+  - GBATEK 快照 `.zcode/gbatek_plain.txt:192251-192253`（号段）、`:192804-192867`（契约、头部、算术）、
+    **`:192826-192827`（它自己的示例向量：unfiltered `10 11 … 19` / filtered `10 +1 +1 …`）**；
+  - **mGBA 的 `_unFilter`**（`src/gba/bios.c:903-946`，经代理取回，**只读格式、不抄代码**）——
+    它是唯一说清「哪一号读 8 位单元、哪一号存半字」的来源（调用点 `bios.c:578`），
+    也是「头部 size 字段按**字节**计」的第二依据。
+- **锁**（期望值 = **GBATEK 公布的那一行**，**不是**拿实现的同一套算法重算 ——
+  测试与实现同错是本项目栽过两次的坑）：
+  - 三个端到端夹具（`fixtures/swi.rs`）：`swi_diff8bit_unfilter_wram`
+    （**由 `swi_unimpl_16` 改写**：`0x16` 有了实现，它作为「未实现 SWI」的锁名与前提都不再成立）、
+    `swi_diff8bit_unfilter_vram`、`swi_diff16bit_unfilter`；
+  - `unfilter.rs` 内 **8 条单元锁**（头部三个字段的落位、size 按字节计、**size 字段的 24 位宽度**、
+    8/16 位单元的解码、累加器回绕、两种拒绝路径）。
+  - **变异矩阵 5 腿逐腿双向可红**（基线 280 全绿，每腿还原后 280/0）：`0x16` 读成 16 位单元 /
+    `0x17` 改成字节写 / `0x18` 读成字节单元 / 半字配对顺序颠倒 / size 字段读成 16 位。
+    M1/M2/M3/M5 各**只红一条**；M4 红两条——它们共用同一段半字写路径。
+    ⚠️ **M5 首轮是「无牙」的**：夹具的 size 只有 10/20 字节，16 位与 24 位两种读法结果**完全相同**
+    ⇒ 补了一条 64 KiB 的字段宽度锁（`the_size_field_is_twenty_four_bits_wide`）才有牙。
+- **落地点的选择有讲究**：`0x17` / `0x18` 的落点用 **VRAM** —— vendor 的总线对
+  **VRAM 字节写**与**半字写**处理不同（`bus.rs:1235-1262`：BG VRAM 的字节写会复制到整个半字，
+  OBJ 区直接丢弃）⇒ **写宽度可观测**；在 WRAM 两者不可区分，宽度就钉不住。
+- ⚠️ **如实登记三点**：
+  ① `0x16` 的落点是 WRAM ⇒ **它的写宽度不可观测**（字节写与半字写在 WRAM 同结果），
+  宽度由实现与 mGBA 参照背书；
+  ② **size 字段按字节**这一读法在 GBATEK 里**没有明说**（它只写「24bit size after decompression」）
+  ⇒ 依据是「与 LZ77 同款头部 ⇒ 同款口径」+ mGBA 的 `remaining = header >> 8`；
+  ③ mGBA 会把 `r0`/`r1` 写成走过的游标，**本仓不动它们**（GBATEK 写明「No return value」，
+  且 SWI ABI 里这两个寄存器对无返回值调用未定义）。
+- **门禁**：GBA 根 crate **270 → 280**（+8 单元锁 +2 端到端夹具）；`ctest -LE perf` **36/36**；
+  vendor **242** / debug **93** / media **52** / formats **153** 全绿。
+  夹具集合 **10 → 12**，红复现器仍是 3 条（`eeprom_chip_capacity` / `flash_status_reg` /
+  `rom_window_mirror`，归属 S3-b ×2 与 S3-d ×1，**本轮未修**）。
+
+### Fixed — S4 · FC 侧修复批次（GitHub issue #12：iNES loader 拒非 2 幂 PRG；mapper 191/199 灰屏）
+
+- **iNES loader 不再硬拒非 2 幂 PRG 的 ROM**：PRG 的文件边界检查、指针推进与 MD5/CRC32
+  全部改用 **raw** 字节数（`rom_size_raw << 14`）；分配与映射仍用舍入后的 2 幂尺寸
+  （`SetupCartPRGMapping` 的要求）。此前 12 银行 PRG 的卡会被当成 16 银行 ⇒ 吞掉 CHR 的
+  前 64 KiB ⇒ 再以「文件太短」硬拒 ⇒ 用户看到「Unknown ROM file format」。
+- **mapper 191 / 199 进 registry**：两者本来就有实现（`bmap[]` 走 legacy 路径），但 v1.8 的
+  `MapperEntry` 注册表里没有 ⇒ `g_cart` 停在 no-op 占位卡 ⇒ power 周期不跑 ⇒ 灰屏。
+- **mapper 199 走自己的 power 函数**：v1.15 B.1 把 MMC3 变体的 power 统一成基类的
+  `GenMMC3Power()`，但 199 有自己的 `M199Power`（播种 DBZ 扩展寄存器 + 装 `0x8001` 写处理器）
+  ⇒ `Mapper199Cart` 覆写 `on_power()` 调它（`M199Power` 已从 `static` 放开）。
+
+### Added — S4 的门禁
+
+- **formats crate 锁** `a_non_power_of_two_prg_rom_loads_with_raw_slices`：合成 12+16+191 的
+  327696 字节镜像，断言装载成功、CHR 起点在 raw PRG 末端（而非舍入末端）、hash 覆盖 raw PRG
+  （基线 **150 → 151**）。
+- **ctest 级端到端锁**：新增 `tests/fixtures/mapper_mmc3_191_nonpow2.nes`（与 issue 复现 ROM 同形），
+  `mapper_load_test` 增 registry 断言、191 装载行、**字节级 PRG 断言**（`0x8000` 是文件 PRG、
+  `0xC000/0xE000` 是 0xFF 填充 ⇒ CHR 没被吞进 PRG）与 **199 的 EXPREGS 断言**。
+- **5 腿变异验证逐条双向可红**（还原腿刷 mtime）：Rust 切片 / Rust hash / C++ memcpy /
+  摘掉 191 注册 / 199 的 power 换成 `GenMMC3Power()`。
+
+### Notes
+
+- **`prg_size` 的语义没变，`prg_data` 的保证变窄了**：非 2 幂 PRG 时 `prg_data` 只有 raw 那么多
+  字节有效，而 `prg_size` 仍是舍入后的分配/映射尺寸 ⇒ C++ 侧拷贝长度取 `min(raw, prg_size)`
+  （同时避开「256 银行 ROM 的 raw 计数为 0」与「NOT_POWER2 mapper 的 `prg_size` 为 0」两个坑）。
+- **未做**：B4 的人工步骤（真 ROM 未到，出画面的观感待人工）；F11QA 矩阵待 push 后由 CI 复核。
+- **新发现、未修**：已注册的**带自定义 power 的 MMC3 变体**（12/37/44/45/47/49/52/114/115/165/
+  195/205/245/249/250/254/406 等）同样只跑 `GenMMC3Power()`，它们自己的 `MxxPower` 从不执行
+  （与 199 同因）⇒ 单独立项。
+
+### Added — S3 收口（r16/r17）：SWI 第二批、EEPROM 动态容量、mode 5 页面翻转
+
+- **BIOS SWI `0x19` / `0x1F` / `0x25` / `0x27` 真实现**（全 GBATEK 有据、全在 `swi/` 模块）：
+  `0x19` SoundBias（SOUNDBIAS `0x04000088` 低 10 位替换、高位保持）；`0x1F` MidiKey2Freq
+  （GBATEK 公式，freq 取 **WaveData+4**，掩码口径标注为推导，期望值 = 整数八度向量独立拼装）；
+  `0x25` MultiBoot（无从机 ⇒ `r0=1` failed，GBATEK 返回契约）；`0x27` CustomHalt
+  （参数在 **r2**：00h Halt / 80h Stop，复用 `enter_low_power`）。
+- **`0x01` RegisterRamReset 补 DISPCNT 强制空白**（GBATEK `:193540-193541`；mGBA 只读参照同构）。
+- **EEPROM 动态容量（D1，mGBA 同款）**：`.srm` 从恒 32 KB 变为 **512 B 起步、高位访问懒扩
+  8 KB 封顶**；旧 32 KB `.srm` 前 8 KB 无损迁入（>8 KB 尾段在旧模型下只可能是 0xFF，一次性
+  丢弃）。ID 串版本号不携带容量（GBATEK `:8521`）⇒ 容量由访问位宽驱动，不由型号猜。
+- **mode 5 页面翻转**：`render_mode5` 补 `frame_offset = bit4 ? 0xA000 : 0`（此前恒读第 0 页；
+  GBATEK `:1918`/`:3204-3206`）。
+- **新夹具模块 `fixtures/lcd.rs`**（2 条端到端锁，注册进 G2）：`mode5_page_flip_reads_the_selected_frame`
+  （两页逐行不同图案、bit4 两运行互为对照）与 `mode4_index0_is_transparent_under_a_lower_priority_obj`
+  （防回归锁，OBJ-behind-BG2 优先级技巧——直接断言 index0==palette[0] 是无牙的）。
+- **锁测试**：根 crate +13 条 SWI 锁、vendor +5 条单元锁（EEPROM ×4、开放总线字读 ×1、mode5 ×2——
+  vendor 侧共 +7 里的 mode5 两锁在 layer_2.rs）。守卫 `REPRODUCERS` 清空（三次晋升史入注释），
+  G2 扫描模块 4 → 5。
+
+### Fixed — S3 收口（r16/r17）：两个潜伏缺陷 + 快路径契约
+
+- **`apply_state` 读档后机器残废**（潜伏缺陷，修复前对真实游戏致命）：`mem::swap` 把带数据的
+  CPU 换出丢弃，而 `rom` / `bios_system_rom` / `backup_type` 三者 `#[serde(skip)]` ⇒ 读档后
+  **ROM 空（取指开总线垃圾）、BIOS 空（中断向量进空数组）、存档芯片死**。修复 = `apply_state`
+  内三条语句（还原 ROM/BIOS + `redetect_backup_type`——该 vendor 函数此前全仓零调用）+ 锁
+  `the_backup_chip_survives_a_savestate_round_trip`（变异 M6a/M6b 双向可红）。**新已知限制**：
+  手动 `gba_set_save_type` 覆盖随读档被还原为检测值（vendor doc 既定语义）。
+- **`try_read_word` 越界臂快路径契约**：整段越界的字读改为半字对公式直算（不再回落 4× 慢路径）；
+  **总线级值修复前后逐位相同**（实证），骑跨分支保持 `None` 零变化。
+
+### Changed — S3 收口（r16）：四条计划前提被权威来源证伪（按证据重划，未做无效功）
+
+- **ROM 窗口不镜像**：GBATEK `:14046` 明文 "Normal ROM Cartridges ... are NOT mirrored"
+  （开放总线公式是唯一成文行为；mGBA/melonDS 同判）⇒ 原计划的镜像修复取消，`rom_window_mirror`
+  改写为**开放总线绿锁**（字节/半字/字四腿 + 双哨兵，期望值独立拼装）。
+- **mode 4 的 palette index 0 本来就该透明**：GBATEK `:3198`（bitmap 模式 Color 0 = backdrop，
+  OBJ 可在其后）⇒ vendor 正确，原「修复」取消，改防回归锁；BG2 门控同为误报（`:1944-1952`）。
+- **Flash 状态寄存器不存在**：GBATEK 命令集无 `0x70`、pret 反编译的官方 SDK 驱动
+  （`agb_flash_1m.c`）的轮询 = **普通阵列字节回读** + DQ5 超时位、mGBA/VBA-M 同 ⇒
+  `0x0E000006/7` 真语义 = 回读（vendor 本来就对），`flash_status_reg` 断言反转为绿锁。
+- **FireRed 冻结与 GPIO/存档无关**：真根因 = 游戏自身 init 时序竞争（IRQ 影子寄存器 apply 链
+  未运行 ⇒ DISPSTAT bit3 未开闸；加速时钟对照跑证实）⇒ 「GPIO 开局可读」修复取消，转长尾；
+  取证同时把忙等地址更正为 `0x0300310C`（旧读数 `0x030030FC` 出自会加速时钟的轮询探针——
+  **探针观测自此一律 `read_raw`**）。
+- **SWI 声音家族（`0x1A`–`0x1E`/`0x20`–`0x24`/`0x28`/`0x29`）与 `0x2A` 维持兜底 + 已知限制**：
+  mGBA HLE 也全是 no-op stub；`0x2A` 的 36 项函数表 GBATEK 零记载；`0x26` HardReset 结构障碍
+  ⇒ 挂起。
+
+### Notes — S3 收口后的门禁读数（2026-11-12，合并终验）
+
+- GBA 根 crate **299 passed / 0 failed / 20 ignored**（提交口径 ignored = 19 个测量工具；
+  **三条红复现器全部转正，复现器清零**）；vendor **249**；debug 93 / media 52 / formats 153 全绿；
+  两态 `cargo check` EXIT=0；`ctest -LE perf` **36/36**。
+- vendor 补丁 **28 → 33 处、6 → 7 个源文件**（`internal_memory.rs` 4 → 8；新增
+  `lcd/layers/layer_2.rs`）；ATTRIBUTION §3.2.13–§3.2.17。
+- 4 张失败卡带的机器判据（r16 长窗口 + 输入注入）：Mario Kart / Dragon Ball / Minish Cap
+  全过（卡死与黑屏均未复现）。**FireRed 的机器判据「出画面」由本批的 `0x01` 强制空白
+  达成**：7 卡基线复跑中它从 FROZEN（1 帧、163724 恒定步数）变为 48 个变化帧哈希 +
+  音频 DMA 激活；**双向变异定位实证**——摘掉 `DISPCNT=0x0080` 写入立即回 FROZEN（与
+  修复前逐字同），还原即复现（r19）。竞态根因分析与长尾条目保留；最终画面观感仍需人工；
+  F11QA 矩阵与 issue #12 回复待 push 后闭环。
+
 ## [2.0.2] - 2026-11-08
 
 本版以 **DEBUG 与性能优化** 为主线：NES 侧把调试门控、APU 帧计数器、PPU 扫描线与

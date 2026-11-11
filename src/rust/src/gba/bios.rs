@@ -92,6 +92,27 @@ const LDR_R1_PC_12: u32 = 0xE59F_100C;
 const STRH_R1_R0: u32 = 0xE1C0_10B0;
 /// `LDR r2, [pc, #8]` -- reaches the third boot literal at `0x5C`.
 const LDR_R2_PC_8_BOOT: u32 = 0xE59F_2008;
+/// `MOVS pc, lr` -- the SWI vector's return trampoline (S2-b, v2.0.3).
+///
+/// GBATEK's SWI chapter states the return convention verbatim: "For Returning
+/// from SWI use MOVS PC,R14, that instruction does restore both PC and CPSR"
+/// (`.zcode/gbatek_plain.txt:185672-185674`), ARM entry saves `R14_svc=PC+4`
+/// (`:185686`) and Thumb entry `R14_svc=PC+2` (`:189222`) -- so `LR` already
+/// points at the instruction after the `SWI`, and the `S` bit restores the
+/// caller's CPSR (including THUMB mode) from `SPSR_svc`
+/// (`:189203-189210`). Encoding is the standard data-processing register
+/// form: `S=1`, `Rd=PC` (bits 15-12), `Rm=LR` (bits 3-0), which is the same
+/// `S=1, Rd=PC` shape the IRQ vector's `SUBS pc, lr, #4` return already
+/// exercises on the vendored core (`operations.rs` restores CPSR from SPSR
+/// there).
+///
+/// A `SWI` the dispatcher declines takes the real exception path to `0x08`,
+/// and this word hands control straight back: registers untouched, no return
+/// value invented, the call a visible no-op. Which numbers were called lives
+/// in `swi::note_unimplemented_swi`, not here -- the vector cannot record,
+/// it is four bytes of ROM. The abort vectors below still park: reaching one
+/// is a bug worth making loud.
+const MOVS_PC_LR: u32 = 0xE1B0_F00E;
 /// `B .` -- park here. A deterministic hang beats executing whatever the
 /// surrounding aperture happens to decode as.
 const BRANCH_SELF: u32 = 0xEAFF_FFFE;
@@ -128,10 +149,14 @@ const fn build() -> [u8; BIOS_SIZE] {
     // means the emulated machine took an exception nothing handles, which is a
     // bug worth making loud and still rather than a silent wild jump.
     put_word(&mut image, 0x04, BRANCH_SELF);
-    // 0x08 SWI vector: only reached for a number our dispatch declines. The
-    // trace goes to stderr, so hanging here turns "unimplemented SWI" into an
-    // obvious stall instead of an inexplicable one.
-    put_word(&mut image, 0x08, BRANCH_SELF);
+    // 0x08 SWI vector: only reached for a number both our dispatch and the
+    // vendored core decline. The word returns to the caller instead of
+    // parking (v2.0.3 S2-b): an unimplemented BIOS call becomes a visible
+    // no-op -- the game keeps running -- and `swi::note_unimplemented_swi`
+    // logs the number. Parking here turned "one missing call" into a
+    // machine that never ran another instruction, which hid every later
+    // failure behind the first one.
+    put_word(&mut image, 0x08, MOVS_PC_LR);
     put_word(&mut image, 0x0C, BRANCH_SELF);
     put_word(&mut image, 0x10, BRANCH_SELF);
     put_word(&mut image, 0x14, BRANCH_SELF);
@@ -175,7 +200,7 @@ pub const fn stub() -> [u8; BIOS_SIZE] {
 mod tests {
     use super::{
         BIOS_SIZE, BOOT_CODE, BOOT_LITERALS, BRANCH_BOOT, BRANCH_SELF, BX_R2, CART_ENTRY,
-        LDR_R0_PC_12, LDR_R1_PC_12, LDR_R2_PC_8_BOOT, STUB, STRH_R1_R0,
+        LDR_R0_PC_12, LDR_R1_PC_12, LDR_R2_PC_8_BOOT, MOVS_PC_LR, STUB, STRH_R1_R0,
     };
 
 
@@ -215,11 +240,26 @@ mod tests {
         assert_eq!(word(0x00), BRANCH_BOOT);
     }
 
+    /// The abort vectors still park -- reaching one means the emulated
+    /// machine took an exception nothing handles, which is a bug worth making
+    /// loud and still. The SWI vector no longer does (v2.0.3 S2-b): a
+    /// declined BIOS call is a missing feature, not a broken machine, so its
+    /// vector returns instead of hanging every later instruction on the first
+    /// unimplemented call. This test was written to demand `BRANCH_SELF` at
+    /// `0x08` as well; that assertion pinned the *defect* as expected
+    /// behaviour (plan §1.2.1 warned about exactly this) and was rewritten
+    /// when the vector became a return trampoline.
     #[test]
-    fn unhandled_vectors_park_instead_of_wandering() {
-        for addr in [0x04, 0x08, 0x0C, 0x10, 0x14] {
+    fn abort_vectors_park_and_the_swi_vector_returns() {
+        for addr in [0x04, 0x0C, 0x10, 0x14] {
             assert_eq!(word(addr), BRANCH_SELF, "{addr:#06x}");
         }
+        assert_eq!(
+            word(0x08),
+            MOVS_PC_LR,
+            "the SWI vector must return to the caller, not park: a declined call \
+             has to cost the game one no-op, not the rest of the run"
+        );
     }
 
     /// A cartridge shaped the way a real one is: a branch at offset 0 into the
@@ -388,15 +428,102 @@ mod tests {
         );
     }
 
-    /// The SWI vector is only reached when `dispatch` declines a number, and
-    /// `Halt` is the first one S1a will claim. This test fixes the expectation
-    /// that the stub does *not* implement it: claiming is our job, the vector
-    /// is the fallback that parks.
+    /// The stub still does not *implement* any SWI -- the vector is a
+    /// one-word return trampoline, not a BIOS call -- but a declined call now
+    /// returns to the caller instead of parking (v2.0.3 S2-b). This drives
+    /// the whole chain end to end: an unimplemented `SWI 0x1A`
+    /// (SoundDriverInit -- not claimed by `dispatch`, not served by the
+    /// vendored core) takes the exception path to `0x08`, the trampoline
+    /// hands control back, and the program continues.
+    ///
+    /// The fallback's semantics come from the SWI ABI rather than from a
+    /// reference implementation (mGBA is not on this machine, and its
+    /// licence is incompatible anyway): GBATEK says outgoing `R0/R1/R3`
+    /// carry "either garbage, or return value(s)" and every other register
+    /// is "kept unchanged" (`.zcode/gbatek_plain.txt:192058-192062`) -- a
+    /// game that called an unimplemented call was never entitled to read a
+    /// return value, so the trampoline invents none and preserves every
+    /// register. `r4` (ABI-preserved) and `r5` (the marker written by the
+    /// instruction after the call) pin both halves.
+    ///
+    /// Visibility (plan red line §六.3): the declined number must be
+    /// recorded, or S3-a would have no list of what is still missing. Both
+    /// recorders are checked -- the test-side tallies and the production
+    /// first-occurrence counter.
+    ///
+    /// This test was previously `the_stub_does_not_implement_swi`, which
+    /// asserted `word(0x08) == BRANCH_SELF` -- it locked the wedge in as
+    /// expected behaviour (plan §1.2.1).
     #[test]
-    fn the_stub_does_not_implement_swi() {
-        // The number exists in the dispatch table...
-        assert!(Swi::from_raw(Swi::Halt as u32).is_some());
-        // ...but the image has no code at the SWI vector to service it.
-        assert_eq!(word(0x08), BRANCH_SELF);
+    fn an_unclaimed_swi_returns_and_is_recorded() {
+        /// The value the ABI-preserved register holds across the call.
+        const GUARD: u32 = 0x6C;
+        const MOV_R4_GUARD: u32 = 0xE3A0_4000 | GUARD;
+
+        /// `SWI n`: the number lives in bits 16-23 (the v2.0.1 plan's r1
+        /// lesson -- the low byte is a comment field real hardware ignores).
+        const fn swi_call(n: u32) -> u32 {
+            0xEF00_0000 | (n << 16)
+        }
+
+        let mut rom = vec![0u8; 0x200];
+        rom[..4].copy_from_slice(&branch_to(CODE_AT).to_le_bytes());
+        let body = [
+            MOV_R4_GUARD,
+            swi_call(Swi::SoundDriverInit as u32),
+            MOV_R5_MARK,
+            swi_call(Swi::Halt as u32),
+        ];
+        for (i, instruction) in body.iter().enumerate() {
+            let at = CODE_AT + i * 4;
+            rom[at..at + 4].copy_from_slice(&instruction.to_le_bytes());
+        }
+
+        let mut gba = Gba::new(STUB, &rom);
+        install_swi_hook(&mut gba);
+        for _ in 0..128 {
+            if gba.cpu.halted {
+                break;
+            }
+            gba.step();
+        }
+
+        assert!(
+            gba.cpu.halted,
+            "the machine never reached its Halt: SWI 0x1A either parked the \
+             CPU at BIOS 0x08 or never returned"
+        );
+        assert_eq!(
+            gba.cpu.registers.register_at(5),
+            MARK,
+            "the instruction after the unimplemented SWI never ran"
+        );
+        assert_eq!(
+            gba.cpu.registers.register_at(4),
+            GUARD,
+            "the trampoline must preserve ABI-preserved registers (no invented \
+             return value, no clobber)"
+        );
+
+        // Recorded, twice over: the test-side tallies ...
+        let tallies = crate::gba::swi::take_swi_tallies();
+        let (_, calls, served) = tallies
+            .iter()
+            .find(|(num, _, _)| *num == Swi::SoundDriverInit as u32)
+            .copied()
+            .expect("SWI 0x1A never reached the dispatcher's tally");
+        assert!(calls >= 1, "SWI 0x1A was never tallied as called");
+        assert_eq!(
+            served, 0,
+            "SWI 0x1A was tallied as served, but nobody implements it"
+        );
+        // ... and the production first-occurrence counter.
+        let counts = crate::gba::swi::unimplemented_swi_counts();
+        assert_eq!(
+            counts,
+            vec![(Swi::SoundDriverInit as u32, 1)],
+            "the production recorder must count the declined call exactly once \
+             (the Halt terminator is claimed and must not be counted)"
+        );
     }
 }

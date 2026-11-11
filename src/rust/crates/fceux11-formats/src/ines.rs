@@ -726,9 +726,19 @@ pub unsafe extern "C" fn fceux11_rust_ines_compute_layout(
     out.round_prg = round;
     out.trainer_present = p.trainer;
 
-    // PRG size in bytes: use rounded banks if mapper requires it, else raw
-    let prg_units = if round { p.rom_size_16kb } else { p.rom_size_raw };
-    out.prg_size_bytes = prg_units << 14;
+    // PRG size in bytes: **always the rounded (power-of-two) size**.
+    //
+    // Upstream keeps ROM_size at the power of two even for the NOT_POWER2
+    // mappers -- its own comment says so ("we have to keep ROM_size to the
+    // power of 2 since PRGCartMapping wants ROM_size to be to the power of
+    // 2") -- and it maps *and hashes* that buffer (upstream ines.cpp:
+    // `SetupCartPRGMapping(0, ROM, ROM_size << 14, 0)`,
+    // `md5_update(&md5, ROM, ROM_size << 14)`).
+    //
+    // The *file* only carries the raw bank count: the boundary check, the
+    // pointer advance and the copy use the raw count (S4 / issue #12) and the
+    // tail of the rounded buffer is 0xFF-filled (C++ side).
+    out.prg_size_bytes = p.rom_size_16kb << 14;
 
     // CHR size in bytes
     out.chr_size_bytes = p.vrom_size_8kb << 13;
@@ -746,6 +756,30 @@ pub unsafe extern "C" fn fceux11_rust_ines_compute_layout(
 // FFI: ROM hash computation
 // ------------------------------------------------------------------
 
+/// Feed `data` plus `0xFF` padding up to `padded` bytes into both hashers.
+///
+/// The padding mirrors the tail the emulator allocates and maps: the PRG/CHR
+/// buffers are rounded up to a power of two and the unused tail is `0xFF`
+/// (`ines_load.cpp`: `memset(ROM, 0xFF, cart.prg_size)`), so the hash must
+/// cover exactly those bytes — see [`fceux11_rust_ines_compute_hash`].
+fn feed_padded(
+    hasher: &mut crc32fast::Hasher,
+    md5_ctx: &mut md5::Context,
+    data: &[u8],
+    padded: usize,
+) {
+    const FF: [u8; 4096] = [0xFF; 4096];
+    hasher.update(data);
+    md5_ctx.consume(data);
+    let mut rest = padded.saturating_sub(data.len());
+    while rest > 0 {
+        let n = rest.min(FF.len());
+        hasher.update(&FF[..n]);
+        md5_ctx.consume(&FF[..n]);
+        rest -= n;
+    }
+}
+
 /// Hash result for iNES ROM data.
 #[repr(C)]
 pub struct FceuInesHashResult {
@@ -756,15 +790,31 @@ pub struct FceuInesHashResult {
 
 /// Compute MD5 and CRC32 of PRG + CHR ROM data.
 ///
+/// **The hash covers the buffer that is actually mapped**, i.e. the raw ROM
+/// bytes followed by `0xFF` padding up to the rounded (power-of-two) size —
+/// not just the bytes the file carries.
+///
+/// That is upstream FCEUX's semantics (`ines.cpp`: `ROM_size = uppow2(not_round_size)`,
+/// `SetupCartPRGMapping(0, ROM, ROM_size << 14, 0)`, `md5_update(&md5, ROM, ROM_size << 14)`,
+/// `CalcCRC32(0, ROM, ROM_size << 14)`), and it matters because the CRC32 is a
+/// **lookup key**: `src/ines-correct.h` (upstream's ROM-correction table) is
+/// keyed by that padded value.  Hashing only the raw bytes makes every
+/// non-power-of-two PRG ROM miss the table — e.g. 吞食天地2 (40 PRG banks):
+/// raw CRC `0x50D82653` finds nothing, padded CRC `0x28192599` hits
+/// `{0x28192599, 198, -1}`, which is the only reason that cartridge boots at
+/// all (it is a mapper-198 board wearing a mapper-4 header).
+///
 /// # Safety
-/// `prg_data` must point to `prg_size` valid bytes.
-/// `chr_data` may be null if `chr_size == 0`.
+/// `prg_data` must point to `prg_size` valid bytes; `prg_padded_size` must be
+/// >= `prg_size`.  `chr_data` may be null if `chr_size == 0`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_ines_compute_hash(
     prg_data: *const u8,
     prg_size: u32,
+    prg_padded_size: u32,
     chr_data: *const u8,
     chr_size: u32,
+    chr_padded_size: u32,
     out: *mut FceuInesHashResult,
 ) -> bool {
     if prg_data.is_null() || out.is_null() {
@@ -773,27 +823,28 @@ pub unsafe extern "C" fn fceux11_rust_ines_compute_hash(
     if prg_size == 0 {
         return false;
     }
+    if prg_padded_size < prg_size {
+        return false;
+    }
+    if chr_padded_size < chr_size {
+        return false;
+    }
 
     let prg = unsafe { std::slice::from_raw_parts(prg_data, prg_size as usize) };
-
-    // Compute CRC32 of PRG+CHR (chained)
-    let crc = if chr_size > 0 && !chr_data.is_null() {
-        let chr = unsafe { std::slice::from_raw_parts(chr_data, chr_size as usize) };
-        let mut hasher = crc32fast::Hasher::new();
-        hasher.update(prg);
-        hasher.update(chr);
-        hasher.finalize()
+    let chr = if chr_size > 0 && !chr_data.is_null() {
+        unsafe { std::slice::from_raw_parts(chr_data, chr_size as usize) }
     } else {
-        crc32fast::hash(prg)
+        &[][..]
     };
 
-    // Compute MD5 of PRG+CHR
+    // Compute CRC32 and MD5 of PRG+CHR (chained), over the *mapped* bytes.
+    let mut hasher = crc32fast::Hasher::new();
     let mut md5_ctx = md5::Context::new();
-    md5_ctx.consume(prg);
-    if chr_size > 0 && !chr_data.is_null() {
-        let chr = unsafe { std::slice::from_raw_parts(chr_data, chr_size as usize) };
-        md5_ctx.consume(chr);
-    }
+    feed_padded(&mut hasher, &mut md5_ctx, prg, prg_padded_size as usize);
+    feed_padded(&mut hasher, &mut md5_ctx, chr, chr_padded_size as usize);
+    let crc = hasher.finalize();
+
+    // Compute MD5 of PRG+CHR
     let md5_digest = md5_ctx.compute();
     let md5_bytes: [u8; 16] = md5_digest.into();
 
@@ -826,8 +877,17 @@ pub unsafe extern "C" fn fceux11_rust_ines_compute_hash(
 #[repr(C)]
 pub struct FceuInesCartResult {
     /// Pointer to PRG-ROM data within the file buffer.
+    ///
+    /// Only the PRG bytes actually present in the file are guaranteed here:
+    /// `rom_size_raw << 14` (with the iNES 1.0 "0 means 256 banks" case
+    /// resolved to 256).  On a header whose PRG size is not a power of two
+    /// this is *shorter* than `prg_size` -- the difference is the padding
+    /// the caller fills with 0xFF.
     pub prg_data: *const u8,
-    /// PRG-ROM size in bytes.
+    /// PRG-ROM size in bytes, rounded up to a power of two.
+    ///
+    /// This is the size to allocate and to map, not the number of bytes the
+    /// file carries.  Copy `rom_size_raw << 14` bytes out of `prg_data`.
     pub prg_size: u32,
     /// Pointer to CHR-ROM data within the file buffer (null if no CHR-ROM).
     pub chr_data: *const u8,
@@ -959,12 +1019,32 @@ pub unsafe extern "C" fn fceux11_rust_ines_load(
     let trainer_size: u32 = if parse_result.trainer { 512 } else { 0 };
 
     // PRG-ROM
-    let prg_size = layout.prg_size_bytes as usize;
-    if offset + prg_size > file_len {
+    //
+    // Two sizes, two jobs:
+    //
+    //   * `layout.prg_size_bytes` is the *rounded* size (a power of two).
+    //     That is what the emulator allocates and maps, because
+    //     SetupCartPRGMapping needs a power-of-two size.
+    //   * The *file* only carries the header's raw bank count.  So the
+    //     file-boundary check, the pointer advance and the hash all use the
+    //     raw byte count.  Slicing with the rounded size used to swallow the
+    //     first 64 KiB of CHR on a 12-bank cart and then reject the file for
+    //     being too short (GitHub issue #12).
+    //
+    // `rom_size_raw` is 0 for an iNES 1.0 header whose PRG size byte means
+    // 256 banks (the spec's zero encoding); `rom_size_16kb` already carries
+    // the resolved 256, so fall back to it in that one case.
+    let prg_raw_units: u32 = if parse_result.rom_size_raw == 0 {
+        layout.prg_banks_16kb
+    } else {
+        parse_result.rom_size_raw
+    };
+    let prg_raw_bytes = (prg_raw_units as usize) << 14;
+    if offset + prg_raw_bytes > file_len {
         return false;
     }
     let prg_data = unsafe { file_data.add(offset) };
-    offset += prg_size;
+    offset += prg_raw_bytes;
 
     // CHR-ROM
     let chr_size = layout.chr_size_bytes as usize;
@@ -986,8 +1066,10 @@ pub unsafe extern "C" fn fceux11_rust_ines_load(
     unsafe {
         fceux11_rust_ines_compute_hash(
             prg_data,
+            prg_raw_bytes as u32,
             layout.prg_size_bytes,
             chr_data,
+            layout.chr_size_bytes,
             layout.chr_size_bytes,
             &mut hash_result,
         );
@@ -1281,6 +1363,218 @@ mod tests {
             assert!(!SAVIE_WHITELIST.is_empty());
             assert!(!ROM_CORRECTIONS.is_empty());
             assert!(!NOT_POWER2.is_empty());
+        }
+    }
+
+    /// A zeroed `FceuInesCartResult`, so a test can hand one to the loader
+    /// and read the fields back without naming all of them.
+    fn zeroed_cart() -> FceuInesCartResult {
+        FceuInesCartResult {
+            prg_data: std::ptr::null(),
+            prg_size: 0,
+            chr_data: std::ptr::null(),
+            chr_size: 0,
+            trainer_data: std::ptr::null(),
+            trainer_size: 0,
+            mapper_no: 0,
+            submapper: 0,
+            mirror: 0,
+            mirror_as_2bits: 0,
+            battery: false,
+            is_nes2: false,
+            md5: [0; 16],
+            crc32: 0,
+            partial_md5: 0,
+            vs_system: 0,
+            vs_ppu: 0,
+            vs_type: 0,
+            tv_system: 0,
+            wram_size: 0,
+            battery_wram_size: 0,
+            vram_size: 0,
+            battery_vram_size: 0,
+            rom_size_raw: 0,
+            rom_size_16kb: 0,
+            vrom_size_8kb: 0,
+        }
+    }
+
+    /// GitHub issue #12: the iNES loader rejected every ROM whose PRG size
+    /// was not a power of two.  It sliced the file with the *rounded* size,
+    /// so a 12-bank PRG cart was expected to carry 16 banks: the CHR that
+    /// followed was swallowed, the CHR slice then ran off the end of the
+    /// file, and the loader answered "Unknown ROM file format".
+    ///
+    /// This builds that exact shape (PRG 12 x 16 KiB, CHR 16 x 8 KiB,
+    /// mapper 191) and pins the three things the fix has to get right:
+    ///
+    ///   1. the load succeeds;
+    ///   2. the CHR slice starts where the *raw* PRG ends, not where the
+    ///      rounded PRG would end;
+    ///   3. the hash covers the **mapped** buffer (raw PRG + `0xFF` padding up
+    ///      to the rounded size, then the CHR) — upstream's rule, and the one
+    ///      the ROM-correction table is keyed by (v2.0.3 S5-A1).
+    #[test]
+    fn a_non_power_of_two_prg_rom_loads_with_raw_slices() {
+        const PRG_BANKS: usize = 12;
+        const CHR_BANKS: usize = 16;
+        const PRG_BYTES: usize = PRG_BANKS * 16384;
+        const CHR_BYTES: usize = CHR_BANKS * 8192;
+
+        // iNES 1.0 header: PRG size byte, CHR size byte, then the mapper
+        // number in the nibbles of bytes 6 and 7.
+        let mut header = [0u8; 16];
+        header[0..4].copy_from_slice(b"NES\x1A");
+        header[4] = PRG_BANKS as u8;
+        header[5] = CHR_BANKS as u8;
+        header[6] = ((191 & 0x0F) << 4) as u8;
+        header[7] = (191 & 0xF0) as u8;
+
+        // Two different patterns, neither of which contains 0xFF, so a slice
+        // that starts at the wrong offset cannot pass by accident.
+        let prg: Vec<u8> = (0..PRG_BYTES).map(|i| (i % 251) as u8).collect();
+        let chr: Vec<u8> = (0..CHR_BYTES).map(|i| ((i % 249) + 1) as u8).collect();
+
+        let mut file = Vec::new();
+        file.extend_from_slice(&header);
+        file.extend_from_slice(&prg);
+        file.extend_from_slice(&chr);
+
+        let mut cart = zeroed_cart();
+        let loaded = unsafe {
+            fceux11_rust_ines_load(file.as_ptr(), file.len(), &mut cart as *mut _)
+        };
+        assert!(
+            loaded,
+            "a 12-bank PRG ROM must load (issue #12): the file is {} bytes, \
+             PRG is 12 banks and CHR is 16 banks",
+            file.len()
+        );
+
+        // The header numbers survive unchanged.
+        assert_eq!(cart.mapper_no, 191);
+        assert_eq!(cart.rom_size_raw, PRG_BANKS as u32);
+        assert_eq!(cart.rom_size_16kb, 16);
+
+        // `prg_size` is the *rounded* size: what the emulator allocates and
+        // maps.  It is deliberately larger than the bytes the file carries.
+        assert_eq!(cart.prg_size, 16 << 14);
+        assert_eq!(cart.chr_size, CHR_BYTES as u32);
+
+        // The PRG slice starts right after the header and holds the PRG
+        // pattern.
+        assert!(!cart.prg_data.is_null());
+        let prg_slice = unsafe { std::slice::from_raw_parts(cart.prg_data, PRG_BYTES) };
+        assert_eq!(prg_slice, prg.as_slice());
+
+        // The CHR slice starts where the *raw* PRG ends.  With the old
+        // rounded slicing this pointer would sit 64 KiB further along, in
+        // the middle of the CHR.
+        assert!(!cart.chr_data.is_null());
+        let chr_slice = unsafe { std::slice::from_raw_parts(cart.chr_data, CHR_BYTES) };
+        assert_eq!(chr_slice, chr.as_slice());
+
+        // The hash covers the **mapped** buffer: the raw PRG bytes, then the
+        // `0xFF` padding up to the rounded (16-bank) size, then the CHR.
+        //
+        // This is upstream's semantics (upstream hashes the rounded buffer it
+        // maps) and it is not cosmetic: the CRC32 is the *key* of upstream's
+        // ROM-correction table (`src/ines-correct.h`), so hashing only the raw
+        // bytes makes every non-power-of-two PRG ROM miss the table.  See
+        // `fceux11_rust_ines_compute_hash`.
+        let mut padded = prg.clone();
+        padded.resize(16 << 14, 0xFF);
+        let mut md5_ctx = md5::Context::new();
+        md5_ctx.consume(&padded);
+        md5_ctx.consume(&chr);
+        let md5_bytes: [u8; 16] = md5_ctx.compute().into();
+        assert_eq!(cart.md5, md5_bytes);
+        let mut hasher = crc32fast::Hasher::new();
+        hasher.update(&padded);
+        hasher.update(&chr);
+        assert_eq!(cart.crc32, hasher.finalize());
+
+        // ... and it must NOT be the raw-only hash: that mismatch is exactly
+        // what made the correction table unreachable for these ROMs.
+        let mut raw_hasher = crc32fast::Hasher::new();
+        raw_hasher.update(&prg);
+        raw_hasher.update(&chr);
+        assert_ne!(
+            cart.crc32,
+            raw_hasher.finalize(),
+            "the hash must cover the padded (mapped) buffer, not only the file bytes"
+        );
+    }
+
+    /// The CRC32 that a 40-bank PRG ROM produces **under the padded rule** is
+    /// the key of a real entry in upstream's ROM-correction table:
+    /// `{0x28192599, 198, -1}`.  That entry is what identifies 吞食天地2 as a
+    /// mapper-198 board wearing a mapper-4 header — without it the cartridge
+    /// loads but never boots.
+    ///
+    /// The lock is on the *lookup*, because the CRC of a synthetic ROM cannot
+    /// be steered onto a table key; the hash rule that produces this CRC is
+    /// pinned by `a_non_power_of_two_prg_rom_loads_with_raw_slices` above.
+    #[test]
+    fn a_non_power_of_two_rom_crc_hits_the_mapper_correction_table() {
+        unsafe {
+            let mut res = FceuInesHInfoResult {
+                mapper: -1,
+                mapper_mask: 0,
+                mirror: -2,
+                force_battery: 0,
+                clear_vrom: 0,
+            };
+            // 吞食天地2诸葛孔明传.nes — 40 x 16 KiB PRG, no CHR.
+            unsafe { fceux11_rust_ines_check_hinfo(0x28192599, 0, &mut res) };
+            assert_eq!(
+                res.mapper, 198,
+                "the padded CRC of a 40-bank PRG ROM must resolve to mapper 198"
+            );
+            // The table's third column is -1 ("special handling") here, and the
+            // lookup only overwrites the mirror for values >= 0 -- so the
+            // mirror stays at "no change" (-2).
+            assert_eq!(res.mirror, -2);
+        }
+    }
+
+    /// The correction must reach the mapper number the loader will use.
+    /// `fceux11_rust_ines_apply_corrections` writes it into the parse
+    /// result; the C++ loader has to carry it over (v2.0.3 S5-A2).
+    #[test]
+    fn a_mapper_correction_is_written_into_the_parse_result() {
+        unsafe {
+            let mut parse = FceuInesParseResult {
+                is_nes2: false,
+                mapper_no: 4,
+                submapper: 0,
+                mirroring: 0,
+                mirroring_as_2bits: 0,
+                battery: false,
+                trainer: false,
+                rom_size_16kb: 64,
+                vrom_size_8kb: 0,
+                rom_size_raw: 40,
+                wram_size: 0,
+                battery_wram_size: 0,
+                vram_size: 0,
+                battery_vram_size: 0,
+                vs_system: -1,
+                vs_ppu: 0,
+                vs_type: 0,
+                tv_system: 0,
+            };
+            let hinfo = FceuInesHInfoResult {
+                mapper: 198,
+                mapper_mask: 0xFF,
+                mirror: -1,
+                force_battery: 0,
+                clear_vrom: 0,
+            };
+            let tofix =
+                unsafe { fceux11_rust_ines_apply_corrections(&mut parse, &hinfo, 0, false) };
+            assert_ne!(tofix & 1, 0, "the mapper correction must be reported");
+            assert_eq!(parse.mapper_no, 198);
         }
     }
 }

@@ -32,6 +32,11 @@ pub mod bios;
 pub mod cartprobe;
 pub mod decoupling;
 pub mod ffi;
+/// The S1-a minimum reproducible fixtures: a synthetic GBA cartridge builder,
+/// the ARM encoders it needs, and a runner. Test-only, so it adds nothing to
+/// a release build. See `docs/plans/FCEUX11-v2.0.3_S1a_最小可复现夹具-实施计划.md`.
+#[cfg(test)]
+pub mod fixtures;
 pub mod frame;
 pub mod gate;
 pub mod overlay;

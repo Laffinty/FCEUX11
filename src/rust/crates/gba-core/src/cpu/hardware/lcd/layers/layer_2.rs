@@ -220,7 +220,17 @@ impl Layer2 {
             return None;
         }
 
-        let offset = (y * 160 + x) * 2;
+        // Frame select: bit 4 of DISPCNT picks which of the two 40 KB frames
+        // is displayed (GBATEK `:1918`, "for BG Modes 4,5 only"; `:3204-3206`:
+        // Frame 0 = 06000000-06009FFF, Frame 1 = 0600A000-06013FFF). The same
+        // bit and the same base address that mode 4 already honours above.
+        let frame_offset = if registers.dispcnt.get_bit(4) {
+            0xA000
+        } else {
+            0
+        };
+
+        let offset = frame_offset + (y * 160 + x) * 2;
 
         if offset + 1 >= memory.video_ram.len() {
             return None;
@@ -234,5 +244,60 @@ impl Layer2 {
             layer: 2,
             semi_transparent: false,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Plant one direct-colour pixel in VRAM.
+    fn plant(memory: &mut Memory, offset: usize, color: u16) {
+        memory.video_ram[offset] = color as u8;
+        memory.video_ram[offset + 1] = (color >> 8) as u8;
+    }
+
+    /// Mode 5 reads the frame DISPCNT bit 4 selects (GBATEK `:1918`: bit 4
+    /// applies "for BG Modes 4,5 only"; `:3204-3206`: Frame 1 begins at
+    /// 0600A000). The two pages hold different values at the same pixel, so
+    /// reading the wrong page cannot pass.
+    #[test]
+    fn mode5_selects_the_frame_through_dispcnt_bit_4() {
+        let mut memory = Memory::default();
+        plant(&mut memory, 0, 0x2000); // Frame 0's (0, 0)
+        plant(&mut memory, 0xA000, 0x4000); // Frame 1's (0, 0)
+
+        let mut registers = Registers::default();
+        registers.dispcnt = 0x0005; // mode 5, bit 4 clear
+        assert_eq!(
+            Layer2.render(0, 0, &memory, &registers).map(|p| p.color.0),
+            Some(0x2000),
+            "bit 4 clear must read Frame 0"
+        );
+
+        registers.dispcnt = 0x0015; // mode 5, bit 4 set
+        assert_eq!(
+            Layer2.render(0, 0, &memory, &registers).map(|p| p.color.0),
+            Some(0x4000),
+            "bit 4 set must read Frame 1 at VRAM 0xA000"
+        );
+    }
+
+    /// Frame 1 keeps mode 5's 160-pixel stride: (x, y) reads
+    /// `0xA000 + (y * 160 + x) * 2`. A decoy planted at the 240-pixel
+    /// stride of the full-screen modes must not be read.
+    #[test]
+    fn mode5_frame_1_uses_mode5s_stride_not_the_full_screen_one() {
+        let mut memory = Memory::default();
+        plant(&mut memory, 0xA000 + (160 + 3) * 2, 0x1234); // Frame 1, row 1, col 3
+        plant(&mut memory, 0xA000 + (240 + 3) * 2, 0x5678); // the decoy
+
+        let mut registers = Registers::default();
+        registers.dispcnt = 0x0015; // mode 5, bit 4 set
+        assert_eq!(
+            Layer2.render(3, 1, &memory, &registers).map(|p| p.color.0),
+            Some(0x1234),
+            "mode 5's stride is 160 pixels per row in frame 1 too"
+        );
     }
 }

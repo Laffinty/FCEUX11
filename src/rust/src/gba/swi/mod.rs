@@ -11,6 +11,7 @@ pub mod checksum;
 pub mod decompress;
 pub mod ram_reset;
 pub mod trig;
+pub mod unfilter;
 pub mod wait;
 
 use gba_core::cpu::arm7tdmi::{Arm7tdmi, WakeHook};
@@ -22,6 +23,11 @@ use wait::{IntrWaitRequest, LowPower};
 use decompress::{
     BusLike, DecompressError, HUFFMAN_TYPE, HuffmanPort, LZ77_SIGNATURE, MachinePort, RL_SIGNATURE,
     huffman_decompress, lz77_decompress, parse_huffman_header, parse_lz77_header, rl_decompress,
+};
+
+use unfilter::{
+    DIFF_DATA_SIZE_16BIT, DIFF_DATA_SIZE_8BIT, DIFF_TYPE, MAX_BLOCK, Unit, Write,
+    parse_diff_header, unfilter_into,
 };
 
 /// The core's bus, seen through the one slice of it the decompressors use.
@@ -50,9 +56,23 @@ impl BusLike for gba_core::bus::Bus {
 ///
 /// Returns `true` if we serviced it (the core then returns from the
 /// exception), `false` to let the core's own `match` try.
+///
+/// The test builds also tally every arrival (`note_dispatch` / `note_served`):
+/// the v2.0.3 probes report which SWI numbers a cartridge reached and whether
+/// anyone serviced them (plan §2.3 "加 SWI 陷阱记录"). The recorder is
+/// `#[cfg(test)]`, so the release build runs exactly the [`dispatch_inner`]
+/// body and nothing else.
 pub fn dispatch(cpu: &mut Arm7tdmi, swi_num: u32, old_cpsr: Psr, return_addr: u32) -> bool {
     #[cfg(test)]
     note_dispatch(swi_num);
+    let served = dispatch_inner(cpu, swi_num, old_cpsr, return_addr);
+    #[cfg(test)]
+    note_served(swi_num, served);
+    served
+}
+
+/// [`dispatch`]'s body, without the test tallying.
+fn dispatch_inner(cpu: &mut Arm7tdmi, swi_num: u32, old_cpsr: Psr, return_addr: u32) -> bool {
     let swi = Swi::from_raw(swi_num);
     match swi {
         Some(Swi::GetBiosChecksum) => {
@@ -84,6 +104,12 @@ pub fn dispatch(cpu: &mut Arm7tdmi, swi_num: u32, old_cpsr: Psr, return_addr: u3
             serve_decompress(cpu, old_cpsr, return_addr, swi);
             true
         }
+        Some(swi @ (Swi::Diff8BitUnFilterWram
+        | Swi::Diff8BitUnFilterVram
+        | Swi::Diff16BitUnFilter)) => {
+            serve_diff_unfilter(cpu, old_cpsr, return_addr, swi);
+            true
+        }
         Some(Swi::HuffUnComp) => {
             serve_huffman(cpu, old_cpsr, return_addr);
             true
@@ -100,8 +126,40 @@ pub fn dispatch(cpu: &mut Arm7tdmi, swi_num: u32, old_cpsr: Psr, return_addr: u3
             serve_obj_affine_set(cpu, old_cpsr, return_addr);
             true
         }
-        Some(Swi::Halt) | Some(Swi::Stop) => {
-            enter_low_power(cpu, old_cpsr, return_addr, swi);
+        Some(Swi::Halt) => {
+            enter_low_power(
+                cpu,
+                old_cpsr,
+                return_addr,
+                Swi::Halt as u32,
+                LowPower::Halt,
+            );
+            true
+        }
+        Some(Swi::Stop) => {
+            enter_low_power(
+                cpu,
+                old_cpsr,
+                return_addr,
+                Swi::Stop as u32,
+                LowPower::Stop,
+            );
+            true
+        }
+        Some(Swi::SoundBias) => {
+            serve_sound_bias(cpu, old_cpsr, return_addr);
+            true
+        }
+        Some(Swi::MidiKey2Freq) => {
+            serve_midi_key2_freq(cpu, old_cpsr, return_addr);
+            true
+        }
+        Some(Swi::MultiBoot) => {
+            serve_multiboot(cpu, old_cpsr, return_addr);
+            true
+        }
+        Some(Swi::CustomHalt) => {
+            serve_custom_halt(cpu, old_cpsr, return_addr);
             true
         }
         Some(Swi::IntrWait) | Some(Swi::VBlankIntrWait) => {
@@ -109,9 +167,26 @@ pub fn dispatch(cpu: &mut Arm7tdmi, swi_num: u32, old_cpsr: Psr, return_addr: u3
             true
         }
         None | Some(_) => {
+            // v2.0.3 S2-b: the decline no longer parks the machine -- the
+            // stub BIOS's SWI vector returns to the caller -- so this arm is
+            // the only place a call nobody services is ever seen. Record it
+            // (production, deduplicated) before the trace line; the red line
+            // in plan §六.3 is that a missing implementation must stay
+            // visible or S3-a has no list of what is left.
+            note_unimplemented_swi(swi_num);
             if tracing_enabled() {
                 match swi {
-                    Some(s) => eprintln!("[gba] swi {swi_num:#04x} {}: not implemented", s.name()),
+                    Some(s) => {
+                        if vendor_core_serves(swi_num) {
+                            eprintln!(
+                                "[gba] swi {swi_num:#04x} {}: declined, the vendored core \
+                                 services this number itself",
+                                s.name()
+                            );
+                        } else {
+                            eprintln!("[gba] swi {swi_num:#04x} {}: not implemented", s.name());
+                        }
+                    }
                     None => eprintln!("[gba] swi {swi_num:#04x}: outside 0x00-0x2A"),
                 }
             }
@@ -233,6 +308,118 @@ fn serve_decompress(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32, swi: Sw
             eprintln!("[gba] swi {swi:?} at 0x{src:08X}: {error}");
         }
     }
+    cpu.swi_return(old_cpsr, return_addr);
+}
+
+/// Serve the three diff-unfilter calls (0x16 / 0x17 / 0x18).
+///
+/// `r0` is the source block -- a 32-bit header followed by the data units --
+/// and `r1` is the destination. The three numbers differ in two ways only:
+/// the width of a source unit, and the width of a destination store. The
+/// table, the header layout and the evidence are in [`unfilter`].
+///
+/// A block we cannot honour leaves the destination **completely untouched**,
+/// like the decompressors: a refusal is loud, a half-written destination is
+/// not.
+fn serve_diff_unfilter(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32, swi: Swi) {
+    let (unit, write, expected_data_size) = match swi {
+        Swi::Diff8BitUnFilterWram => (Unit::Byte, Write::Byte, DIFF_DATA_SIZE_8BIT),
+        Swi::Diff8BitUnFilterVram => (Unit::Byte, Write::Halfword, DIFF_DATA_SIZE_8BIT),
+        Swi::Diff16BitUnFilter => (Unit::Halfword, Write::Halfword, DIFF_DATA_SIZE_16BIT),
+        _ => return,
+    };
+
+    // GBATEK: "r0 Source address (must be aligned by 4)". The BIOS reads the
+    // header from the aligned address, so an unaligned pointer is rounded
+    // down rather than refused -- the reference implementation does the same.
+    let src = cpu.registers.register_at(0) & !3;
+    let dest = cpu.registers.register_at(1);
+
+    // The header is a byte at a time: a word read on this bus rotates, and we
+    // are about to read a field out of the low byte.
+    let mut raw = 0u32;
+    for i in 0..4 {
+        raw |= u32::from(cpu.bus.read_byte((src + i) as usize)) << (i * 8);
+    }
+    let header = parse_diff_header(raw);
+
+    // The two header fields that describe the block are advisory: the unit
+    // width comes from the SWI number, not from the header. A mismatch is
+    // worth saying out loud -- the block was not made by the tool that wrote
+    // the header -- but it is not a reason to refuse. The reference
+    // implementation ignores both, and refusing would break a game that
+    // leaves the fields zero.
+    if header.block_type != DIFF_TYPE && tracing_enabled() {
+        eprintln!(
+            "[gba] swi {swi:?} at 0x{src:08X}: block type is {:#04x}, not {DIFF_TYPE:#04x}",
+            header.block_type
+        );
+    }
+    if header.data_size != expected_data_size && tracing_enabled() {
+        eprintln!(
+            "[gba] swi {swi:?} at 0x{src:08X}: the header's data size is {}, this call reads {}",
+            header.data_size, expected_data_size
+        );
+    }
+
+    // The refusals. Each one leaves the destination untouched.
+    let refusal = if header.size == 0 {
+        Some(unfilter::UnfilterError::ZeroSize)
+    } else if header.size > MAX_BLOCK {
+        Some(unfilter::UnfilterError::SizeTooLarge { size: header.size })
+    } else if header.size % unit.bytes() != 0 {
+        Some(unfilter::UnfilterError::NotAWholeNumberOfUnits {
+            size: header.size,
+            unit_bytes: unit.bytes(),
+        })
+    } else if write == Write::Halfword && header.size % 2 != 0 {
+        Some(unfilter::UnfilterError::NotAWholeNumberOfHalfwords { size: header.size })
+    } else if write == Write::Halfword && dest % 2 != 0 {
+        Some(unfilter::UnfilterError::MisalignedDestination { address: dest })
+    } else {
+        None
+    };
+    if let Some(error) = refusal {
+        if tracing_enabled() {
+            eprintln!("[gba] swi {swi:?} at 0x{src:08X}: {error}, not unfiltering");
+        }
+        cpu.swi_return(old_cpsr, return_addr);
+        return;
+    }
+
+    // Pull the block in, decode it, and put it out.
+    let size = header.size as usize;
+    let mut source = vec![0u8; size];
+    for (index, slot) in source.iter_mut().enumerate() {
+        *slot = cpu.bus.read_byte((src + 4 + index as u32) as usize);
+    }
+
+    let mut decoded = vec![0u8; size];
+    if let Err(error) = unfilter_into(&source, &mut decoded, unit) {
+        if tracing_enabled() {
+            eprintln!("[gba] swi {swi:?} at 0x{src:08X}: {error}");
+        }
+        cpu.swi_return(old_cpsr, return_addr);
+        return;
+    }
+
+    match write {
+        Write::Byte => {
+            for (index, byte) in decoded.iter().enumerate() {
+                cpu.bus.write_byte((dest + index as u32) as usize, *byte);
+            }
+        }
+        Write::Halfword => {
+            // The two decoded bytes of a pair go out as one halfword, the
+            // first one in the low half -- the order the reference
+            // implementation's pairing produces.
+            for (index, pair) in decoded.chunks_exact(2).enumerate() {
+                let value = u16::from(pair[0]) | (u16::from(pair[1]) << 8);
+                cpu.bus.write_half_word((dest + index as u32 * 2) as usize, value);
+            }
+        }
+    }
+
     cpu.swi_return(old_cpsr, return_addr);
 }
 
@@ -380,6 +567,151 @@ fn serve_bios_checksum(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32) {
     cpu.swi_return(old_cpsr, return_addr);
 }
 
+/// Serve `SoundBias` (0x19).
+///
+/// GBATEK `:194291-194301`: the call moves SOUNDBIAS (`0400088h`) to a new
+/// level -- r0 selects it ("0=Level 000h, any other value=Level 200h") -- and
+/// "the upper bits of the register are kept unchanged". r1 is a delay count
+/// the GBA ignores (it "uses a fixed delay count of 8").
+///
+/// The ramp's intermediate values live only in the timing domain, which this
+/// machine does not observe, so the target level is written in one step and
+/// the ramp (and its fixed delay) is recorded as not modelled. The register
+/// itself is modelled by the vendored core (`sound.sound_pwm_control`,
+/// serialized with the rest of the machine).
+fn serve_sound_bias(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32) {
+    /// SOUNDBIAS, `0400088h` (GBATEK `:4570`).
+    const SOUNDBIAS: usize = 0x0400_0088;
+    /// The field the call replaces: the low 10 bits of the register. GBATEK
+    /// `:4582-4586` puts the bias level at bits 1-9 and marks bit 0 unused,
+    /// and the two level values the call can select (`000h`/`200h`) fit
+    /// inside bits 0-9.
+    const LEVEL_FIELD: u16 = 0x03FF;
+    /// The level a non-zero r0 selects (GBATEK `:194300`).
+    const LEVEL_200: u16 = 0x0200;
+
+    let level = if cpu.registers.register_at(0) != 0 {
+        LEVEL_200
+    } else {
+        0
+    };
+    // The register is a halfword on a byte-decoded I/O block: two byte reads,
+    // low first, and one halfword write back.
+    let current = u16::from(cpu.bus.read_byte(SOUNDBIAS))
+        | (u16::from(cpu.bus.read_byte(SOUNDBIAS + 1)) << 8);
+    cpu.bus
+        .write_half_word(SOUNDBIAS, (current & !LEVEL_FIELD) | level);
+    cpu.swi_return(old_cpsr, return_addr);
+}
+
+/// Serve `MidiKey2Freq` (0x1F).
+///
+/// GBATEK `:194243-194263`: r0 is a WaveData pointer, r1 the MIDI key (u8),
+/// r2 the fine adjustment (u8, 256ths of a halftone), and r0 returns the
+/// value a game writes to `vchn.fr` when playing the wave at that pitch.
+///
+/// The `freq` field sits at **WaveData+4** (`:194409-194414`: `u16 type`
+/// at +0, `u16 stat` at +2, `u32 freq` at +4 -- the evidence table's "+8"
+/// was wrong and the v2.0.3 S3-a RE report corrects it).
+///
+/// # The formula is derived, not copied
+///
+/// GBATEK publishes two pieces and the rest follows:
+/// `freq = sampling_rate x 2^((180 - original key) / 12)` (`:194413-194414`),
+/// and `fr` is the frequency the wave plays at key `mk` with fine `fp`,
+/// i.e. `sampling_rate x 2^((mk + fp/256 - original key) / 12)`. Dividing
+/// the second by the first: **fr = freq / 2^((180 - mk - fp/256) / 12)**.
+/// The real BIOS's fixed-point layout is not documented; this uses f32,
+/// which is what the read-only reference implementation does too. Precision:
+/// derived (plan §四's sanctioned route), not read off a BIOS dump.
+fn serve_midi_key2_freq(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32) {
+    /// The key the WaveData's `freq` field is normalized to (GBATEK
+    /// `:194414`'s `180 - original MIDI key`).
+    const REFERENCE_KEY: f32 = 180.0;
+    /// Where the WaveData's `freq` field lives (GBATEK `:194409-194414`).
+    const FREQ_FIELD_OFFSET: u32 = 4;
+    /// Fine adjustment granularity: 256 per halftone (GBATEK `:194245`).
+    const FINE_PER_HALFTONE: f32 = 256.0;
+    /// Halftones per octave.
+    const SEMITONES_PER_OCTAVE: f32 = 12.0;
+
+    let wave = cpu.registers.register_at(0);
+    let key = (cpu.registers.register_at(1) as u8) as f32;
+    let fine = (cpu.registers.register_at(2) as u8) as f32 / FINE_PER_HALFTONE;
+
+    // The bus rounds a word read down to its aligned address, which is the
+    // behaviour the BIOS's own load32 has.
+    let freq = cpu.bus.read_word((wave + FREQ_FIELD_OFFSET) as usize);
+
+    let semitones = (REFERENCE_KEY - key - fine) / SEMITONES_PER_OCTAVE;
+    let fr = freq as f32 / semitones.exp2();
+    cpu.registers.set_register_at(0, fr as u32);
+    cpu.swi_return(old_cpsr, return_addr);
+}
+
+/// Serve `MultiBoot` (0x25).
+///
+/// GBATEK `:193877-193914`: the call uploads and starts program code on
+/// **slave** GBAs over the serial link, and "r0 0=okay, 1=failed". This
+/// machine has no slave -- the vendored core's SIO registers store what is
+/// written to them and transmit nothing (`bus.rs:306-369`) -- and a real
+/// master with no slave answering walks the handshake timeout into the same
+/// failure. So `r0 = 1` is the honest and hardware-consistent answer, and it
+/// needs neither of the parameters (the block pointer and the transfer mode
+/// only matter once a transfer actually starts).
+fn serve_multiboot(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32) {
+    /// GBATEK `:193914`: "r0 0=okay, 1=failed".
+    const FAILED: u32 = 1;
+
+    cpu.registers.set_register_at(0, FAILED);
+    cpu.swi_return(old_cpsr, return_addr);
+}
+
+/// Serve `CustomHalt` (0x27).
+///
+/// GBATEK `:193418-193426`: "Writes the 8bit parameter value to HALTCNT,
+/// below values are equivalent to Halt and Stop/Sleep functions, other
+/// values reserved" -- and the parameter is in **r2** ("r2 8bit parameter
+/// (GBA: 00h=Halt, 80h=Stop)"), unlike `Halt`/`Stop` which carry no
+/// parameter at all.
+///
+/// This machine models both low-power modes the same way -- any enabled
+/// interrupt wakes the CPU (`enter_low_power`) -- so both accepted values
+/// enter it. A reserved value returns instead, along the `IntrWait`
+/// unsatisfiable precedent: a mistaken argument becomes a visible no-op
+/// rather than a wedged machine.
+fn serve_custom_halt(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32) {
+    /// GBATEK `:193426`: `00h=Halt`.
+    const HALTCNT_HALT: u8 = 0x00;
+    /// GBATEK `:193426`: `80h=Stop`.
+    const HALTCNT_STOP: u8 = 0x80;
+
+    match cpu.registers.register_at(2) as u8 {
+        HALTCNT_HALT => enter_low_power(
+            cpu,
+            old_cpsr,
+            return_addr,
+            Swi::CustomHalt as u32,
+            LowPower::Halt,
+        ),
+        HALTCNT_STOP => enter_low_power(
+            cpu,
+            old_cpsr,
+            return_addr,
+            Swi::CustomHalt as u32,
+            LowPower::Stop,
+        ),
+        reserved => {
+            if tracing_enabled() {
+                eprintln!(
+                    "[gba] swi 0x27: HALTCNT parameter {reserved:#04x} is reserved, returning"
+                );
+            }
+            cpu.swi_return(old_cpsr, return_addr);
+        }
+    }
+}
+
 /// Serve `RegisterRamReset` (0x01).
 ///
 /// Claiming this number is all-or-nothing: the core's own arm never runs
@@ -389,6 +721,17 @@ fn serve_bios_checksum(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32) {
 /// plan r15 and known limits L5 / L6.
 fn serve_register_ram_reset(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32) {
     let request = RamResetRequest::decode(cpu.registers.register_at(0));
+
+    // GBATEK `:193540-193541`: "The function always switches the screen into
+    // forced blank by setting DISPCNT=0080h (regardless of incoming R0,
+    // screen becomes white)." The blank is unconditional -- it is not one of
+    // the flag bits -- and the register gets the whole value `0080h`, which
+    // is what the read-only reference implementation writes first too
+    // (mGBA `_RegisterRamReset`, store16(REG_DISPCNT, 0x0080)). A game that
+    // calls this mid-frame therefore sees its display settings replaced by
+    // the blank, exactly as on hardware.
+    cpu.bus
+        .write_half_word(ram_reset::DISPCNT as usize, ram_reset::FORCED_BLANK);
 
     for region in request.regions() {
         for addr in region.start..region.end {
@@ -425,15 +768,20 @@ fn serve_register_ram_reset(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32)
 /// that register faithfully is recorded as a known limitation rather than
 /// guessed at. `wake_hook = None` is what makes the core's guard treat any
 /// enabled interrupt as sufficient.
-fn enter_low_power(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32, swi: Option<Swi>) {
+///
+/// The number and the mode are passed separately: `CustomHalt` (0x27) selects
+/// the same two modes through a register parameter and arrives through a
+/// different number, and the trace has to name the call the game actually
+/// made.
+fn enter_low_power(
+    cpu: &mut Arm7tdmi,
+    old_cpsr: Psr,
+    return_addr: u32,
+    swi_num: u32,
+    mode: LowPower,
+) {
     if tracing_enabled() {
-        if let Some(mode) = swi.and_then(|s| match s {
-            Swi::Halt => Some(LowPower::Halt),
-            Swi::Stop => Some(LowPower::Stop),
-            _ => None,
-        }) {
-            eprintln!("[gba] swi {}: entering {mode:?}", mode.swi_number());
-        }
+        eprintln!("[gba] swi {swi_num:#04x}: entering {mode:?}");
     }
     PENDING_INTR_WAIT.with(|pending| pending.set(None));
     cpu.wake_hook = None;
@@ -582,6 +930,73 @@ fn tracing_enabled() -> bool {
     TRACE_SWI.load(std::sync::atomic::Ordering::Relaxed)
 }
 
+// The v2.0.3 S2-b production recorder for calls nobody services: the number,
+// and how many times it has been declined.
+//
+// The stub BIOS's SWI vector returns instead of parking (v2.0.3 S2-b), so an
+// unimplemented BIOS call no longer wedges the machine -- which also means
+// nothing on the machine side shows that anything happened. Plan red line
+// §六.3: a missing implementation must stay visible, or S3-a has no list of
+// what is left to implement. This is that visibility: one stderr line the
+// first time each number is declined, then silent counting.
+//
+// Thread-local like the test tallies below: `dispatch` runs on the one
+// emulation thread (the §4.1 contract), and a per-thread map keeps the test
+// harness's parallel machines from answering each other's questions.
+thread_local! {
+    static UNIMPLEMENTED_SWI: std::cell::RefCell<std::collections::BTreeMap<u32, u64>> =
+        std::cell::RefCell::new(std::collections::BTreeMap::new());
+}
+
+/// Record a declined SWI, reporting each number once.
+///
+/// Called from [`dispatch_inner`]'s decline arm -- the only place a call
+/// nobody services is ever seen. Numbers the vendored core services itself
+/// (`0x00`, `0x06-0x08`, `0x0B`, `0x0C`) are **not** recorded: the core's own
+/// `match` runs them and the machine continues normally, so counting them
+/// would put implemented calls on the "still missing" list.
+///
+/// The first occurrence of each number logs to stderr, unconditionally --
+/// gated behind the trace flag it would never be seen by a shipping build,
+/// which is exactly the build that runs the commercial cartridges S3-a is
+/// for. Later occurrences only advance the count.
+fn note_unimplemented_swi(swi_num: u32) {
+    if vendor_core_serves(swi_num) {
+        return;
+    }
+    let first = UNIMPLEMENTED_SWI.with(|map| {
+        let mut map = map.borrow_mut();
+        let entry = map.entry(swi_num).or_insert(0);
+        *entry += 1;
+        *entry == 1
+    });
+    if first {
+        let name = match Swi::from_raw(swi_num) {
+            Some(swi) => swi.name(),
+            None => "outside 0x00-0x2A",
+        };
+        eprintln!(
+            "[gba] swi {swi_num:#04x} {name}: not implemented, returning without \
+             servicing it (S2-b fallback; further calls are counted, not logged)"
+        );
+    }
+}
+
+/// The recorded counts since process start, drained: `(number, calls)`.
+///
+/// Test-side read of [`note_unimplemented_swi`]'s map, for the locks that pin
+/// the S2-b visibility (plan red line §六.3). The record itself is compiled
+/// into every build; only this reader is test-only, because production has
+/// no caller for it yet -- exposing it across the C ABI would mean new
+/// exports, which is out of S2-b's scope.
+#[cfg(test)]
+pub(crate) fn unimplemented_swi_counts() -> Vec<(u32, u64)> {
+    UNIMPLEMENTED_SWI
+        .with(|map| std::mem::take(&mut *map.borrow_mut()))
+        .into_iter()
+        .collect()
+}
+
 // Records the number the core last handed to `dispatch`.
 //
 // The core reaches us through a raw function pointer, so there is no other
@@ -609,12 +1024,76 @@ fn take_last_dispatch() -> Option<u32> {
     (seen != u32::MAX).then_some(seen)
 }
 
+/// Per-number call tallies since the last drain, as `(calls, served calls)`.
+///
+/// `served = false` covers two different things -- a number in `0x00-0x2A`
+/// that only the vendored core implements (it runs them itself), and a number
+/// nobody implements (S2-b: the stub BIOS's SWI vector returns the machine to
+/// the caller without servicing the call). [`vendor_core_serves`] tells the
+/// two apart. Thread-local like [`LAST_DISPATCH`]: the test harness
+/// runs tests in parallel and one test's tallies must not answer another's
+/// question.
+#[cfg(test)]
+thread_local! {
+    static TALLIES: std::cell::RefCell<std::collections::BTreeMap<u32, (u64, u64)>> =
+        std::cell::RefCell::new(std::collections::BTreeMap::new());
+}
+
+#[cfg(test)]
+fn note_served(swi_num: u32, served: bool) {
+    TALLIES.with(|tallies| {
+        let mut map = tallies.borrow_mut();
+        let entry = map.entry(swi_num).or_insert((0, 0));
+        entry.0 += 1;
+        if served {
+            entry.1 += 1;
+        }
+    });
+}
+
+/// The per-number tallies since the last call, drained:
+/// `(number, calls, served calls)`.
+///
+/// Test-only like the recording itself -- the counters are `#[cfg(test)]`, so
+/// the release build carries none of this -- and the consumers are the
+/// research probes, which only exist under `cargo test`.
+#[cfg(test)]
+pub fn take_swi_tallies() -> Vec<(u32, u64, u64)> {
+    TALLIES.with(|tallies| std::mem::take(&mut *tallies.borrow_mut()))
+        .into_iter()
+        .map(|(num, (calls, served))| (num, calls, served))
+        .collect()
+}
+
+/// The name of a SWI number, for probe reports. Numbers outside the BIOS
+/// range get a phrase instead of a name.
+#[cfg(test)]
+pub fn swi_name(swi_num: u32) -> String {
+    match Swi::from_raw(swi_num) {
+        Some(swi) => swi.name().to_string(),
+        None => "outside 0x00-0x2A".to_string(),
+    }
+}
+
+/// Whether the vendored core services this number itself when we decline it
+/// (`arm7tdmi.rs` `handle_swi_hle`, plan §1.2.1): `0x00`, `0x06-0x08`, `0x0B`,
+/// `0x0C`. For these a declined dispatch is **not** "unimplemented" -- the
+/// core's own `match` handles them -- so `served = false` in a tally must not
+/// be read as a missing implementation, and [`note_unimplemented_swi`] must
+/// not count them. Readable outside tests since S2-b: the production recorder
+/// needs the same distinction the probes report.
+pub fn vendor_core_serves(swi_num: u32) -> bool {
+    matches!(swi_num, 0x00 | 0x06 | 0x07 | 0x08 | 0x0B | 0x0C)
+}
+
 /// BIOS software-interrupt numbers, as encoded by the ARM `SWI` immediate.
 ///
 /// 0x00-0x2A is the range the GBA BIOS documents. Anything outside it is
 /// undefined; the core returns `false` for those, which drops the CPU into
-/// the exception vector -- with a stub BIOS loaded that is an unimplemented
-/// vector, so SWI coverage is not optional (plan section 5.3).
+/// the exception vector -- which, since v2.0.3 S2-b, returns to the caller
+/// as a no-op instead of parking (`bios.rs` SWI vector). Coverage is still
+/// not optional: an uncovered number costs the game its call's effect, and
+/// only `note_unimplemented_swi`'s log says so.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum Swi {
@@ -846,6 +1325,11 @@ mod tests {
     /// landed. S1a-1 replaced it with the wait family, and S1b-c has added
     /// `RegisterRamReset`. Everything else still has to fall through, so
     /// T1-d (decompressors) and T2 (math) can land one at a time.
+    ///
+    /// S3-a added the three diff-unfilter numbers (0x16/0x17/0x18): a number
+    /// that is claimed must not be in this list, and a number that is **not**
+    /// claimed must still be absent -- the test is about the exact set, not
+    /// about a few known members.
     #[test]
     fn dispatch_claims_exactly_what_is_implemented() {
         let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
@@ -866,6 +1350,13 @@ mod tests {
             Swi::HuffUnComp as u32,
             Swi::RlUnCompWram as u32,
             Swi::RlUnCompVram as u32,
+            Swi::Diff8BitUnFilterWram as u32,
+            Swi::Diff8BitUnFilterVram as u32,
+            Swi::Diff16BitUnFilter as u32,
+            Swi::SoundBias as u32,
+            Swi::MidiKey2Freq as u32,
+            Swi::MultiBoot as u32,
+            Swi::CustomHalt as u32,
         ] {
             assert!(
                 claimed.contains(&expected),
@@ -894,9 +1385,18 @@ mod tests {
                 Swi::HuffUnComp as u32,
                 Swi::RlUnCompWram as u32,
                 Swi::RlUnCompVram as u32,
+                Swi::Diff8BitUnFilterWram as u32,
+                Swi::Diff8BitUnFilterVram as u32,
+                Swi::Diff16BitUnFilter as u32,
+                Swi::SoundBias as u32,
+                Swi::MidiKey2Freq as u32,
+                Swi::MultiBoot as u32,
+                Swi::CustomHalt as u32,
             ],
             "0x09, 0x0A, 0x0D, 0x0E, 0x0F, 0x10, RegisterRamReset, the wait \
-             family and all four decompressors are claimed; only 0x08 is not"
+             family, all four decompressors, the three diff-unfilter calls, \
+             SoundBias, MidiKey2Freq, MultiBoot and CustomHalt are claimed; \
+             only 0x08 is not"
         );
     }
 
@@ -928,6 +1428,13 @@ mod tests {
                         | Swi::BgAffineSet
                         | Swi::ObjAffineSet
                         | Swi::ArcTan2
+                        | Swi::Diff8BitUnFilterWram
+                        | Swi::Diff8BitUnFilterVram
+                        | Swi::Diff16BitUnFilter
+                        | Swi::SoundBias
+                        | Swi::MidiKey2Freq
+                        | Swi::MultiBoot
+                        | Swi::CustomHalt
                 )
             );
             if is_claimed {
@@ -944,6 +1451,34 @@ mod tests {
             pending_intr_groups(&mut gba.cpu),
             0,
             "declining must not conjure an interrupt group"
+        );
+    }
+
+    /// The S2-b production recorder must count calls nobody services -- that
+    /// list is what S3-a works from (plan red line §六.3) -- and must keep
+    /// implemented numbers off it: a number the vendored core services is not
+    /// missing, and a number we claim never reaches the decline arm.
+    #[test]
+    fn the_production_recorder_counts_unimplemented_calls_and_skips_served_ones() {
+        let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
+        let cpsr = gba.cpu.cpsr;
+
+        // 0x1A (SoundDriverInit): neither we nor the core implements it --
+        // counted, once per call, every call.
+        assert!(!dispatch(&mut gba.cpu, 0x1A, cpsr, ROM_BASE));
+        assert!(!dispatch(&mut gba.cpu, 0x1A, cpsr, ROM_BASE));
+        // 0x06 (Div): we decline, but the vendored core services it itself --
+        // a working call, not a missing one. Not counted.
+        assert!(!dispatch(&mut gba.cpu, 0x06, cpsr, ROM_BASE));
+        // 0x02 (Halt): we claim it outright. Not a decline at all. (Dispatched
+        // last so its halt does not shadow the calls above.)
+        assert!(dispatch(&mut gba.cpu, Swi::Halt as u32, cpsr, ROM_BASE));
+
+        assert_eq!(
+            super::unimplemented_swi_counts(),
+            vec![(0x1A, 2)],
+            "the recorder must count exactly the calls nobody services, with the \
+             full per-number tally"
         );
     }
 
@@ -2247,6 +2782,443 @@ mod tests {
                 cpu.read_word(at),
                 0x5A5A_5A5A,
                 "the bytes before element {k} were clobbered"
+            );
+        }
+    }
+
+    // ---- S3-a batch 2: SoundBias (0x19) ---------------------------------
+    //
+    // GBATEK `:194291-194301`: r0 picks the level ("0=Level 000h, any other
+    // value=Level 200h"), "the upper bits of the register are kept
+    // unchanged", r1 is a delay count the GBA ignores. The expected values
+    // below are bit-field arithmetic on the preset, never calls into the
+    // implementation (discipline 12).
+
+    /// SOUNDBIAS, `0400088h` (GBATEK `:4570`).
+    const SOUNDBIAS: usize = 0x0400_0088;
+
+    /// The field the call replaces: the low 10 bits of the register
+    /// (GBATEK `:4582-4586` -- the bias level sits at bits 1-9, bit 0 is
+    /// unused, and both selectable levels fit inside bits 0-9).
+    const BIAS_LEVEL_FIELD: u16 = 0x03FF;
+    /// The level a non-zero r0 selects (GBATEK `:194300`).
+    const BIAS_LEVEL_200: u16 = 0x0200;
+
+    /// A machine with the hook installed and SOUNDBIAS pre-set.
+    fn gba_for_sound_bias(preset: u16) -> Gba {
+        let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
+        install_swi_hook(&mut gba);
+        gba.cpu.bus.write_half_word(SOUNDBIAS, preset);
+        gba
+    }
+
+    /// Run `SoundBias` with the staged r0/r1.
+    fn run_sound_bias(gba: &mut Gba, r0: u32, r1: u32) {
+        gba.cpu.registers.set_register_at(0, r0);
+        gba.cpu.registers.set_register_at(1, r1);
+        let cpsr = gba.cpu.cpsr;
+        assert!(
+            dispatch(&mut gba.cpu, Swi::SoundBias as u32, cpsr, ROM_BASE),
+            "0x19 must be claimed"
+        );
+    }
+
+    /// The preset for the level vectors: bits 14-15 carry amplitude
+    /// resolution 2 and the level field holds junk that is neither `000h`
+    /// nor `200h`, so both writes have something observable to change.
+    fn bias_preset() -> u16 {
+        (0b10 << 14) | 0x0155
+    }
+
+    /// r0 = 0 selects level `000h` and keeps the upper bits; r0 != 0 selects
+    /// level `200h` and keeps the upper bits. The preset's level field is
+    /// `155h` on purpose: an identity write would prove nothing.
+    #[test]
+    fn sound_bias_writes_the_requested_level_and_keeps_the_high_bits() {
+        let preset = bias_preset();
+        assert_ne!(preset & BIAS_LEVEL_FIELD, 0, "the preset must differ from level 000h");
+        assert_ne!(
+            preset & BIAS_LEVEL_FIELD,
+            BIAS_LEVEL_200,
+            "the preset must differ from level 200h"
+        );
+
+        let mut gba = gba_for_sound_bias(preset);
+        gba.cpu.registers.set_register_at(2, 0xCAFE_F00D);
+        run_sound_bias(&mut gba, 0, 0);
+        assert_eq!(
+            gba.cpu.bus.read_half_word(SOUNDBIAS),
+            preset & !BIAS_LEVEL_FIELD,
+            "r0 = 0 must select level 000h while the upper bits stay"
+        );
+        assert_eq!(
+            gba.cpu.registers.register_at(2),
+            0xCAFE_F00D,
+            "r2 is kept by the SWI ABI (GBATEK :192061-192062)"
+        );
+
+        let mut gba = gba_for_sound_bias(preset);
+        run_sound_bias(&mut gba, 1, 0);
+        assert_eq!(
+            gba.cpu.bus.read_half_word(SOUNDBIAS),
+            (preset & !BIAS_LEVEL_FIELD) | BIAS_LEVEL_200,
+            "any non-zero r0 must select level 200h while the upper bits stay"
+        );
+    }
+
+    /// r1 is a delay count the GBA ignores (GBATEK `:194301`: "GBA uses a
+    /// fixed delay count of 8"): whatever it carries must not change the
+    /// level that gets written.
+    #[test]
+    fn sound_bias_ignores_the_delay_count_in_r1() {
+        let preset = bias_preset();
+        let mut gba = gba_for_sound_bias(preset);
+        run_sound_bias(&mut gba, 1, 0);
+        let without_delay = gba.cpu.bus.read_half_word(SOUNDBIAS);
+
+        let mut gba = gba_for_sound_bias(preset);
+        run_sound_bias(&mut gba, 1, 0x0012_3456);
+        assert_eq!(
+            gba.cpu.bus.read_half_word(SOUNDBIAS),
+            without_delay,
+            "r1 must not reach the register: the GBA ignores the delay count"
+        );
+    }
+
+    // ---- S3-a batch 2: MidiKey2Freq (0x1F) ------------------------------
+    //
+    // GBATEK `:194243-194263` + the WaveData layout at `:194409-194414`.
+    // The octave vectors' expected values are exact integers assembled from
+    // the definition (one octave = factor 2), never from the implementation's
+    // floating-point path (discipline 12).
+
+    /// Where the WaveData is planted: IWRAM, like the decompressor blocks.
+    const WAVE_DATA: u32 = 0x0300_2000;
+
+    /// Plant a WaveData whose every field is distinctive.
+    ///
+    /// `type` (+0) and `stat` (+2) hold junk, `freq` (+4) holds the value
+    /// under test, and `loop` (+8) / `size` (+12) hold sentinels -- an
+    /// implementation that reads the wrong offset computes on the sentinel
+    /// and the octave vectors go red.
+    fn plant_wave_data(gba: &mut Gba, freq: u32) {
+        gba.cpu.bus.write_half_word(WAVE_DATA as usize, 0x1234);
+        gba.cpu.bus.write_half_word(WAVE_DATA as usize + 2, 0x5678);
+        gba.cpu.bus.write_word(WAVE_DATA as usize + 4, freq);
+        gba.cpu.bus.write_word(WAVE_DATA as usize + 8, 0x0000_0099);
+        gba.cpu.bus.write_word(WAVE_DATA as usize + 12, 0x0000_0077);
+    }
+
+    /// Run `MidiKey2Freq` against the planted WaveData and return r0.
+    fn run_midi_key2_freq(gba: &mut Gba, mk: u32, fp: u32) -> u32 {
+        gba.cpu.registers.set_register_at(0, WAVE_DATA);
+        gba.cpu.registers.set_register_at(1, mk);
+        gba.cpu.registers.set_register_at(2, fp);
+        let cpsr = gba.cpu.cpsr;
+        assert!(
+            dispatch(&mut gba.cpu, Swi::MidiKey2Freq as u32, cpsr, ROM_BASE),
+            "0x1F must be claimed"
+        );
+        gba.cpu.registers.register_at(0)
+    }
+
+    /// The exact integer octaves. With `freq = 2^22` and fine adjustment 0:
+    /// key 180 is the reference (r0 = freq), key 168 is one octave below
+    /// (r0 = freq/2) and key 192 one above (r0 = freq*2) -- each expected
+    /// value is a shift of the input, assembled without touching the
+    /// implementation's `exp2` path.
+    ///
+    /// These vectors also pin the `WaveData+4` offset: the sentinels at +8
+    /// and +12 would produce wildly different answers under an offset bug.
+    #[test]
+    fn midi_key2_freq_returns_the_exact_integer_octaves() {
+        const FREQ: u32 = 0x0040_0000;
+        let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
+        install_swi_hook(&mut gba);
+        plant_wave_data(&mut gba, FREQ);
+
+        assert_eq!(
+            run_midi_key2_freq(&mut gba, 168, 0),
+            FREQ / 2,
+            "key 168 is 12 semitones below the reference: one octave down"
+        );
+        assert_eq!(
+            run_midi_key2_freq(&mut gba, 180, 0),
+            FREQ,
+            "key 180 is the reference key: identity"
+        );
+        assert_eq!(
+            run_midi_key2_freq(&mut gba, 192, 0),
+            FREQ * 2,
+            "key 192 is 12 semitones above the reference: one octave up"
+        );
+    }
+
+    /// Only the `freq` field at WaveData+4 feeds the answer: junk in
+    /// `type`/`stat` and different sentinels behind it must change nothing.
+    #[test]
+    fn midi_key2_freq_depends_only_on_the_freq_field() {
+        let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
+        install_swi_hook(&mut gba);
+        plant_wave_data(&mut gba, 0x0040_0000);
+        let reference = run_midi_key2_freq(&mut gba, 168, 0);
+
+        // Same freq, different junk everywhere else.
+        gba.cpu.bus.write_half_word(WAVE_DATA as usize, 0x4321);
+        gba.cpu.bus.write_half_word(WAVE_DATA as usize + 2, 0x8765);
+        gba.cpu.bus.write_word(WAVE_DATA as usize + 8, 0x0000_0044);
+        gba.cpu.bus.write_word(WAVE_DATA as usize + 12, 0x0000_0033);
+        assert_eq!(
+            run_midi_key2_freq(&mut gba, 168, 0),
+            reference,
+            "type/stat/loop/size must not leak into the result"
+        );
+    }
+
+    /// The fine adjustment shifts the pitch up, by less than an octave for
+    /// any u8 fp. Only the direction and the non-identity are asserted: the
+    /// exact ratio would be recomputed by the same formula the
+    /// implementation uses, which is discipline 12's "testing with the
+    /// implementation's own arithmetic" trap.
+    #[test]
+    fn midi_key2_freq_shifts_up_with_the_fine_adjustment() {
+        const FREQ: u32 = 0x0040_0000;
+        let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
+        install_swi_hook(&mut gba);
+        plant_wave_data(&mut gba, FREQ);
+
+        let without = run_midi_key2_freq(&mut gba, 168, 0);
+        let with = run_midi_key2_freq(&mut gba, 168, 128);
+        assert_ne!(with, without, "fp = 128 must shift the pitch");
+        assert!(with > without, "a higher fp is a higher pitch, so a larger fr");
+        assert!(with < FREQ * 2, "fp is 256ths of one halftone: never a full octave");
+    }
+
+    /// r1 is an outgoing register per the ABI, but r2 and r4-r14 are kept
+    /// (GBATEK `:192061-192062`) -- and r2 is this call's *input*, so
+    /// preserving it is observable at the input value itself.
+    #[test]
+    fn midi_key2_freq_leaves_r2_and_r4_alone_and_returns() {
+        const RETURN_ADDR: u32 = 0x18;
+        let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
+        install_swi_hook(&mut gba);
+        plant_wave_data(&mut gba, 0x0040_0000);
+        gba.cpu.registers.set_register_at(0, WAVE_DATA);
+        gba.cpu.registers.set_register_at(1, 168);
+        gba.cpu.registers.set_register_at(2, 5);
+        gba.cpu.registers.set_register_at(4, 0xDEAD_BEEF);
+        gba.cpu.registers.set_program_counter(0x30);
+        let cpsr = gba.cpu.cpsr;
+        assert!(dispatch(
+            &mut gba.cpu,
+            Swi::MidiKey2Freq as u32,
+            cpsr,
+            RETURN_ADDR
+        ));
+        assert_eq!(
+            gba.cpu.registers.register_at(2),
+            5,
+            "r2 is kept and was the input"
+        );
+        assert_eq!(
+            gba.cpu.registers.register_at(4),
+            0xDEAD_BEEF,
+            "r4 is kept"
+        );
+        assert_eq!(gba.cpu.registers.program_counter(), RETURN_ADDR as usize);
+        assert!(!gba.cpu.halted);
+    }
+
+    // ---- S3-a batch 2: MultiBoot (0x25) ---------------------------------
+    //
+    // GBATEK `:193914`: "r0 0=okay, 1=failed". Without a slave -- and the
+    // vendored core's SIO transmits nothing, so there never is one -- the
+    // honest answer is failure, exactly like a real master's handshake
+    // timeout.
+
+    /// `MultiBoot` reports failure and returns: r0 = 1, the machine keeps
+    /// running, and no parameter was read (failing needs neither the block
+    /// pointer nor the mode).
+    #[test]
+    fn multiboot_reports_failure_without_a_slave() {
+        let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
+        install_swi_hook(&mut gba);
+        gba.cpu.registers.set_register_at(0, 0x1234_5678);
+        gba.cpu.registers.set_register_at(1, 1); // MultiPlay mode, GBATEK :193896
+        gba.cpu.registers.set_program_counter(0x30);
+        let cpsr = gba.cpu.cpsr;
+        assert!(dispatch(&mut gba.cpu, Swi::MultiBoot as u32, cpsr, 0x18));
+        assert_eq!(
+            gba.cpu.registers.register_at(0),
+            1,
+            "GBATEK :193914: r0 0=okay, 1=failed"
+        );
+        assert_eq!(gba.cpu.registers.program_counter(), 0x18);
+        assert!(!gba.cpu.halted, "the call must return, not park the machine");
+    }
+
+    /// The failure answer does not write past the contract: r1-r3 and r4 are
+    /// outgoing-garbage at best, and a caller that started depending on them
+    /// would depend on values the BIOS never promised.
+    #[test]
+    fn multiboot_does_not_touch_the_other_registers() {
+        let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
+        install_swi_hook(&mut gba);
+        for reg in [1usize, 2, 3, 4] {
+            gba.cpu.registers.set_register_at(reg, 0xDEAD_BEEF);
+        }
+        let cpsr = gba.cpu.cpsr;
+        assert!(dispatch(&mut gba.cpu, Swi::MultiBoot as u32, cpsr, ROM_BASE));
+        for reg in [1usize, 2, 3, 4] {
+            assert_eq!(
+                gba.cpu.registers.register_at(reg),
+                0xDEAD_BEEF,
+                "r{reg} is not part of the contract and must be untouched"
+            );
+        }
+    }
+
+    // ---- S3-a batch 2: CustomHalt (0x27) --------------------------------
+    //
+    // GBATEK `:193418-193426`: the parameter is in **r2** ("00h=Halt,
+    // 80h=Stop"), other values are reserved. Measured through a real `SWI`
+    // instruction like the `Halt` tests above, because the contract is about
+    // the machine's state afterwards.
+
+    /// `MOV r0, #imm` -- the parameter a wrong implementation would read.
+    const fn mov_r0(v: u32) -> u32 {
+        0xE3A0_0000 | (v & 0xFF)
+    }
+    /// `MOV r2, #imm` -- where the parameter actually lives.
+    const fn mov_r2(v: u32) -> u32 {
+        0xE3A0_2000 | (v & 0xFF)
+    }
+
+    /// r2 = 00h parks the CPU: the instruction after the SWI must not run,
+    /// and the machine clock must keep running so an interrupt can ever
+    /// arrive -- the same contract `Halt` (0x02) is held to.
+    #[test]
+    fn custom_halt_parks_the_cpu_on_the_halt_parameter() {
+        let program = [mov_r2(0x00), arm_swi(0x27), IRQ_HALT, PARK];
+        let mut gba = machine(&program);
+        assert!(
+            run_until_halted(&mut gba, 32),
+            "SWI 0x27 with r2 = 00h must enter Halt"
+        );
+        let cycles_at_halt = gba.cpu.current_cycle;
+        for _ in 0..64 {
+            gba.step();
+        }
+        assert!(
+            gba.cpu.halted,
+            "a Halt with interrupts disabled must stay asleep"
+        );
+        assert_eq!(
+            gba.cpu.registers.register_at(5),
+            0,
+            "the instruction after SWI 0x27 ran while halted"
+        );
+        assert!(
+            gba.cpu.current_cycle > cycles_at_halt,
+            "the machine clock stopped while the CPU slept"
+        );
+    }
+
+    /// r2 = 80h enters the same low power (Stop is modelled like Halt --
+    /// any enabled interrupt wakes, which `enter_low_power` documents).
+    #[test]
+    fn custom_halt_parks_the_cpu_on_the_stop_parameter() {
+        let program = [mov_r2(0x80), arm_swi(0x27), IRQ_HALT, PARK];
+        let mut gba = machine(&program);
+        assert!(
+            run_until_halted(&mut gba, 32),
+            "SWI 0x27 with r2 = 80h must enter Stop's low power"
+        );
+        assert_eq!(
+            gba.cpu.registers.register_at(5),
+            0,
+            "the instruction after SWI 0x27 ran while halted"
+        );
+    }
+
+    /// A reserved parameter returns instead: the machine carries on and the
+    /// instruction after the SWI runs, along the `IntrWait` unsatisfiable
+    /// precedent (GBATEK `:193419`: "other values reserved").
+    #[test]
+    fn custom_halt_returns_on_a_reserved_parameter() {
+        let program = [mov_r2(0x55), arm_swi(0x27), IRQ_HALT, PARK];
+        let mut gba = machine(&program);
+        run(&mut gba, 32);
+        assert!(
+            !gba.cpu.halted,
+            "a reserved parameter must not park the CPU"
+        );
+        assert_eq!(
+            gba.cpu.registers.register_at(5),
+            0x34,
+            "the SWI returned and execution carried on"
+        );
+    }
+
+    /// The parameter is read from **r2**, not r0. Both directions are
+    /// measured: an r0 that says Halt with r2 reserved must not park the
+    /// machine, and an r2 that says Stop with r0 reserved must park it.
+    #[test]
+    fn custom_halt_reads_its_parameter_from_r2_not_r0() {
+        // r0 = 55h (reserved), r2 = 80h (Stop): must halt. An implementation
+        // reading r0 sees a reserved value and would keep running.
+        let r0_reserved = [mov_r0(0x55), mov_r2(0x80), arm_swi(0x27), IRQ_HALT, PARK];
+        let mut gba = machine(&r0_reserved);
+        assert!(
+            run_until_halted(&mut gba, 32),
+            "r2 = 80h must halt even when r0 carries a reserved value"
+        );
+
+        // r0 = 80h (Stop), r2 = 55h (reserved): must return. An
+        // implementation reading r0 would park here.
+        let r2_reserved = [mov_r0(0x80), mov_r2(0x55), arm_swi(0x27), IRQ_HALT, PARK];
+        let mut gba = machine(&r2_reserved);
+        run(&mut gba, 32);
+        assert!(
+            !gba.cpu.halted,
+            "a reserved r2 must return even when r0 carries 80h"
+        );
+        assert_eq!(
+            gba.cpu.registers.register_at(5),
+            0x34,
+            "execution carried on past the reserved-parameter call"
+        );
+    }
+
+    // ---- S3-a batch 2 搭车项: RegisterRamReset forced blank (0x01) ------
+    //
+    // GBATEK `:193540-193541`: "The function always switches the screen into
+    // forced blank by setting DISPCNT=0080h (regardless of incoming R0,
+    // screen becomes white)." The expected value is the literal the snapshot
+    // publishes, not the constant the implementation writes (discipline 12).
+
+    /// The blank happens with r0 = 0 -- no region requested at all -- and
+    /// with every flag bit set: "regardless of incoming R0".
+    #[test]
+    fn register_ram_reset_forces_blank_regardless_of_the_flags() {
+        for flags in [0u32, 0xFF] {
+            let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
+            install_swi_hook(&mut gba);
+            // A mid-frame display setup a game could have running: mode 4,
+            // BG2 and OBJ enabled. The blank must replace it.
+            gba.cpu.bus.write_half_word(0x0400_0000, 0x1404);
+            gba.cpu.registers.set_register_at(0, flags);
+            let cpsr = gba.cpu.cpsr;
+            assert!(dispatch(
+                &mut gba.cpu,
+                Swi::RegisterRamReset as u32,
+                cpsr,
+                ROM_BASE
+            ));
+            assert_eq!(
+                gba.cpu.bus.read_half_word(0x0400_0000),
+                0x0080,
+                "DISPCNT must hold the forced blank (r0 = {flags:#04x})"
             );
         }
     }

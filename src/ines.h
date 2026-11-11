@@ -80,6 +80,18 @@ struct iNES_HEADER {
 
 extern struct iNES_HEADER head; //for mappers usage
 
+// v2.0.3 S5-A2: the effective mapper number after the CRC-based ROM
+// corrections (`src/ines-correct.h`, upstream's table, 251 entries).
+//
+// `corrected_mapper` is the number the correction table gave for this ROM,
+// or -1 when it gave nothing.  The loader has to use the result for
+// `iNES_Init()` (which sets `iNESCart.mapper_number`) and for the v1.8 cart
+// factory -- before this rule existed, the whole table was inert for mapper
+// corrections (e.g. 吞食天地2, header mapper 4, corrected to 198).
+static inline int FCEU_EffectiveMapperNo(int header_mapper, int corrected_mapper) {
+	return corrected_mapper >= 0 ? corrected_mapper : header_mapper;
+}
+
 void NSFVRC6_Init(void);
 void NSFMMC5_Init(void);
 void NSFAY_Init(void);
