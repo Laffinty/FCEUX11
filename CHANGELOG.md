@@ -191,6 +191,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ⚠️ **F11QA 矩阵（`pass_to_fail = 0` / grade ≥ B）待 push 后由 CI 复核**
   （本地只有 `ctest` 这个近似门禁）。
 
+### Added — S3-a 第一批：BIOS SWI `0x16` / `0x17` / `0x18`（diff unfilter）
+
+- **症状**：这三个 BIOS 调用此前**没有实现** ⇒ 落到 stub 的 SWI 向量 ⇒ 机器「返回但不干活」
+  （S2-b 起不再自旋，但功能是空的）。商用卡用它们加载差分/压缩数据 ⇒ 拿到的数据是错的。
+- **修法**：新增 bus-free 模块 `src/rust/src/gba/swi/unfilter.rs`（解码核）
+  + `swi/mod.rs` 的 `serve_diff_unfilter`（接线）：
+  - `0x16` `Diff8bitUnFilterWrite8bit`（"Wram"）：**8 位单元**，逐**字节**写；
+  - `0x17` `Diff8bitUnFilterWrite16bit`（"Vram"）：**8 位单元**，逐**半字**写（两个解码字节一个半字）；
+  - `0x18` `Diff16bitUnFilter`：**16 位单元**，逐**半字**写。
+- **依据（不凭记忆写位级格式）**：
+  - GBATEK 快照 `.zcode/gbatek_plain.txt:192251-192253`（号段）、`:192804-192867`（契约、头部、算术）、
+    **`:192826-192827`（它自己的示例向量：unfiltered `10 11 … 19` / filtered `10 +1 +1 …`）**；
+  - **mGBA 的 `_unFilter`**（`src/gba/bios.c:903-946`，经代理取回，**只读格式、不抄代码**）——
+    它是唯一说清「哪一号读 8 位单元、哪一号存半字」的来源（调用点 `bios.c:578`），
+    也是「头部 size 字段按**字节**计」的第二依据。
+- **锁**（期望值 = **GBATEK 公布的那一行**，**不是**拿实现的同一套算法重算 ——
+  测试与实现同错是本项目栽过两次的坑）：
+  - 三个端到端夹具（`fixtures/swi.rs`）：`swi_diff8bit_unfilter_wram`
+    （**由 `swi_unimpl_16` 改写**：`0x16` 有了实现，它作为「未实现 SWI」的锁名与前提都不再成立）、
+    `swi_diff8bit_unfilter_vram`、`swi_diff16bit_unfilter`；
+  - `unfilter.rs` 内 **8 条单元锁**（头部三个字段的落位、size 按字节计、**size 字段的 24 位宽度**、
+    8/16 位单元的解码、累加器回绕、两种拒绝路径）。
+  - **变异矩阵 5 腿逐腿双向可红**（基线 280 全绿，每腿还原后 280/0）：`0x16` 读成 16 位单元 /
+    `0x17` 改成字节写 / `0x18` 读成字节单元 / 半字配对顺序颠倒 / size 字段读成 16 位。
+    M1/M2/M3/M5 各**只红一条**；M4 红两条——它们共用同一段半字写路径。
+    ⚠️ **M5 首轮是「无牙」的**：夹具的 size 只有 10/20 字节，16 位与 24 位两种读法结果**完全相同**
+    ⇒ 补了一条 64 KiB 的字段宽度锁（`the_size_field_is_twenty_four_bits_wide`）才有牙。
+- **落地点的选择有讲究**：`0x17` / `0x18` 的落点用 **VRAM** —— vendor 的总线对
+  **VRAM 字节写**与**半字写**处理不同（`bus.rs:1235-1262`：BG VRAM 的字节写会复制到整个半字，
+  OBJ 区直接丢弃）⇒ **写宽度可观测**；在 WRAM 两者不可区分，宽度就钉不住。
+- ⚠️ **如实登记三点**：
+  ① `0x16` 的落点是 WRAM ⇒ **它的写宽度不可观测**（字节写与半字写在 WRAM 同结果），
+  宽度由实现与 mGBA 参照背书；
+  ② **size 字段按字节**这一读法在 GBATEK 里**没有明说**（它只写「24bit size after decompression」）
+  ⇒ 依据是「与 LZ77 同款头部 ⇒ 同款口径」+ mGBA 的 `remaining = header >> 8`；
+  ③ mGBA 会把 `r0`/`r1` 写成走过的游标，**本仓不动它们**（GBATEK 写明「No return value」，
+  且 SWI ABI 里这两个寄存器对无返回值调用未定义）。
+- **门禁**：GBA 根 crate **270 → 280**（+8 单元锁 +2 端到端夹具）；`ctest -LE perf` **36/36**；
+  vendor **242** / debug **93** / media **52** / formats **153** 全绿。
+  夹具集合 **10 → 12**，红复现器仍是 3 条（`eeprom_chip_capacity` / `flash_status_reg` /
+  `rom_window_mirror`，归属 S3-b ×2 与 S3-d ×1，**本轮未修**）。
+
 ### Fixed — S4 · FC 侧修复批次（GitHub issue #12：iNES loader 拒非 2 幂 PRG；mapper 191/199 灰屏）
 
 - **iNES loader 不再硬拒非 2 幂 PRG 的 ROM**：PRG 的文件边界检查、指针推进与 MD5/CRC32

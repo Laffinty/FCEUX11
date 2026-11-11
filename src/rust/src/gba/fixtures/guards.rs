@@ -1,7 +1,8 @@
 //! The three guards that keep the S1-a fixture set from rotting.
 //!
-//! The nine fixtures of S1-a are the **only** record that the nine defects
-//! are still defects. They rot in three ways, and each way has a guard:
+//! The fixtures of S1-a and of the work items that grew out of it are the
+//! **only** record that the defects they watch are still defects. They rot in
+//! three ways, and each way has a guard:
 //!
 //! | guard | what it stops |
 //! |---|---|
@@ -37,13 +38,19 @@ const ROM: &str = include_str!("rom.rs");
 /// fixes cannot break it.
 const PLANNED: &[(&str, &[&str])] = &[
     ("swi_unimpl_1a", &["S2-b"]),
-    ("swi_unimpl_16", &["S2-b", "S3-a"]),
     // S2-b's Thumb fixture: a green lock from birth (the vector returns, the
     // Thumb halfword after the call must run), so it has no reproducer leg.
     (
         "thumb_swi_unimpl_1a_returns_and_continues_in_thumb",
         &["S2-b"],
     ),
+    // S3-a's three diff-unfilter fixtures. `swi_unimpl_16` was the fallback
+    // lock for 0x16; S3-a gave that number a real implementation, so the
+    // fixture was rewritten (`swi_diff8bit_unfilter_wram`) and two more were
+    // added for 0x17 and 0x18.
+    ("swi_diff8bit_unfilter_wram", &["S3-a"]),
+    ("swi_diff8bit_unfilter_vram", &["S3-a"]),
+    ("swi_diff16bit_unfilter", &["S3-a"]),
     ("oam_bad_shape", &["S2-a"]),
     ("oam_gfx_mode3", &["S2-a"]),
     ("eeprom_chip_capacity", &["S3-b"]),

@@ -11,6 +11,7 @@ pub mod checksum;
 pub mod decompress;
 pub mod ram_reset;
 pub mod trig;
+pub mod unfilter;
 pub mod wait;
 
 use gba_core::cpu::arm7tdmi::{Arm7tdmi, WakeHook};
@@ -22,6 +23,11 @@ use wait::{IntrWaitRequest, LowPower};
 use decompress::{
     BusLike, DecompressError, HUFFMAN_TYPE, HuffmanPort, LZ77_SIGNATURE, MachinePort, RL_SIGNATURE,
     huffman_decompress, lz77_decompress, parse_huffman_header, parse_lz77_header, rl_decompress,
+};
+
+use unfilter::{
+    DIFF_DATA_SIZE_16BIT, DIFF_DATA_SIZE_8BIT, DIFF_TYPE, MAX_BLOCK, Unit, Write,
+    parse_diff_header, unfilter_into,
 };
 
 /// The core's bus, seen through the one slice of it the decompressors use.
@@ -96,6 +102,12 @@ fn dispatch_inner(cpu: &mut Arm7tdmi, swi_num: u32, old_cpsr: Psr, return_addr: 
         | Swi::RlUnCompWram
         | Swi::RlUnCompVram)) => {
             serve_decompress(cpu, old_cpsr, return_addr, swi);
+            true
+        }
+        Some(swi @ (Swi::Diff8BitUnFilterWram
+        | Swi::Diff8BitUnFilterVram
+        | Swi::Diff16BitUnFilter)) => {
+            serve_diff_unfilter(cpu, old_cpsr, return_addr, swi);
             true
         }
         Some(Swi::HuffUnComp) => {
@@ -264,6 +276,118 @@ fn serve_decompress(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32, swi: Sw
             eprintln!("[gba] swi {swi:?} at 0x{src:08X}: {error}");
         }
     }
+    cpu.swi_return(old_cpsr, return_addr);
+}
+
+/// Serve the three diff-unfilter calls (0x16 / 0x17 / 0x18).
+///
+/// `r0` is the source block -- a 32-bit header followed by the data units --
+/// and `r1` is the destination. The three numbers differ in two ways only:
+/// the width of a source unit, and the width of a destination store. The
+/// table, the header layout and the evidence are in [`unfilter`].
+///
+/// A block we cannot honour leaves the destination **completely untouched**,
+/// like the decompressors: a refusal is loud, a half-written destination is
+/// not.
+fn serve_diff_unfilter(cpu: &mut Arm7tdmi, old_cpsr: Psr, return_addr: u32, swi: Swi) {
+    let (unit, write, expected_data_size) = match swi {
+        Swi::Diff8BitUnFilterWram => (Unit::Byte, Write::Byte, DIFF_DATA_SIZE_8BIT),
+        Swi::Diff8BitUnFilterVram => (Unit::Byte, Write::Halfword, DIFF_DATA_SIZE_8BIT),
+        Swi::Diff16BitUnFilter => (Unit::Halfword, Write::Halfword, DIFF_DATA_SIZE_16BIT),
+        _ => return,
+    };
+
+    // GBATEK: "r0 Source address (must be aligned by 4)". The BIOS reads the
+    // header from the aligned address, so an unaligned pointer is rounded
+    // down rather than refused -- the reference implementation does the same.
+    let src = cpu.registers.register_at(0) & !3;
+    let dest = cpu.registers.register_at(1);
+
+    // The header is a byte at a time: a word read on this bus rotates, and we
+    // are about to read a field out of the low byte.
+    let mut raw = 0u32;
+    for i in 0..4 {
+        raw |= u32::from(cpu.bus.read_byte((src + i) as usize)) << (i * 8);
+    }
+    let header = parse_diff_header(raw);
+
+    // The two header fields that describe the block are advisory: the unit
+    // width comes from the SWI number, not from the header. A mismatch is
+    // worth saying out loud -- the block was not made by the tool that wrote
+    // the header -- but it is not a reason to refuse. The reference
+    // implementation ignores both, and refusing would break a game that
+    // leaves the fields zero.
+    if header.block_type != DIFF_TYPE && tracing_enabled() {
+        eprintln!(
+            "[gba] swi {swi:?} at 0x{src:08X}: block type is {:#04x}, not {DIFF_TYPE:#04x}",
+            header.block_type
+        );
+    }
+    if header.data_size != expected_data_size && tracing_enabled() {
+        eprintln!(
+            "[gba] swi {swi:?} at 0x{src:08X}: the header's data size is {}, this call reads {}",
+            header.data_size, expected_data_size
+        );
+    }
+
+    // The refusals. Each one leaves the destination untouched.
+    let refusal = if header.size == 0 {
+        Some(unfilter::UnfilterError::ZeroSize)
+    } else if header.size > MAX_BLOCK {
+        Some(unfilter::UnfilterError::SizeTooLarge { size: header.size })
+    } else if header.size % unit.bytes() != 0 {
+        Some(unfilter::UnfilterError::NotAWholeNumberOfUnits {
+            size: header.size,
+            unit_bytes: unit.bytes(),
+        })
+    } else if write == Write::Halfword && header.size % 2 != 0 {
+        Some(unfilter::UnfilterError::NotAWholeNumberOfHalfwords { size: header.size })
+    } else if write == Write::Halfword && dest % 2 != 0 {
+        Some(unfilter::UnfilterError::MisalignedDestination { address: dest })
+    } else {
+        None
+    };
+    if let Some(error) = refusal {
+        if tracing_enabled() {
+            eprintln!("[gba] swi {swi:?} at 0x{src:08X}: {error}, not unfiltering");
+        }
+        cpu.swi_return(old_cpsr, return_addr);
+        return;
+    }
+
+    // Pull the block in, decode it, and put it out.
+    let size = header.size as usize;
+    let mut source = vec![0u8; size];
+    for (index, slot) in source.iter_mut().enumerate() {
+        *slot = cpu.bus.read_byte((src + 4 + index as u32) as usize);
+    }
+
+    let mut decoded = vec![0u8; size];
+    if let Err(error) = unfilter_into(&source, &mut decoded, unit) {
+        if tracing_enabled() {
+            eprintln!("[gba] swi {swi:?} at 0x{src:08X}: {error}");
+        }
+        cpu.swi_return(old_cpsr, return_addr);
+        return;
+    }
+
+    match write {
+        Write::Byte => {
+            for (index, byte) in decoded.iter().enumerate() {
+                cpu.bus.write_byte((dest + index as u32) as usize, *byte);
+            }
+        }
+        Write::Halfword => {
+            // The two decoded bytes of a pair go out as one halfword, the
+            // first one in the low half -- the order the reference
+            // implementation's pairing produces.
+            for (index, pair) in decoded.chunks_exact(2).enumerate() {
+                let value = u16::from(pair[0]) | (u16::from(pair[1]) << 8);
+                cpu.bus.write_half_word((dest + index as u32 * 2) as usize, value);
+            }
+        }
+    }
+
     cpu.swi_return(old_cpsr, return_addr);
 }
 
@@ -1008,6 +1132,11 @@ mod tests {
     /// landed. S1a-1 replaced it with the wait family, and S1b-c has added
     /// `RegisterRamReset`. Everything else still has to fall through, so
     /// T1-d (decompressors) and T2 (math) can land one at a time.
+    ///
+    /// S3-a added the three diff-unfilter numbers (0x16/0x17/0x18): a number
+    /// that is claimed must not be in this list, and a number that is **not**
+    /// claimed must still be absent -- the test is about the exact set, not
+    /// about a few known members.
     #[test]
     fn dispatch_claims_exactly_what_is_implemented() {
         let mut gba = Gba::new([0u8; 0x4000], &[0u8; 0x200]);
@@ -1028,6 +1157,9 @@ mod tests {
             Swi::HuffUnComp as u32,
             Swi::RlUnCompWram as u32,
             Swi::RlUnCompVram as u32,
+            Swi::Diff8BitUnFilterWram as u32,
+            Swi::Diff8BitUnFilterVram as u32,
+            Swi::Diff16BitUnFilter as u32,
         ] {
             assert!(
                 claimed.contains(&expected),
@@ -1056,9 +1188,13 @@ mod tests {
                 Swi::HuffUnComp as u32,
                 Swi::RlUnCompWram as u32,
                 Swi::RlUnCompVram as u32,
+                Swi::Diff8BitUnFilterWram as u32,
+                Swi::Diff8BitUnFilterVram as u32,
+                Swi::Diff16BitUnFilter as u32,
             ],
             "0x09, 0x0A, 0x0D, 0x0E, 0x0F, 0x10, RegisterRamReset, the wait \
-             family and all four decompressors are claimed; only 0x08 is not"
+             family, all four decompressors and the three diff-unfilter calls \
+             are claimed; only 0x08 is not"
         );
     }
 
@@ -1090,6 +1226,9 @@ mod tests {
                         | Swi::BgAffineSet
                         | Swi::ObjAffineSet
                         | Swi::ArcTan2
+                        | Swi::Diff8BitUnFilterWram
+                        | Swi::Diff8BitUnFilterVram
+                        | Swi::Diff16BitUnFilter
                 )
             );
             if is_claimed {

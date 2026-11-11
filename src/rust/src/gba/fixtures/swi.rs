@@ -3,8 +3,34 @@
 //! | fixture | what it drives | belongs to | status |
 //! |---|---|---|---|
 //! | `swi_unimpl_1a` | ARM code executes `SWI 0x1A` (SoundDriverInit) | S2-b | 常驻绿锁（S2-b 转正） |
-//! | `swi_unimpl_16` | ARM code executes `SWI 0x16` (Diff8BitUnFilterWram) | S2-b + S3-a | 常驻绿锁（S2-b 转正；S3-a 补实现时此锁继续背书「返回且继续」不回归） |
 //! | `thumb_swi_unimpl_1a` | Thumb 代码执行 `SWI 0x1A` | S2-b | 常驻绿锁（S2-b 新增） |
+//! | `swi_diff8bit_unfilter_wram` | ARM code executes `SWI 0x16` (Diff8BitUnFilterWram) | S3-a | 常驻绿锁（S3-a **改写**：由「兜底返回」改成「真实现」） |
+//! | `swi_diff8bit_unfilter_vram` | ARM code executes `SWI 0x17` (Diff8BitUnFilterVram) | S3-a | 常驻绿锁（S3-a 新增） |
+//! | `swi_diff16bit_unfilter` | ARM code executes `SWI 0x18` (Diff16BitUnFilter) | S3-a | 常驻绿锁（S3-a 新增） |
+//!
+//! # What S3-a did about it (2026-11-11, v2.0.3 r15)
+//!
+//! S2-b made the *fallback* work; S3-a gave three of the numbers **real
+//! semantics**. `SWI 0x16`, `0x17` and `0x18` are the BIOS's diff-unfilter
+//! calls: the source holds a difference stream and the destination must hold
+//! the running sum. GBATEK's own example (`.zcode/gbatek_plain.txt:192826-192827`)
+//! is the golden vector these fixtures assert against:
+//!
+//! ```text
+//! unfiltered:   10  11  12  13  14  15  16  17  18  19
+//! filtered:     10  +1  +1  +1  +1  +1  +1  +1  +1  +1
+//! ```
+//!
+//! The expected values in the fixtures are **GBATEK's published row**, not a
+//! recomputation of the same sum the implementation does — a test that
+//! recomputes the answer is a mirror of the code, and the two can be wrong
+//! together (v2.0.3 plan §九 r13's lesson, twice applied).
+//!
+//! `swi_unimpl_16` was the fallback lock for `0x16`; now that the call has a
+//! real implementation the fallback contract for that number is gone, and the
+//! fixture was **rewritten** to assert the implementation instead. The
+//! fallback itself is still locked — by `swi_unimpl_1a`, whose number is still
+//! unimplemented on purpose.
 //!
 //! # The defect, and what S2-b did about it (v2.0.3 plan §1.2.1 / §3.2)
 //!
@@ -116,7 +142,7 @@ use gba_core::cpu::arm7tdmi::{Arm7tdmi, SwiHook};
 use gba_core::cpu::psr::{CpuState, Psr};
 use gba_core::gba::Gba;
 
-use super::{mov_imm, orr_imm, swi, Cartridge, BUDGET, HALT};
+use super::{mov_imm, orr_imm, swi, Cartridge, BUDGET, HALT, SCRATCH};
 
 /// The register the instruction after the SWI writes.
 ///
@@ -271,15 +297,42 @@ impl Machine {
     fn in_thumb(&self) -> bool {
         self.gba.cpu.cpsr.cpu_state() == CpuState::Thumb
     }
+
+    /// Put `data` at `address` through the bus, before the program runs.
+    ///
+    /// The stub BIOS's boot code only programs `WAITCNT` and branches to the
+    /// cartridge (`bios.rs:176-184`), so nothing it does disturbs a planted
+    /// block in IWRAM.
+    fn plant(&mut self, address: u32, data: &[u8]) {
+        for (index, byte) in data.iter().enumerate() {
+            self.gba
+                .cpu
+                .bus
+                .write_byte((address + index as u32) as usize, *byte);
+        }
+    }
+
+    /// Read `len` bytes at `address` through the bus.
+    fn read_bytes(&mut self, address: u32, len: usize) -> Vec<u8> {
+        (0..len)
+            .map(|index| self.gba.cpu.bus.read_byte((address + index as u32) as usize))
+            .collect()
+    }
+
+    /// Read the halfword at `address` through the bus.
+    fn read_half_word(&mut self, address: u32) -> u16 {
+        self.gba.cpu.bus.read_half_word(address as usize)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        bx_reg, mov_imm, swi, thumb_mov_imm, thumb_swi, Cartridge, Machine, BUDGET, HALT, MARKER,
-        MARKER_REGISTER,
+        bx_reg, mov_imm, orr_imm, swi, thumb_mov_imm, thumb_swi, Cartridge, Machine, BUDGET,
+        HALT, MARKER, MARKER_REGISTER, SCRATCH,
     };
     use crate::gba::swi::Swi;
+    use crate::gba::swi::unfilter::{DIFF_DATA_SIZE_16BIT, DIFF_DATA_SIZE_8BIT, DIFF_TYPE};
 
     /// `SWI 0x1A` (SoundDriverInit) is not implemented: the machine must come
     /// back from the call and keep running.
@@ -294,18 +347,108 @@ mod tests {
         unimplemented_swi_keeps_running(Swi::SoundDriverInit);
     }
 
-    /// `SWI 0x16` (Diff8BitUnFilterWram) is not implemented: the same target
-    /// behaviour, and the number the fallback has to report is this one.
+    /// `SWI 0x16` (Diff8BitUnFilterWram) now has a real implementation: the
+    /// destination must hold GBATEK's unfiltered row.
     ///
     /// GBATEK `:192251`: `16h  -    16h  -    16h  Diff8bitUnFilterWrite8bit ;"Wram"`.
     ///
-    /// Resident since S2-b (promoted from a red reproducer, alongside
-    /// `swi_unimpl_1a`). This is also the number S3-a implements first, so
-    /// this lock doubles as the "returning must not regress" guard for that
-    /// work.
+    /// This fixture **was** `swi_unimpl_16` -- the fallback lock for the same
+    /// number, promoted by S2-b. S3-a gave the number real semantics, so the
+    /// fallback contract for it is gone and the fixture was rewritten to
+    /// assert the implementation instead. The fallback itself is still
+    /// locked, by `swi_unimpl_1a`, whose number is still unimplemented on
+    /// purpose.
     #[test]
-    fn swi_unimpl_16() {
-        unimplemented_swi_keeps_running(Swi::Diff8BitUnFilterWram);
+    fn swi_diff8bit_unfilter_wram() {
+        let program = call_program(Swi::Diff8BitUnFilterWram as u32, SOURCE, DEST_8BIT);
+        let mut machine = Machine::for_body(&program);
+        machine.plant(SOURCE, &diff_block(DIFF_DATA_SIZE_8BIT, &FILTERED));
+
+        assert_the_call_was_served(
+            &mut machine,
+            Swi::Diff8BitUnFilterWram as u32,
+            "Diff8BitUnFilterWram",
+        );
+
+        assert_eq!(
+            machine.read_bytes(DEST_8BIT, UNFILTERED.len()),
+            UNFILTERED.to_vec(),
+            "the destination must hold GBATEK's unfiltered row, byte for byte"
+        );
+    }
+
+    /// `SWI 0x17` (Diff8BitUnFilterVram) decodes the same 8-bit stream, but
+    /// the answer goes out as **halfwords**.
+    ///
+    /// GBATEK `:192252`: `17h  -    -    -    -  Diff8bitUnFilterWrite16bit ;"Vram"`.
+    ///
+    /// The bytes at the destination are the same row as `0x16`'s -- that is
+    /// the point of the "Vram" variant: the *data* is identical and only the
+    /// store width differs. The halfword assertion pins the pairing order
+    /// (the first decoded byte in the low half), which the byte row alone
+    /// cannot: a swapped pair would still put the same ten bytes in memory.
+    ///
+    /// **The VRAM destination is what gives this fixture teeth about the
+    /// store width**: the vendored bus duplicates a byte written to BG VRAM
+    /// across its halfword and drops one written to the OBJ region
+    /// (`bus.rs:1235-1262`), so a byte-store implementation would leave a
+    /// *different* picture there. In work RAM the two are
+    /// indistinguishable, and the width would go unpinned.
+    #[test]
+    fn swi_diff8bit_unfilter_vram() {
+        let program = call_program(Swi::Diff8BitUnFilterVram as u32, SOURCE, DEST_VRAM);
+        let mut machine = Machine::for_body(&program);
+        machine.plant(SOURCE, &diff_block(DIFF_DATA_SIZE_8BIT, &FILTERED));
+
+        assert_the_call_was_served(
+            &mut machine,
+            Swi::Diff8BitUnFilterVram as u32,
+            "Diff8BitUnFilterVram",
+        );
+
+        assert_eq!(
+            machine.read_bytes(DEST_VRAM, UNFILTERED.len()),
+            UNFILTERED.to_vec(),
+            "the destination must hold GBATEK's unfiltered row, byte for byte"
+        );
+        assert_eq!(
+            machine.read_half_word(DEST_VRAM),
+            u16::from(UNFILTERED[0]) | (u16::from(UNFILTERED[1]) << 8),
+            "the first two decoded bytes go out as one halfword, the first one \
+             in the low half"
+        );
+    }
+
+    /// `SWI 0x18` (Diff16BitUnFilter) reads **halfword** units.
+    ///
+    /// GBATEK `:192253`: `18h  -    18h  -    18h  Diff16bitUnFilter`, and
+    /// `:192840-192841`: "Data units may be either 8bit or 16bit used with
+    /// Diff8bit or Diff16bit functions respectively."
+    ///
+    /// The numbers are GBATEK's own example again, in halfwords this time:
+    /// the same ten values, so the running sum is the same sequence.
+    #[test]
+    fn swi_diff16bit_unfilter() {
+        const FILTERED_16: [u16; 10] = [10, 1, 1, 1, 1, 1, 1, 1, 1, 1];
+        const UNFILTERED_16: [u16; 10] = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+
+        let program = call_program(Swi::Diff16BitUnFilter as u32, SOURCE, DEST_16BIT);
+        let mut machine = Machine::for_body(&program);
+        machine.plant(SOURCE, &diff_block_16(DIFF_DATA_SIZE_16BIT, &FILTERED_16));
+
+        assert_the_call_was_served(
+            &mut machine,
+            Swi::Diff16BitUnFilter as u32,
+            "Diff16BitUnFilter",
+        );
+
+        for (index, expected) in UNFILTERED_16.iter().enumerate() {
+            assert_eq!(
+                machine.read_half_word(DEST_16BIT + index as u32 * 2),
+                *expected,
+                "unit {index} must be GBATEK's unfiltered value"
+            );
+        }
     }
 
     /// The same call, issued from **Thumb** state.
@@ -386,7 +529,126 @@ mod tests {
         );
     }
 
-    /// The body both reproducers share.
+    // ---- the diff-unfilter fixtures' toolkit (S3-a) ------------------------
+    //
+    // One golden vector, three numbers. The vector is GBATEK's own
+    // (`.zcode/gbatek_plain.txt:192826-192827`), and the expected values are
+    // **published** rather than recomputed -- a test that recomputes the
+    // answer with the implementation's own algorithm is a mirror of the code,
+    // and the two can be wrong together.
+
+    /// GBATEK's filtered stream: the first value, then the differences.
+    const FILTERED: [u8; 10] = [10, 1, 1, 1, 1, 1, 1, 1, 1, 1];
+
+    /// GBATEK's unfiltered row: what the destination must hold.
+    const UNFILTERED: [u8; 10] = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+
+    /// Where the block is planted.
+    const SOURCE: u32 = SCRATCH as u32;
+
+    /// Where the 8-bit call's answer goes.
+    ///
+    /// IWRAM: the "Wram" variant is meant for work RAM, where a byte store
+    /// and a halfword store put the same bytes in memory.
+    const DEST_8BIT: u32 = SOURCE + 0x80;
+
+    /// Where the "Vram" call's answer goes.
+    ///
+    /// **VRAM, on purpose.** The vendored bus treats a byte write to VRAM
+    /// differently from a halfword write (`bus.rs:1235-1262`: a byte written
+    /// to BG VRAM is duplicated across the halfword, and one written to the
+    /// OBJ region is dropped), so a VRAM destination is what makes the
+    /// fixture **able to see the store width** -- in work RAM the two are
+    /// indistinguishable. It is also where the "Vram" variant belongs.
+    const DEST_VRAM: u32 = 0x0600_0000;
+
+    /// Where the 16-bit call's answer goes.
+    ///
+    /// VRAM as well, for the same reason: the call stores halfwords, and a
+    /// byte-store implementation would leave a different picture there.
+    const DEST_16BIT: u32 = 0x0600_0040;
+
+    /// The diff block's header word, assembled from its fields
+    /// (GBATEK `:192848-192853`: bits 0-3 data size, bits 4-7 type, bits 8-31
+    /// size in bytes).
+    fn diff_header(data_size: u8, size: u32) -> u32 {
+        assert!(size <= 0x00FF_FFFF, "the size field is 24 bits wide");
+        (size << 8) | (u32::from(DIFF_TYPE) << 4) | u32::from(data_size)
+    }
+
+    /// A whole diff block: the header followed by the data units.
+    fn diff_block(data_size: u8, data: &[u8]) -> Vec<u8> {
+        let mut block = Vec::with_capacity(4 + data.len());
+        block.extend_from_slice(&diff_header(data_size, data.len() as u32).to_le_bytes());
+        block.extend_from_slice(data);
+        block
+    }
+
+    /// A whole diff block whose units are halfwords.
+    fn diff_block_16(data_size: u8, values: &[u16]) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(values.len() * 2);
+        for value in values {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        diff_block(data_size, &bytes)
+    }
+
+    /// The program that calls `number` with `src` and `dest`.
+    ///
+    /// The addresses are built with `MOV` + `ORR`, because the encoders only
+    /// cover **rotated** immediates (`fixtures.rs`: "旋转立即数旋不进就报错")
+    /// and the destination is not one of them.
+    fn call_program(number: u32, src: u32, dest: u32) -> Vec<u32> {
+        vec![
+            mov_imm(0, src & !0xFF),
+            orr_imm(0, 0, src & 0xFF),
+            mov_imm(1, dest & !0xFF),
+            orr_imm(1, 1, dest & 0xFF),
+            swi(number),
+            mov_imm(MARKER_REGISTER as u32, MARKER),
+            swi(HALT),
+        ]
+    }
+
+    /// The assertions every diff fixture shares.
+    ///
+    /// * the call returned -- the machine reached its `Halt`;
+    /// * the instruction after the call ran;
+    /// * the call was **served**: the number is not on the "still
+    ///   unimplemented" list, and the dispatcher's tally says so.
+    ///
+    /// The third one is what tells the S2-b fallback and the S3-a
+    /// implementation apart: both of them let the machine carry on, so only
+    /// the tally and the recorder can say which happened.
+    fn assert_the_call_was_served(machine: &mut Machine, number: u32, name: &str) {
+        assert!(
+            machine.run_to_halt(BUDGET),
+            "the program never reached its Halt: SWI {number:#04x} ({name}) did \
+             not return"
+        );
+        assert_eq!(
+            machine.reg(MARKER_REGISTER),
+            MARKER,
+            "the instruction after SWI {number:#04x} ({name}) never ran"
+        );
+
+        let tallies = crate::gba::swi::take_swi_tallies();
+        assert!(
+            tallies
+                .iter()
+                .any(|(num, calls, served)| *num == number && *calls == 1 && *served == 1),
+            "SWI {number:#04x} ({name}) must be served by this crate's dispatcher, \
+             not declined: {tallies:?}"
+        );
+
+        let declined = crate::gba::swi::unimplemented_swi_counts();
+        assert!(
+            !declined.iter().any(|(num, _)| *num == number),
+            "SWI {number:#04x} ({name}) was recorded as unimplemented: {declined:?}"
+        );
+    }
+
+    /// The body the fallback reproducers share.
     ///
     /// The program is
     ///

@@ -1,6 +1,8 @@
 # FCEUX11 v2.0.3 — GBA 卡带兼容性优化计划
 
-> **STATUS: DRAFT**（业主 2026-11-08 批准立项范围：**三段式** + **卡带不进仓库、判据换成自建最小夹具**）
+> **STATUS: 在途**（业主 2026-11-08 批准立项范围：**三段式** + **卡带不进仓库、判据换成自建最小夹具**）
+> **进度快照（2026-11-11，r15）**：S1 ✅ 收口 · S2 ✅ 收口 · **S3 进行中（第一批 = SWI `0x16`–`0x18` 已落地）**
+> · S4 ✅ · S5 ✅ ⇒ **S3 的 S3-b / S3-c / S3-d / S3-e 与 SWI `0x19`–`0x2A` 仍未动**。
 > **⚠️ r2（2026-11-09）：§一.2.2 的「可触达 panic 点」清单已按源码复核并收窄（6 处更正），§二.2 / §二.4 的夹具清单与出口判据已改写。**
 > **⚠️ r3（2026-11-09）：GBATEK 逐位核实 ⇒ 撤回 r2 的「EEPROM 访问窗口过宽」一条，并据此把夹具改成 8 条（7 会红 + 2 绿锁）、出口改成 262 全绿 + 7 条复现器。**
 > **⚠️ r4（2026-11-09）：S1-a 的 Step 1（G3 编码器自检）已过变异验收 —— 测出 3 条盲区并修掉，
@@ -365,7 +367,9 @@ GBATEK 权威（摘录见 §附录 A）：
 | # | 夹具 | 红/绿 | 触发什么 | 对应缺陷 | 期望断言 | 归属 |
 |---|---|---|---|---|---|---|
 | 1 | `swi_unimpl_1a` | 🔴 | 执行 SWI `0x1A`（SoundDriverInit） | §1.2.1 | **不永久自旋**；机器能继续跑下一条指令；读数里报出「SWI 0x1A 未实现」 | S2-b |
-| 2 | `swi_unimpl_16` | 🔴 | 执行 SWI `0x16`（Diff8bitUnFilterWram） | §1.2.1 | 同上 | S2-b（兜底）+ S3-a（真实现） |
+| 2 | `swi_diff8bit_unfilter_wram` | 🟢 | 执行 SWI `0x16`（Diff8bitUnFilterWram），源块是一段**差分流** | §1.2.1 | 落点必须**逐字节等于 GBATEK 自己的 unfiltered 行**（`:192826-192827` 的 10 11 … 19） | S3-a（**r15 转正**：原 `swi_unimpl_16` 的「兜底返回」锁被**改写**为「真实现」锁） |
+| 2′ | `swi_diff8bit_unfilter_vram` | 🟢 | 执行 SWI `0x17`（Diff8bitUnFilterVram），落点是 **VRAM** | §1.2.1 | 同上的字节行 + **半字配对顺序**（第一个解码字节在低半字） | S3-a（r15 新增） |
+| 2″ | `swi_diff16bit_unfilter` | 🟢 | 执行 SWI `0x18`（Diff16BitUnFilter），源单元是**半字** | §1.2.1 | 每个半字单元都等于 GBATEK 的 unfiltered 值 | S3-a（r15 新增） |
 | 3 | `oam_bad_shape` | 🔴 | 用 `STRH` 把 OAM 精灵 0 的 attr0 写成 **shape = 3** | §1.2.2（`:265`） | **不 panic**；该精灵按「禁用」处理；帧正常步进 | S2-a |
 | 4 | `oam_gfx_mode3` | 🔴 | 同上，但 attr0 写成 **gfx mode = 3** | §1.2.2（`:144`） | 同上 | S2-a |
 | 5 | `eeprom_chip_capacity` | 🔴 | ROM 含 `EEPROM_V124`（8 KB 芯片）；走一遍存档通路 | §1.2.4 **E2** | `.srm` 尺寸 = **8192**（8 KB 芯片）/ **512**（512 B 芯片）——今天**恒 32768** | S3-b |
@@ -381,6 +385,13 @@ GBATEK 权威（摘录见 §附录 A）：
 > **GPIO「未写入前」的行为 GBATEK 未定义** ⇒ 这两条不能写成会红的断言。
 > ⇒ **`-- --ignored` 下的复现器集合 = 7 条**。
 > ⇒ 详见 `docs/plans/FCEUX11-v2.0.3_S1a_最小可复现夹具-实施计划.md` §1.7.1 / §1.8 / §五。
+>
+> ✅ **r15（2026-11-11）更正**：S3-a 落地后夹具 **10 → 12 条**，红绿分布
+> **3 红 + 9 绿**（r12 时是 3 红 + 7 绿）。改动三处：① `swi_unimpl_16`
+> **改名为 `swi_diff8bit_unfilter_wram` 并从「兜底返回」锁改写为「真实现」锁**
+> ——`0x16` 有了实现，它作为「未实现 SWI」的锁名与前提都不再成立；
+> ② 新增 `swi_diff8bit_unfilter_vram`（`0x17`）与 `swi_diff16bit_unfilter`（`0x18`）；
+> ③ 「兜底」这件事本身仍由 `swi_unimpl_1a`（`0x1A` **故意**不实现）锁着。
 **夹具的纪律**：
 - 每条夹具**必须能单独触发一条缺陷**，一个夹具不混两件事；
 - 夹具的期望值**按字段拼装，不手写字面量**（AGENTS.md 纪律 5）——
@@ -424,14 +435,15 @@ GBATEK 权威（摘录见 §附录 A）：
 
 - [x] **夹具全部就位**（`src/rust/src/gba/fixtures/*.rs`，按缺陷域分四个文件
       `swi` / `oam` / `backup` / `rom`，公共底座在 `fixtures.rs`；**Rust 内建、无二进制入库**）；
-      **r12 后共 10 条** = **7 条已转常驻绿锁**（swi ×3 / oam ×2 / backup ×1 / rom ×1）
+      **r15 后共 12 条** = **9 条常驻绿锁**（swi ×5 / oam ×2 / backup ×1 / rom ×1）
       + **3 条红复现器**（`rom_window_mirror` / `eeprom_chip_capacity` / `flash_status_reg`
       —— 归属 S3-d / S3-b / S3-b，**未修 ⇒ 按设计为红**）；
 - [x] `cargo test -p fceux11-rust --no-default-features --features gba --lib`
-      **从 249 项增加到 270 项，全绿**（2026-11-11 实测 `270 passed / 22 ignored`）
+      **从 249 项增加到 280 项，全绿**（2026-11-11 实测 `280 passed / 22 ignored`）
       = 249 + **8** 条编码器端到端自检 + **3** 条守卫 + **2** 条绿色回归锁（r5 的 262）
       + **2** 条探针锁（r6）+ **2** 条 OAM 转正（r7）
-      + **4** 条（r12：两条 SWI 转正 + Thumb 绿锁 + 生产记录器锁）；
+      + **4** 条（r12：两条 SWI 转正 + Thumb 绿锁 + 生产记录器锁）
+      + **8** 条单元锁 + **2** 条端到端夹具（r15 的 diff-unfilter 三号）；
       另有 **`#[ignore]` 复现器**（r5 时 7 条 ⇒ r7 后 5 条 ⇒ **r12 后 3 条**：
       两条 OAM（r7）与两条 SWI（r12）复现器已转常驻绿锁），
       在 `-- --ignored` 下运行，**它们必须逐条为红**（红 = 缺陷在场）——
@@ -439,12 +451,29 @@ GBATEK 权威（摘录见 §附录 A）：
 - [x] 每条复现器都带 `#[ignore = "S2-x / S3-x: 修复后转常驻锁测试"]` 的**指名归属**
       （G1 守卫强制：孤儿 `#[ignore]` 的原因串必须指名工作项）；
 - [x] **每条绿锁今天就是绿的**（EEPROM 协议逐位对 GBATEK、GPIO 机制事实）
-      —— 7 条常驻绿锁（`eeprom_protocol_lock` / `gpio_read_before_write` /
-      `oam_bad_shape` / `oam_gfx_mode3` / `swi_unimpl_1a` / `swi_unimpl_16` /
-      `thumb_swi_unimpl_1a_returns_and_continues_in_thumb`）全绿；
+      —— 9 条常驻绿锁（`eeprom_protocol_lock` / `gpio_read_before_write` /
+      `oam_bad_shape` / `oam_gfx_mode3` / `swi_unimpl_1a` /
+      `thumb_swi_unimpl_1a_returns_and_continues_in_thumb` /
+      `swi_diff8bit_unfilter_wram` / `swi_diff8bit_unfilter_vram` /
+      `swi_diff16bit_unfilter`）全绿；
       它们的作用是**防 S2/S3 的修复改坏本来正确的东西**；
 - [x] 每条新锁测试的**变异验证双向可红**（改回修复前的值 ⇒ 转红；还原 ⇒ 复绿）
-      —— r5 逐条双向、r7 两腿、r12 的 M1–M4（各腿其余测试保持绿）；
+      —— r5 逐条双向、r7 两腿、r12 的 M1–M4、**r15 的 M1–M5**（各腿其余测试保持绿）。
+      **r15 五腿读数**（基线 280 全绿；执行器 `.zcode/mutation_s3a.ps1`，**不入库**）：
+
+      | 腿 | 改动 | 转红的锁 |
+      |---|---|---|
+      | M1 | `0x16` 读成 16 位单元 | `swi_diff8bit_unfilter_wram`（**只红这一条**） |
+      | M2 | `0x17` 改成字节写 | `swi_diff8bit_unfilter_vram`（**只红这一条**） |
+      | M3 | `0x18` 读成字节单元 | `swi_diff16bit_unfilter`（**只红这一条**） |
+      | M4 | 半字配对顺序颠倒 | `swi_diff8bit_unfilter_vram` + `swi_diff16bit_unfilter`（两条共用同一段半字写路径） |
+      | M5 | size 字段读成 16 位 | `the_size_field_is_twenty_four_bits_wide`（**只红这一条**） |
+
+      每腿还原后 **280 passed / 0 failed**。
+      ⚠️ **M5 首轮是「无牙」的**：当时的夹具 size 只有 10 / 20 字节，16 位与 24 位两种读法
+      **结果完全相同** ⇒ 补了 `the_size_field_is_twenty_four_bits_wide`
+      （用 64 KiB 的 size，bit 16 置位）才让这一腿有牙。
+      ⇒ 这与 r4 的三条盲区是**同一类**：断言的值太小，两种读法都过得去。
 - [x] **编码器端到端自检逐条变异可红** —— 编码器是全部夹具的**共因**，
       它错了 ⇒ 夹具都在测别的东西，而且照样「全绿」（AGENTS.md 纪律 12 的同族，更隐蔽）。
       r4 的矩阵 **8/8 的目标都能红**（首轮测出 3 条盲区并修掉）；
@@ -535,9 +564,21 @@ GBATEK 权威（摘录见 §附录 A）：
 
 ### S3-a SWI `0x16–0x2A` 补齐
 
+> ✅ **第一批已落地（2026-11-11，r15）：`0x16` / `0x17` / `0x18` 三个 diff-unfilter**
+> —— 新的 bus-free 模块 `src/rust/src/gba/swi/unfilter.rs` + `swi/mod.rs` 的
+> `serve_diff_unfilter`。依据 = **GBATEK 快照**（`:192251-192253` 号段、
+> `:192804-192867` 契约与算术、`:192826-192827` **它自己的示例向量**）
+> **+ mGBA 的 `_unFilter`**（`src/gba/bios.c:903-946`，**只读格式、不抄代码**——
+> 它是唯一说清「哪一号读 8 位单元、哪一号存半字」的来源）。
+> ⇒ 夹具 `swi_unimpl_16` **改写**为 `swi_diff8bit_unfilter_wram`，
+> 新增 `swi_diff8bit_unfilter_vram`（`0x17`）与 `swi_diff16bit_unfilter`（`0x18`）；
+> 期望值用 **GBATEK 公布的 10 11 … 19** 那一行，**不是**拿实现的同一套算法重算
+> （测试与实现同错是本项目栽过两次的坑）。
+> ⇒ 详见 §九 r15。
+
 | 优先 | 号码 | 名称 | 备注 |
 |---|---|---|---|
-| P0 | `0x16/0x17/0x18` | Diff8bitUnFilterWram / Vram / Diff16bitUnFilter | 压缩数据加载常用，商用卡命中率最高 |
+| P0 | `0x16/0x17/0x18` | Diff8bitUnFilterWram / Vram / Diff16bitUnFilter | 压缩数据加载常用，商用卡命中率最高 —— ✅ **r15 已落地** |
 | P0 | `0x1A–0x1E` | SoundDriverInit / Mode / Main / VSync / ChannelClear | **官方 SDK 声音驱动**，Nintendo 自家卡几乎必用 |
 | P1 | `0x1F` | MidiKey2Freq | |
 | P1 | `0x20–0x24` | MusicPlayerOpen / Start / Stop / Continue / FadeOut | 官方音乐播放器 |
@@ -738,7 +779,7 @@ C++ 侧 `ines_load.cpp:158` 已在读）。
 
 ```
 S1 可复现门禁（夹具 + 探针改造）        ← 必须先做，否则后面不可证伪
- ├─ S1-a 最小夹具（9 条）
+ ├─ S1-a 最小夹具（r15 后 12 条）
  ├─ S1-b 探针改造（SWI 陷阱 / panic 捕获 / 输入注入 / 长窗口 / 忙等开窗）
  └─ S1-c 修 cartprobe 的 verdict 判词
         │
@@ -789,7 +830,9 @@ S3 修根因（可多路并行，文件域互斥）
 - [ ] `ctest -LE perf` **36 项全绿**；F11QA 矩阵 **`pass_to_fail = 0`**、**grade ≥ B**
 - [ ] GBA 锁测试 **≥ 262 项全绿**（249 + 8 条编码器自检 + 3 条守卫 + 2 条绿锁）；
       vendor **242** / debug **93** / media **52** 全绿
-- [ ] **9 条夹具**逐条绿，且每条的**变异验证双向可红**
+- [ ] **12 条夹具**逐条绿，且每条的**变异验证双向可红**
+      （r15 后：9 条常驻绿锁 + **3 条红复现器**——`eeprom_chip_capacity` /
+      `flash_status_reg`（S3-b）、`rom_window_mirror`（S3-d）——**S3 修完才转绿**）
 - [ ] **4 张失败卡带本地逐张复核通过**（判据见 §四 S3 出口表）；
       **卡带不进仓库**，仓库内判据一律是夹具
 - [ ] `cartprobe` 的 verdict 判词**已修正**，不再输出误导性表述
@@ -856,6 +899,7 @@ curl.exe -x http://127.0.0.1:7897 -o .zcode\gbatek_probe.html https://mgba-emu.g
 | r12 | 2026-11-11 | **S2-b 落地——stub BIOS 的 SWI 向量从 `b .` 自旋改为 `MOVS PC, LR`，未实现 SWI 从「机器冻结在 BIOS 0x08」变「返回 + 记录」。** ① **兜底语义（口径修正）**：§3.2 原文「寄存器返回值按 mGBA 的做法给合理默认」**无法按字面执行——mGBA 源码不在本机**（`Research_only/` 目录已不存在，实测）；改按 **GBATEK 自建依据**：SWI 通用 ABI「Outgoing registers R0,R1,R3 are typically containing either garbage, or return value(s). All other registers (R2,R4-R14) are kept unchanged.」（`.zcode/gbatek_plain.txt:192058-192062`）⇒ 调用了未实现调用的游戏本就无权期待返回值，**向量字 = `MOVS PC, LR`（`0xE1B0F00E`）、全寄存器保留、零编造**。② **返回地址证据链**：GBATEK「For Returning from SWI use MOVS PC,R14」`:185672-185674`；ARM 态 LR=PC+4 `:185686`、Thumb 态 LR=PC+2 `:189222` ⇒ LR 恰好停在 SWI 之后那条指令，两种状态都直落续接点；`SUBS PC,LR,#4` 会退回 SWI 自身重入（r5 ⑥(b) 预警的实证确认）。③ **落点**：`bios.rs` 的 `MOVS_PC_LR` 常量（`:115`）进 `build()` 的 0x08 槽位；`BRANCH_SELF` 保留给 abort 向量 0x04/0x0C/0x10/0x14（真异常响亮地停仍是对的）；vendor 侧**零改动**（`operations.rs:121-151` 的 S 位返回路径被 IRQ 返回实际走通，只读核实）。④ **生产侧记录（红线 §六.3）**：`swi/mod.rs` 的 `note_unimplemented_swi`（decline 臂调用）——thread-local `BTreeMap` 每号累计计数、每号只报首次 `eprintln!`（格式 `[gba] swi 0xNN …`），后续静默计数不刷屏；过滤器 `vendor_core_serves` 从 `#[cfg(test)]` 转常驻（vendor 自答的 0x00/0x06-0x08/0x0B/0x0C 不计入）；**未新增 C ABI 导出**（跨出须动 build.rs + ffi.rs + drift guard + 生成头，登记为延后项）。⑤ **锁面**：两条被 §1.2.1 预告的锁按预告改写并更名——`abort_vectors_park_and_the_swi_vector_returns`（原 `unhandled_vectors_park_instead_of_wandering`：abort 向量仍 park、0x08 = MOVS_PC_LR）与 `an_unclaimed_swi_returns_and_is_recorded`（原 `the_stub_does_not_implement_swi`：端到端断言 SWI 0x1A 后机器到 Halt、续接指令真跑、ABI 保留 r4、tallies 记 (0x1A, served=0)、生产计数恰 [(0x1A,1)]）；新增 `the_production_recorder_counts_unimplemented_calls_and_skips_served_ones`；`swi_unimpl_1a`/`swi_unimpl_16` 摘 `#[ignore]` 转常驻绿锁（照 r7 ④ 先例）；新增 Thumb 绿锁（见 ⑦）；REPRODUCERS 5 → 3、夹具 9 → 10。⑥ **变异 M1–M4 逐腿双向可红**（还原刷 mtime）：M1 向量改回 park ⇒ 恰 5 条红；M2 记录器摘掉 ⇒ 恰 2 条红；M3 vendor 过滤摘掉 ⇒ 恰 1 条红；M4 Thumb 编码器 rd 字段挪错 ⇒ 恰 1 条红；各腿其余测试保持绿（各断言各管一段）。⑦ **Thumb 路径完整成立**：夹具 `thumb_swi_unimpl_1a_returns_and_continues_in_thumb`——ARM 入口 BX 进 Thumb，`swi 0x1A` 后 post-call 标记 0xA5 ≠ pre-call 0x5A（只能由异常返回后真继续执行 Thumb 置位），halt 时仍为 Thumb 态（MOVS 从 SPSR 恢复 THUMB 态，GBATEK `:189203-189210` 在 vendor 上实证）。⚠️ **新坑（已写进编码器文档）**：ARM `BX` 基字 bits 7-4 必须是 `0001`（`0xE12FFF10|rm`）——首版写 `0xE12FFF00` 被 vendor 的 `is_msr_flg` 特判劫走解码成 MSR，机器停 0x08、dispatcher 零调用的假象；「文档注释写对位段、常量写错」靠 disasm 通道实证才抓到。⑧ **门禁（终轮复跑）**：根 crate **270 passed / 22 ignored**（266/24 → +2 转正 + 记录器锁 + Thumb 锁；22 = 19 测量工具 + 3 复现器）；复现器域过滤 `--ignored` **0 passed / 3 failed**（eeprom_chip_capacity / flash_status_reg / rom_window_mirror，归属 S3）；vendor **242**（= 未碰 vendor）；debug 93 / media 52 / formats 153 / 两态 `cargo check` 全绿；Release 构建 EXIT=0、`ctest -LE perf` **36/36**；**7 卡 release 基线逐字一致**（6 changing + FireRed FROZEN；零 panic、零 not-implemented 日志、tallies 无 NOT SERVED——兜底路径在 7 卡窗口内未被触发，触发面由 M1–M4 背书）；探针日志存 `.zcode/s2b/baseline_s2b.log`（gitignored）。⑨ **S3-a 前置 RE 同轮完成（只读）**：15 个目标号码逐号证据表（GBATEK 行号逐条、mGBA 列全部 n/a）、**8 条「GBATEK 未指定」清单**（0x1F 公式、0x20–0x24 全部语义、0x19 渐变表、0x1A 写入效果、无参声音 SWI 的指针来源、0x2A 的 36 项函数表等——开工时按纪律 4 停下记录）、0x26 HardReset 的**结构性实现障碍**（dispatch 拿不到整机所有权）、SOUNDBIAS 是 `0x04000088` 不是 `0x04000208`（那是 IME）；证据表存 `docs/plans/FCEUX11-v2.0.3_S3a前置RE-GBATEK与SWI证据表.md`。⑩ 文件面：`bios.rs` / `swi/mod.rs` / `fixtures.rs` / `fixtures/swi.rs` / `fixtures/guards.rs` / `frame.rs`（注释）/ `cartprobe.rs`（判词措辞随行为更新：「CPU parks at BIOS 0x08」的旧表述在本修复后成为虚假陈述）；未碰 `gba_load.cpp`（r13）与 vendor 树。 |
 | r13 | 2026-11-11 | **S2-c 落地——`gba_load.cpp` 每帧步进的错误码从「静默吞掉」改为去重日志（不弹窗/不崩/不卸载）。** ① **现状（只读调查）**：改动前 `gba_step_frame()` 的非零返回被 `if (… != GBA_OK) return;` 完全吞掉——无日志、无弹窗、不崩、不卸载，静默跳过该帧的帧缓冲拉取 / 重绘信号 / 音频排空 / 电池落盘；对照一次性路径（装载 / savestate 读写 / 电池读取）全部已有报告，**规律 = 一次性路径全报告、每帧路径全静默** ⇒ §3.3 要求的「记日志」与红线 2 的容错读数缺失。② **改动（只动 `gba_load.cpp`，4 处）**：会话态去重闩 `g_reportedStepError` + `step_error_name`（6 码全名映射）+ `note_step_error`（同码 streak 只报首帧、码变化即再报、干净帧清闩、`GbaLoad` 新会话清闩——一次 panic 共约 3 行日志，最坏有界）；步进点 rc 入变量、非零 `note_step_error` + return（跳过集与改前逐字一致，电池 dirty 标志不被取走）。③ **日志设施 = `FCEU_printf`**：实现在 core（`fceu.cpp:1132`）、经 driver 回调表分发到 stdout + 消息日志 dock，F11QA 四个只链 core 的可执行文件不受影响（纪律 8）；**刻意不用 `FCEU_PrintError`**——它经 `QueueErrorMsgWindow` 下个 GUI tick 变**弹窗**，正是每帧路径禁止的行为。④ **GBA_ERR_STATE 语义**：日志附一行「the core caught an internal panic and dropped the machine; loading a ROM again is what recovers」——对齐 r6 ⑤ 的恢复机制（机器已丢、毒锁透明恢复、重载即重建），**不发明新恢复动作**；release（`panic="abort"`）下该码不可达，日志注释写明读者是 debug/探针构建。⑤ **边界（如实登记）**：release 生产的真 panic 仍带走进程（C++ 侧无法拦——S2-c 对 release 的真实保障是 S2-a/S2-b 消灭可达 panic，本改动是 unwind 构建的安全网 + 红线 2 可见性）；相邻每帧静默点（`gba_frame_buffer*` / `gba_render_audio` / 电池 flush 两导出）**刻意未包**（step 成功后不可达 + diff 最小，要全覆盖接同一个 `note_step_error` 即可）；`gba_last_error` 是恒返 GBA_OK 的 stub，文本化待其被填充。⑥ **门禁**：与 r12 同轮终验——Release 构建 EXIT=0、`ctest -LE perf` **36/36**；`git diff --numstat` 与真实改动一致、文件保持 CRLF 纯 ASCII。 |
 | r14 | 2026-11-11 | **账面修正（§2.4 的 S1 出口判据勾选 + CHANGELOG 补记 S2-b/S2-c）—— 未动任何生产代码。** ① **§2.4 的 10 条 S1 出口判据逐条勾选**，每条附**当日实测读数**（`ctest -LE perf` **36/36**；GBA 根 **270 passed / 22 ignored**；vendor **242** / debug **93** / media **52** / formats **153**；复现器 `--lib gba::fixtures:: -- --ignored` **0 passed / 3 failed**，红的正是 S3-b ×2 + S3-d ×1）——**不是事后追认**，是拿当日读数逐条对出来的。② **两处口径按实际修正**：夹具数 **9 → 10**（**7 条常驻绿锁** + **3 条红复现器**，r12 新增 Thumb 绿锁）；门禁计数 **262 → 270**（r6 +2 探针锁、r7 +2 OAM 转正、r12 +4）。⚠️ **§2.2 的「9 条」表与 §五 编排图仍写 9 条**（已知不一致，已在 §2.4 明示，留待下一轮统一）。③ **两处勾选时保留「未完成」字样**：F11QA 矩阵 `pass_to_fail = 0` / grade ≥ B **待 push 后由 CI 复核**（本地只有 `ctest` 这个近似门禁）；**Flash 状态寄存器 `0x0E000006/7` 在 GBATEK 全文零命中**（GBATEK 的 flash 轮询是回读比较 `:8981`）⇒ `flash_status_reg` 复现器断言的是**本计划自定的约定** ⇒ **S3-b 开工前须另找来源或用真卡带重新推导**。④ **CHANGELOG 的 `[Unreleased] v2.0.3` 段补记 S2-b / S2-c**（此前只记了 S1-a 与 S4 ⇒ 两个**有生产行为变更**的批次漏记：S2-b 改向量字、S2-c 改 C++ 每帧错误路径）+ 一节「S2 收口后的门禁读数」。**未动任何生产代码**（两个改动文件都是 Markdown）。 |
+| r15 | 2026-11-11 | **S3-a 第一批落地 —— BIOS SWI `0x16`/`0x17`/`0x18`（diff unfilter）有真实现了**；夹具集合 **10 → 12**，GBA 根 crate **270 → 280**。**未动 vendor 树**（改动只在 `src/rust/src/gba/`），**未动任何 C/C++** ⇒ NES 零回归面不受影响。① **实现**：新 bus-free 模块 `src/rust/src/gba/swi/unfilter.rs`（解码核）+ `swi/mod.rs` 的 `serve_diff_unfilter`（接线）—— `0x16` = 8 位单元/逐**字节**写、`0x17` = 8 位单元/逐**半字**写、`0x18` = 16 位单元/逐**半字**写；源块 = 32 位头部（bits 0-3 数据大小 / 4-7 类型 / 8-31 **字节数**）+ 数据单元；累加器按单元宽度回绕（8 位 mod 256、16 位 mod 65536）；源地址按 GBATEK 要求对齐到 4；**拒绝**零长度 / 超 16 MiB / 半字调用遇奇数长度 / 半字调用遇奇地址（**落点一律不动**，不留半写的目的地）。② **依据（两份独立）**：GBATEK 快照 `:192251-192253`（号段）、`:192804-192867`（契约/头部/算术）、**`:192826-192827` 它自己的示例向量**；**mGBA 的 `_unFilter`**（`src/gba/bios.c:903-946`，经代理 `127.0.0.1:7897` 取回，**只读格式不抄代码**——MPL-2.0 与本项目许可不相容）—— 它是唯一说清「哪一号读 8 位单元、哪一号存半字」的来源（调用点 `bios.c:578`），也是「size 字段按**字节**计」的第二依据。③ **锁**：三个端到端夹具（`swi_diff8bit_unfilter_wram`——**由 `swi_unimpl_16` 改写**、`swi_diff8bit_unfilter_vram`、`swi_diff16bit_unfilter`）+ `unfilter.rs` 内 **8 条单元锁**；期望值取 **GBATEK 公布的那一行**（10 11 … 19），**不是**拿实现的同一套算法重算——「测试与实现同错」是本项目栽过两次的坑。④ **落地点的选择有讲究**：`0x17`/`0x18` 的落点用 **VRAM** —— vendor 对 VRAM 字节写会复制/丢弃（`bus.rs:1235-1262`）⇒ **写宽度可观测**；`0x16` 的落点是 WRAM ⇒ **它的写宽度不可观测**（已如实登记，宽度由实现与 mGBA 参照背书）。⑤ **变异 M1–M5 逐腿双向可红**（基线 280 全绿；每腿还原后 **280 / 0**）：M1 `0x16` 读成 16 位单元 ⇒ 只红 `swi_diff8bit_unfilter_wram`；M2 `0x17` 改字节写 ⇒ 只红 `swi_diff8bit_unfilter_vram`；M3 `0x18` 读成字节单元 ⇒ 只红 `swi_diff16bit_unfilter`；M4 半字配对顺序颠倒 ⇒ 红两个共用该路径的；M5 size 字段读成 16 位 ⇒ 只红 `the_size_field_is_twenty_four_bits_wide`。⚠️ **M5 首轮是「无牙」的**（夹具 size 只有 10/20 字节，16 位与 24 位两种读法结果完全相同）⇒ 补了 64 KiB 的字段宽度锁才有牙——与 r4 的三条盲区同类。⑥ **两条被新认领号打破的老锁已修**：`dispatch_claims_exactly_what_is_implemented` 与 `declining_a_number_has_no_side_effects`（两条都把「认领集合」写死了）——它们**在实现落地后立刻变红**，是「认领集合一变，老锁必须同步」的又一实例。⑦ **门禁**：GBA 根 **280 passed / 22 ignored**（22 = 19 个测量工具 + **3 条红复现器**，逐条仍红：S3-b ×2 + S3-d ×1）；vendor **242** / debug **93** / media **52** / formats **153** 全绿；`ctest -LE perf` **36/36**。⑧ **如实登记三点**：size 按字节在 GBATEK 里**没有明说**（依据 = 与 LZ77 同款头部 + mGBA 的 `remaining = header >> 8`）；mGBA 会把 `r0`/`r1` 写成走过的游标，本仓**不动**（GBATEK：No return value；SWI ABI 里这两个寄存器对无返回值调用未定义）；`0x16` 的写宽度不可观测。⑨ **本轮未做**：`0x19`–`0x2A`（声音驱动等）与 S3-b/c/d/e 全部未动。 |
 
 
 ---
