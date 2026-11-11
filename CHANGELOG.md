@@ -133,6 +133,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > 本轮**未动任何生产代码**（夹具全在 `#[cfg(test)]` 下；vendor 树零改动，已逐文件哈希核对）。
 
+### Fixed — S2-b 未实现 BIOS SWI 的兜底（stub 向量不再 `b .` 自旋）
+
+- **症状**：未被认领的 BIOS SWI 落到 stub BIOS 的 0x08 向量，而那个向量是 `b .`
+  （`BRANCH_SELF`）⇒ CPU **永久自旋在 BIOS 0x08**。症状即「按了按钮就卡死」
+  （MKSC 的白屏卡死属此类）。
+- **修法**：0x08 向量字从 `b .` 改为 **`MOVS PC, LR`**（`0xE1B0F00E`）⇒ 未实现 SWI
+  从「机器冻结」变成「**返回续接点 + 记录号码**」。
+  - 依据：GBATEK「For Returning from SWI use `MOVS PC,R14`」；ARM 态 `LR = PC+4`、
+    Thumb 态 `LR = PC+2` ⇒ LR 恰好停在 SWI 之后那条指令（ARM / Thumb 双路夹具实证）。
+  - ⚠️ **不用 `SUBS PC, LR, #4`**（IRQ 向量的写法）：那会退回 SWI 自身重入。
+  - abort 向量（0x04 / 0x0C / 0x10 / 0x14）**仍 park** —— 那是真异常，响亮地停是对的。
+- **兜底语义（口径修正）**：按 GBATEK 的 SWI ABI「R2, R4–R14 保持不变」⇒
+  **全寄存器保留、零编造返回值**。⚠️ 计划原先写的「按 mGBA 的做法给合理默认」**无法执行**
+  —— mGBA 源码不在本机 ⇒ 改按 GBATEK 自建依据。
+- **生产侧记录（红线 §六.3）**：`swi/mod.rs` 的 `note_unimplemented_swi` —— 每个号码
+  **首次** `eprintln!`（`[gba] swi 0xNN …`）+ 常驻计数（thread-local `BTreeMap`），
+  后续静默计数不刷屏；vendor 核心自答的 6 个号（0x00 / 0x06–0x08 / 0x0B / 0x0C）不计入。
+  ⇒ 「还差哪些 SWI」从此有一份可直接读的清单（S3-a 的施工单）。
+- **锁面**：两条被 §1.2.1 预告的锁按预告改写并更名 ——
+  `abort_vectors_park_and_the_swi_vector_returns`（abort 向量仍 park、0x08 = MOVS_PC_LR）、
+  `an_unclaimed_swi_returns_and_is_recorded`（端到端断言 SWI 0x1A 后机器到 Halt、
+  续接指令真跑、ABI 保留 r4、tallies 记 `(0x1A, served=0)`、生产计数恰 `[(0x1A,1)]`）；
+  新增 `the_production_recorder_counts_unimplemented_calls_and_skips_served_ones`
+  与 Thumb 绿锁 `thumb_swi_unimpl_1a_returns_and_continues_in_thumb`。
+- **计数**：GBA 锁测试 **266/24 → 270/22**；复现器 **5 → 3**；夹具 **9 → 10**。
+- **变异 M1–M4 逐腿双向可红**（还原腿刷 mtime）：向量改回 park ⇒ 恰 5 条红；
+  摘掉记录器 ⇒ 恰 2 条红；摘掉 vendor 过滤 ⇒ 恰 1 条红；Thumb 编码器 rd 字段挪错 ⇒ 恰 1 条红。
+- **vendor 树零改动**（改动只在 `src/rust/src/gba/`）。
+
+### Fixed — S2-c C++ 侧不再静默吞掉每帧错误码
+
+- **症状**：`gba_step_frame()` 的非零返回被 `if (… != GBA_OK) return;` **完全吞掉** ——
+  无日志、无弹窗、不崩、不卸载 ⇒ 静默跳过该帧的帧缓冲拉取 / 重绘信号 / 音频排空 / 电池落盘。
+  对照：装载 / savestate 读写 / 电池读取等**一次性路径全都有报告**
+  ⇒ 规律 =「一次性路径全报告、每帧路径全静默」。
+- **修法**（只动 `src/gba_load.cpp`，4 处）：会话态去重闩 `g_reportedStepError`
+  + `step_error_name`（6 码全名映射）+ `note_step_error`
+  —— 同码 streak **只报首帧**、码变化即再报、干净帧清闩、`GbaLoad` 新会话清闩
+  ⇒ 一次 panic 约 3 行日志，最坏有界。
+- **日志设施 = `FCEU_printf`**（core 的 `fceu.cpp:1132`，经 driver 回调表分发到
+  stdout + 消息日志 dock）。⚠️ **刻意不用 `FCEU_PrintError`** —— 它下游是
+  `QueueErrorMsgWindow` ⇒ 下个 GUI tick 变**弹窗**，正是每帧路径禁止的行为。
+- **`GBA_ERR_STATE` 语义**：日志附一句「core 捕到内部 panic 并丢弃了机器；重新装载 ROM
+  即恢复」—— 对齐 r6 的恢复机制（机器已丢、毒锁透明恢复、重载即重建），**不发明新恢复动作**。
+- ⚠️ **边界（如实登记）**：release 生产的真 panic 仍带走进程（C++ 侧无法拦）
+  ⇒ **S2-c 对 release 的真实保障是 S2-a / S2-b 消灭可达 panic**，本改动是 unwind 构建的
+  安全网 + 容错读数的可见性；相邻每帧静默点（`gba_frame_buffer*` / `gba_render_audio` /
+  电池 flush 两个导出）**刻意未包**（step 成功后不可达，diff 最小）。
+
+### Added — S2 收口后的门禁读数（2026-11-11 实测）
+
+- `ctest -LE perf` **36/36 全绿**（Release 构建 EXIT=0）。
+- GBA 根 crate **270 passed / 22 ignored**（22 = 19 个测量工具 + **3 条红复现器**，
+  在 `--lib gba::fixtures:: -- --ignored` 下**逐条为红**）；vendor **242** / debug **93** /
+  media **52** / formats **153** 全绿。
+- ⚠️ **F11QA 矩阵（`pass_to_fail = 0` / grade ≥ B）待 push 后由 CI 复核**
+  （本地只有 `ctest` 这个近似门禁）。
+
 ### Fixed — S4 · FC 侧修复批次（GitHub issue #12：iNES loader 拒非 2 幂 PRG；mapper 191/199 灰屏）
 
 - **iNES loader 不再硬拒非 2 幂 PRG 的 ROM**：PRG 的文件边界检查、指针推进与 MD5/CRC32
