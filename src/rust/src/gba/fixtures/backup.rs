@@ -2,22 +2,32 @@
 //!
 //! | fixture | red/green | what it drives | belongs to |
 //! |---|---|---|---|
-//! | `eeprom_chip_capacity` | red | ROM carries `EEPROM_V124`; the save path runs | S3-b (E2) |
-//! | `flash_status_reg` | red | ROM carries `FLASH_V124`; write `0x0E00_0000`, read `0x0E00_0006` | S3-b (E3) |
+//! | `eeprom_chip_capacity` | **green lock** | one `EEPROM_V124` cart and one bare `EEPROM_V` cart; the access width decides the size | S3-b (E2, fixed) |
+//! | `flash_status_reg` | **green lock** | ROM carries `FLASH_V124`; plant `0x00`, read `0x0E000006/7` back | S3-b (E3, resolved) |
 //! | `eeprom_protocol_lock` | **green lock** | the EEPROM command protocol itself | S3-b (regression lock) |
 //!
 //! # The defects (v2.0.3 plan §1.2.4)
 //!
-//! * **E2 — the chip type and its capacity are not modelled.**
-//!   `BackupType::detect` folds `EEPROM_V` (a 512-byte chip) and
-//!   `EEPROM_V124` (an 8 KB chip) into one `Eeprom`, and `buffer_size()`
-//!   answers `0x8000` for it. A real EEPROM is 512 bytes or 8 KB, so the
-//!   `.srm` file is always 32768 bytes no matter which cartridge it came
-//!   from.
-//! * **E3 — there is no flash status register.** Reading `0x0E00_0006/7`
-//!   falls into the plain-read branch and hands back the *save data* instead
-//!   of the chip's status, so any commercial cartridge that polls the flash
-//!   waits forever.
+//! * **E2 — was "the chip type and its capacity are not modelled"; fixed by
+//!   the dynamic-capacity model.** The buffer used to be a flat 32 KB for
+//!   every EEPROM cartridge. The ID string cannot carry the capacity (GBATEK
+//!   `:8521` — "EEPROM_Vnnn EEPROM 512 bytes or 8 Kbytes", `nnn` being a
+//!   library version), so the buffer now starts at the smallest real chip,
+//!   512 B (GBATEK `:8665`), and grows to the 8 KB ceiling (GBATEK `:8669`)
+//!   the first time a transfer addresses past it — mGBA's `_ensureEeprom`
+//!   semantics (`savedata.c:471-489`). The fixture below pins the observable
+//!   consequence: a 6-bit transfer leaves the file at 512 B, a 14-bit
+//!   transfer past the low half grows it to 8 KB with the block addressable
+//!   there, and the bare-`EEPROM_V` cartridge behaves exactly like
+//!   `EEPROM_V124` — the string decides "is an EEPROM", never "how big".
+//! * **E3 — was "there is no flash status register"; resolved by RE.** The
+//!   plan expected one, but four independent sources (GBATEK's whole FLASH
+//!   chapter, Nintendo's in-cartridge SDK driver, mGBA, VBA-M — see the
+//!   `flash_status_reg` doc below) agree GBA flash has **no** status-register
+//!   command, and that what a game polls is the written data itself, read
+//!   back and compared. The vendor's plain-read behaviour was therefore
+//!   already right, and the reproducer became a **green lock** on that
+//!   read-back semantics instead of a fix.
 //!
 //! The **protocol** is not a defect: GBATEK and the vendor agree bit for bit
 //! (see the plan's §1.7.1). `eeprom_protocol_lock` is therefore a **green
@@ -53,25 +63,31 @@
 //! | flash data read | `:8898` | "dat=[E00xxxxh] (read byte from address xxxx)" |
 //! | ID strings | `:8501-8502`, `:8509-8513` | "The ID string must be located at a word-aligned memory location, the string length should be a multiple of 4 bytes (padded with zero's)" / "EEPROM_Vnnn EEPROM 512 bytes or 8 Kbytes (4Kbit or 64Kbit)" / "FLASH_Vnnn FLASH 64 Kbytes (512Kbit) (ID used in older files)" |
 //!
-//! ## Two gaps, recorded rather than papered over
+//! ## Two gaps — the first has been closed by the RE round
 //!
-//! 1. **The flash status register has no GBATEK authority.** The snapshot
-//!    contains no `E000006h` at all (a grep for it over the whole 4.0 MB
-//!    file returns zero hits), and GBATEK's flash polling is a read-back and
+//! 1. **The flash status register: falsified and re-locked.** The plan's
+//!    status-register reading was **falsified** by the S3-b RE (four
+//!    independent sources, listed in the `flash_status_reg` doc below): the
+//!    snapshot contains no `E000006h` at all (a grep over the whole 4.0 MB
+//!    file returns zero hits), GBATEK's flash polling is a read-back and
 //!    compare — "wait until [E00xxxxh]=dat" (`:8981`) or "wait until
-//!    [E000000h]=FFh" (`:8915`) — not a status register. The address
-//!    `0x0E000006/7` and the "ready = bit 0" layout come from the **v2.0.3
-//!    plan** (§1.2.4 and §3 S3-b item 2), not from GBATEK. This fixture
-//!    asserts what the plan asks for, and **the plan's own wording ("按
-//!    GBATEK 的状态位定义返回") is not backed by GBATEK** — that sentence
-//!    should be corrected when S3-b starts.
+//!    [E000000h]=FFh" (`:8915`) — and Nintendo's own SDK driver polls with a
+//!    plain array read. The fixture originally asserted the plan's
+//!    "ready = bit 0" wording, which had no authority behind it; it now
+//!    asserts the **read-back semantics** the four sources agree on, as a
+//!    resident green lock.
 //! 2. **GBATEK does not say which `EEPROM_Vnnn` version means which size.**
 //!    Its ID table (`:8509`) says "EEPROM 512 bytes or 8 Kbytes" for the
-//!    whole family. The split used here — `EEPROM_V124` = 8 KB, bare
-//!    `EEPROM_V` = 512 B — is the **plan's** (§1.2.4), corroborated by the
-//!    plan's real cartridges: Super Mario Advance 2 carries `EEPROM_V122`
-//!    and GBATEK names Super Mario Advance as the 512-byte user (`:8665`),
-//!    while Boktai is the 8 KB user (`:8669`).
+//!    whole family. The original fixture split them — `EEPROM_V124` = 8 KB,
+//!    bare `EEPROM_V` = 512 B — on the plan's word, and that split was
+//!    self-contradictory: Super Mario Advance 2 carries `EEPROM_V122` while
+//!    GBATEK names Super Mario Advance as the 512-byte user (`:8665`). The
+//!    RE round settled it the other way: neither reference simulator reads
+//!    the version (mGBA defaults to 512 B and grows on the first high
+//!    access, `savedata.c:291-315`; VBA-M watches the bit-stream width). The
+//!    lock now pins **that** behaviour, with a leg on the bare-`EEPROM_V`
+//!    cartridge that goes red if anyone ever reintroduces a version→size
+//!    mapping.
 //!
 //! # Deviations from the plan's wording (recorded, not silent)
 //!
@@ -154,12 +170,21 @@ const EEPROM_512_BYTES: usize = 512;
 /// zero)".
 const EEPROM_8K_ADDRESS_BITS: usize = 14;
 
-/// The flash chip's "ready" bit in its status byte: bit 0.
+/// The width of the EEPROM's address field, in bits, for the 512 B chip.
 ///
-/// The plan's §1.2.4 wording. **Not** a GBATEK definition — see the module
-/// docs. The chip's byte reaches the register replicated across the lanes
-/// (`bus.rs:1644-1645`), so the bit is looked for in lane 0.
-const FLASH_STATUS_READY: u32 = 0x0001;
+/// GBATEK `:8702-8704`: "for 512 Bytes EEPROMS: an address range of 0-3Fh,
+/// 6bit bus width".
+const EEPROM_512_ADDRESS_BITS: usize = 6;
+
+/// The byte the flash fixture plants over the offsets it reads back.
+///
+/// `0x00` on purpose: it is neither the erased value `0xFF` nor any bit
+/// pattern a "status register" reading could be confused with, so a
+/// read-back at `0x0E000006` can only be the bytes themselves. The chip's
+/// byte reaches the reader replicated across the 8-bit bus's lanes
+/// (`bus.rs:1643-1646`), so the expected halfword is this byte times
+/// `0x0101`.
+const PLANT_BYTE: u8 = 0x00;
 
 /// The last save-area offset the flash fixture plants.
 const PLANT_LAST_OFFSET: usize = 7;
@@ -233,15 +258,20 @@ fn eeprom_clock_out(fixture: &mut Fixture) -> bool {
     fixture.gba.cpu.bus.read_half_word(EEPROM_WINDOW) & 1 == 1
 }
 
-/// Clock a write request for the 64-bit block at `address`.
+/// Clock a write request for the 64-bit block at `address`, with the
+/// address field `address_bits` wide (6 for the 512 B chip, 14 for 8 KB).
 ///
 /// GBATEK `:8772-8775`: "2 bits \"10\" (Write Request)", "n bits eeprom
 /// address (MSB first, 6 or 14 bits, depending on EEPROM)", "64 bits data
 /// (conventionally MSB first)", "1 bit \"0\"".
-fn eeprom_write_block(fixture: &mut Fixture, address: u32, data: u64) {
+///
+/// The command only lands when something reads the chip afterwards — the
+/// write is interpreted on the next clock-out — so a caller that wants the
+/// write committed asserts a `Ready` clock-out first.
+fn eeprom_write_block(fixture: &mut Fixture, address: u32, data: u64, address_bits: usize) {
     eeprom_clock_in(fixture, true);
     eeprom_clock_in(fixture, false);
-    for bit in (0..EEPROM_8K_ADDRESS_BITS).rev() {
+    for bit in (0..address_bits).rev() {
         eeprom_clock_in(fixture, address & (1 << bit) != 0);
     }
     for bit in (0..64).rev() {
@@ -250,16 +280,16 @@ fn eeprom_write_block(fixture: &mut Fixture, address: u32, data: u64) {
     eeprom_clock_in(fixture, false);
 }
 
-/// Clock a read request for the 64-bit block at `address`, and collect the
-/// answer.
+/// Clock a read request for the 64-bit block at `address` (address field
+/// `address_bits` wide), and collect the answer.
 ///
 /// GBATEK `:8721-8723` for the request, `:8739`/`:8750-8751` for the answer:
 /// 68 bits, of which the first four are to be ignored and the next 64 are
 /// the data, MSB first.
-fn eeprom_read_block(fixture: &mut Fixture, address: u32) -> u64 {
+fn eeprom_read_block(fixture: &mut Fixture, address: u32, address_bits: usize) -> u64 {
     eeprom_clock_in(fixture, true);
     eeprom_clock_in(fixture, true);
-    for bit in (0..EEPROM_8K_ADDRESS_BITS).rev() {
+    for bit in (0..address_bits).rev() {
         eeprom_clock_in(fixture, address & (1 << bit) != 0);
     }
     eeprom_clock_in(fixture, false);
@@ -276,77 +306,132 @@ fn eeprom_read_block(fixture: &mut Fixture, address: u32) -> u64 {
     data
 }
 
-/// **E2 — the save file must be sized by the chip the ROM advertises.**
+/// **E2 — the save file's size is the chip's, decided by the accesses, not
+/// by the ID string.**
 ///
-/// A cartridge whose ROM carries `EEPROM_V124` has an 8 KB EEPROM
-/// (GBATEK `:8669`), so its `.srm` is 8192 bytes; one carrying the bare
-/// `EEPROM_V` has the 512-byte chip (GBATEK `:8665`), so its `.srm` is 512
-/// bytes.
+/// The dynamic-capacity model (v2.0.3 S3-b): an EEPROM buffer starts at the
+/// smallest real chip, 512 B (GBATEK `:8665`), and the first transfer that
+/// addresses past it grows the buffer to the 8 KB ceiling the 14-bit address
+/// width spans (GBATEK `:8669`, `:8705-8706`; mGBA's `_ensureEeprom`,
+/// `savedata.c:471-489`). The ID string decides only that the cartridge has
+/// an EEPROM — GBATEK `:8521` gives the whole family one entry, "EEPROM_Vnnn
+/// EEPROM 512 bytes or 8 Kbytes", where `nnn` is the library version — so a
+/// bare `EEPROM_V` cartridge and an `EEPROM_V124` one must behave alike.
 ///
-/// Today both are 32768: `BackupType::detect` folds the two strings into
-/// one `Eeprom` and `buffer_size()` answers `0x8000` for it
-/// (`internal_memory.rs:75-98`).
+/// Every size is asserted against a number derived from GBATEK's own
+/// 0200h/2000h ([`EEPROM_512_BYTES`] / [`EEPROM_8K_BYTES`]), and the grown
+/// block is read back, so a buffer that merely *reported* 8 KB without being
+/// addressable there would still fail. Each write is committed with a
+/// `Ready` clock-out before its size is read: an uninterpreted command sits
+/// in the transfer buffer and would make the size assertion green for the
+/// wrong reason.
 #[test]
-#[ignore = "S3-b: 修复后转常驻锁测试"]
 fn eeprom_chip_capacity() {
     let mut eight_k = Fixture::new(&cartridge_with("EEPROM_V124", &[swi(HALT)]));
-    let mut small = Fixture::new(&cartridge_with("EEPROM_V", &[swi(HALT)]));
-
     assert!(
         eight_k.run_to_halt(BUDGET),
         "the program never reached its Halt"
     );
+
+    // A 6-bit transfer fills a slice of the 512 B chip: the file stays at
+    // the floor, and must not be the flat 32 KB the old model answered for
+    // every EEPROM cartridge.
+    eeprom_write_block(&mut eight_k, 0, EEPROM_TEST_DATA, EEPROM_512_ADDRESS_BITS);
     assert!(
-        small.run_to_halt(BUDGET),
+        eeprom_clock_out(&mut eight_k),
+        "the chip must report Ready after the 6-bit write"
+    );
+    assert_eq!(
+        battery_size(&eight_k),
+        EEPROM_512_BYTES,
+        "a 6-bit transfer never leaves the 512 B floor (GBATEK :8665)"
+    );
+
+    // A 14-bit transfer to block 0x1FF (byte 4088) is past the low half, so
+    // the buffer grows to the ceiling — and the block is addressable there.
+    eeprom_write_block(&mut eight_k, 0x1FF, EEPROM_TEST_DATA, EEPROM_8K_ADDRESS_BITS);
+    assert!(
+        eeprom_clock_out(&mut eight_k),
+        "the chip must report Ready after the 14-bit write"
+    );
+    assert_eq!(
+        battery_size(&eight_k),
+        EEPROM_8K_BYTES,
+        "a 14-bit transfer past the low half grows the file to 8 KB (GBATEK :8669)"
+    );
+    let data = eeprom_read_block(&mut eight_k, 0x1FF, EEPROM_8K_ADDRESS_BITS);
+    assert_eq!(
+        data, EEPROM_TEST_DATA,
+        "the grown region must read back what was written, not just be longer"
+    );
+
+    // The bare `EEPROM_V` cartridge has the same chip behaviour: the ID
+    // string says "is an EEPROM", never "how big". Pinning this on a second
+    // cartridge keeps anyone from reintroducing a version-to-size mapping
+    // (the plan's original split was contradicted by GBATEK `:8521`).
+    let mut bare = Fixture::new(&cartridge_with("EEPROM_V", &[swi(HALT)]));
+    assert!(
+        bare.run_to_halt(BUDGET),
         "the program never reached its Halt"
     );
-
-    let eight_k_size = battery_size(&eight_k);
-    let small_size = battery_size(&small);
-
-    assert_eq!(
-        eight_k_size, EEPROM_8K_BYTES,
-        "an `EEPROM_V124` cartridge has an 8 KB EEPROM, so its save file must \
-         be {EEPROM_8K_BYTES} bytes"
-    );
-    assert_ne!(
-        eight_k_size, small_size,
-        "the two EEPROM chips must not collapse into one size: the chip type \
-         is what the size comes from"
+    eeprom_write_block(&mut bare, 0x1FF, EEPROM_TEST_DATA, EEPROM_8K_ADDRESS_BITS);
+    assert!(
+        eeprom_clock_out(&mut bare),
+        "the chip must report Ready after the bare cartridge's write"
     );
     assert_eq!(
-        small_size, EEPROM_512_BYTES,
-        "a bare `EEPROM_V` cartridge has the 512-byte EEPROM, so its save \
-         file must be {EEPROM_512_BYTES} bytes"
+        battery_size(&bare),
+        EEPROM_8K_BYTES,
+        "a bare `EEPROM_V` cartridge grows the same way: the ID string does \
+         not carry the capacity"
     );
 }
 
-/// **E3 — reading the flash's status register must not return save data.**
+/// **E3, resolved — `0x0E000006/7` is the save array, and the completion
+/// signal is the data read back.**
 ///
-/// The plan's recipe is "write `0x00` to `0x0E00_0000`, then read
-/// `0x0E00_0006`", and the expectation is "the chip's status (ready = bit
-/// 0), not the save byte". Two things make the plan's recipe unusable as
-/// written, so this fixture does the corrected version of it:
+/// The plan (§1.2.4) expected a flash *status register* here, whose bit 0
+/// would say "ready". Four independent sources agree that GBA flash has no
+/// such register — there is no `0x70` command at all — and that the wait a
+/// game runs is a **read-back compare** against the bytes just written:
 ///
-/// * A plain byte write on a flash cartridge does **not** reach the save
-///   data — it enters the chip's command state machine, and in the `Ready`
-///   state the vendor drops it (`internal_memory.rs:755-759`). The plant
-///   therefore uses GBATEK's write-byte command (`:8972-8981`).
-/// * The byte has to land on the offset that is read (6), because the
-///   erased byte is `0xFF` and `0xFF`'s bit 0 is 1 — the same value the
-///   ready bit would have. Offsets 0..=7 are planted with `0x00`, so the
-///   byte at offset 6 has bit 0 clear.
+/// 1. **GBATEK** (the snapshot's whole FLASH chapter, `:8858-9146`): every
+///    polling line is an array read and compare — "wait until
+///    [E00xxxxh]=dat" (`:8981`), "wait until [E000000h]=FFh" (`:8915`) — a
+///    grep for `E000006` over the 4.0 MB snapshot returns zero hits, and
+///    `:9119-9126` adds a software verify-retry on top of the polling.
+/// 2. **Nintendo's own SDK flash driver**, decompiled by pret
+///    (`agb_flash_1m.c:51-86`, `agb_flash.c:106-116`) — the code actually
+///    burned into commercial cartridges — polls with a plain array read
+///    (`ReadFlash1`) and compares against the last byte written.
+/// 3. **mGBA 0.10.5** (command set `savedata.h:38-49`, decode
+///    `savedata.c:367-381`) implements no `0x70` either.
+/// 4. **VBA-M** (`vbam_gbaFlash.cpp`) likewise: zero occurrences of `0x70`.
+///
+/// So the target behaviour this lock asserts is the vendor's current one: a
+/// byte written with GBATEK's write-byte command (`:8972-8981`) must read
+/// back as **itself** — not as `0xFF`, not as anything else. Offsets
+/// 0..=7 are planted with [`PLANT_BYTE`], so the halfword at `0x0E000006/7`
+/// is that byte replicated across both lanes; a witness byte proves the
+/// plant landed before the read is trusted, and a plain byte write would not
+/// do — on a flash cartridge it enters the command state machine and is
+/// dropped in the `Ready` state (`internal_memory.rs:755-759`).
 ///
 /// The assertion reads the **register** the program loaded, not a memory
-/// round trip.
+/// round trip. (A busy-window simulation — the read "not yet ready" for some
+/// cycles after a write, mGBA's dust timer — was considered and is **not**
+/// implemented: GBATEK `:9119`'s verify-retry and the SDK's immediate-success
+/// path mean games cope without it, and MKSC plays with saves on the current
+/// behaviour. Revisit only with real-cartridge evidence.)
 #[test]
-#[ignore = "S3-b: 修复后转常驻锁测试"]
 fn flash_status_reg() {
     let body = [
         // r1 = 0x0E00_0000, then OR in the offset: 0x0E00_0006.
         mov_imm(1, 0x0E00_0000),
         orr_imm(1, 1, 0x06),
-        // r2 = the halfword the game would read at the status address.
+        // r2 = the halfword the game would poll after a write: the planted
+        // array byte, replicated across the 8-bit bus's lanes
+        // (`bus.rs:1643-1646`).
         ldrh(2, 1),
         swi(HALT),
     ];
@@ -354,28 +439,40 @@ fn flash_status_reg() {
     let mut fixture = Fixture::new(&rom);
 
     for offset in 0..=PLANT_LAST_OFFSET {
-        flash_write_byte(&mut fixture, offset, 0x00);
+        flash_write_byte(&mut fixture, offset, PLANT_BYTE);
     }
 
+    // The expected halfword, assembled from the plant and the 8-bit bus's
+    // lane replication rather than typed as a literal: the single byte at
+    // the polled offset appears in both lanes of the halfword the CPU sees.
+    // The register is 32 bits wide, so the comparison happens at that width.
+    let expected = u32::from(PLANT_BYTE) * 0x0101;
+    assert_ne!(
+        expected, 0xFFFF,
+        "the planted halfword must differ from the erased one, or this lock \
+         could not tell a read-back from an untouched chip"
+    );
+
     // The plant must have landed: without it the read below could not tell
-    // "status" from "data", and the test would pass on the erased byte.
+    // "the bytes we wrote" from "the erased value", and the assertion would
+    // pass or fail for a reason that has nothing to do with the read path.
     assert_eq!(
         flash_save_byte(&mut fixture, PLANT_WITNESS_OFFSET),
-        0x00,
-        "the plant must have landed in the save data, or the status read below \
-         cannot tell status from data"
+        PLANT_BYTE,
+        "the plant must have landed in the save data, or the read-back below \
+         proves nothing"
     );
 
     assert!(
         fixture.run_to_halt(BUDGET),
         "the program never reached its Halt"
     );
-    let status = fixture.reg(2);
+    let read_back = fixture.reg(2);
     assert_eq!(
-        status & FLASH_STATUS_READY,
-        FLASH_STATUS_READY,
-        "reading the flash's status register must answer the chip's status \
-         (ready = bit 0), not the save byte that was written there"
+        read_back, expected,
+        "reading 0x0E000006/7 after planting must return the bytes just \
+         written — the read-back compare that is this chip's only completion \
+         signal — not 0xFF and not a status word"
     );
 }
 
@@ -405,7 +502,7 @@ fn eeprom_protocol_lock() {
     );
 
     // Write block 0.
-    eeprom_write_block(&mut fixture, 0, EEPROM_TEST_DATA);
+    eeprom_write_block(&mut fixture, 0, EEPROM_TEST_DATA, EEPROM_8K_ADDRESS_BITS);
     // GBATEK `:8783-8786`: keep reading until bit 0 says "Ready".
     assert!(
         eeprom_clock_out(&mut fixture),
@@ -413,7 +510,7 @@ fn eeprom_protocol_lock() {
     );
 
     // Read block 0 back.
-    let data = eeprom_read_block(&mut fixture, 0);
+    let data = eeprom_read_block(&mut fixture, 0, EEPROM_8K_ADDRESS_BITS);
     assert_eq!(
         data, EEPROM_TEST_DATA,
         "the EEPROM must give back the block it was given, bit for bit"

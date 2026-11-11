@@ -580,9 +580,13 @@ fn encode_machine(machine: &Machine) -> Result<Vec<u8>, i32> {
 /// which is the whole content of this function:
 ///
 /// 1. **the ROM and the BIOS** — the core marks them `#[serde(skip)]`, so the
-///    decoded machine has neither. [`Gba::new`] takes the cartridge back and
-///    rebuilds the header, which is a plain struct with no `Serialize` derive
-///    and therefore could not have been in the payload either;
+///    decoded machine has neither. [`Gba::new`] takes the cartridge back to
+///    rebuild the header (a plain struct with no `Serialize` derive, which
+///    could not have been in the payload either), but the CPU it builds is
+///    then swapped **out** again, so the ROM bytes and the stub BIOS have to
+///    be handed back to the decoded core explicitly — and the backup type,
+///    skipped for the same reason, is re-derived from the ROM (v2.0.3 S3-b
+///    W4);
 /// 2. **the SWI hook**, a function pointer the derive cannot carry;
 /// 3. **the audio ring**, a channel rather than data — and with it the
 ///    residual, which is only meaningful if the rate has not changed;
@@ -610,6 +614,25 @@ fn apply_state(machine: &mut Machine, mut wire: WireState) -> i32 {
     let mut fresh = Box::new(Gba::new(bios::stub(), &rom));
     std::mem::swap(&mut fresh.cpu, wire.cpu.as_mut());
     machine.gba = fresh;
+
+    // The decoded core came back without the ROM, the BIOS and the backup
+    // type -- all three are `#[serde(skip)]`. The rebuilt CPU that carried
+    // them was just swapped *out* and dropped with `wire`, so they have to
+    // be handed back here: a machine whose ROM is empty answers every fetch
+    // with open-bus garbage, an empty BIOS traps the first interrupt vector,
+    // and a lost backup type stops the save chip from answering at all
+    // (v2.0.3 S3-b W4 -- previously only the backup type was known-missing,
+    // and `redetect_backup_type` alone could not fix even that, because it
+    // re-detects *from the ROM*). The cartridge is this machine's own by
+    // construction: the fingerprint check above refused any other.
+    machine.gba.cpu.bus.internal_memory.rom = rom;
+    machine.gba.cpu.bus.internal_memory.bios_system_rom = bios::stub().to_vec();
+    machine
+        .gba
+        .cpu
+        .bus
+        .internal_memory
+        .redetect_backup_type();
 
     crate::gba::install_swi_hook(&mut machine.gba);
     let pending: Option<IntrWaitRequest> = wire.pending_wait.map(save::PendingWait::to_request);
@@ -2216,6 +2239,122 @@ use gba_core::cpu::hardware::keypad::GbaButton;
         });
     }
 
+    /// The cartridge the state was taken from, plus a save chip: the plain
+    /// [`cartridge`] fixture has no marker, and this one needs a type the
+    /// detector actually answers.
+    fn cartridge_with_save_chip() -> Vec<u8> {
+        let mut rom = cartridge();
+        // The ID string the vendor's detector scans for, word-aligned and
+        // zero-padded the way GBATEK `:8501-8502` asks; the program body sits
+        // at 0xC0, well above it.
+        rom[0x40..0x48].copy_from_slice(b"SRAM_V\0\0");
+        rom
+    }
+
+    /// The save chip survives a savestate round trip (v2.0.3 S3-b, W4).
+    ///
+    /// Three things the payload does not carry are `#[serde(skip)]`ped: the
+    /// ROM, the BIOS and the backup type. `apply_state` swaps the decoded
+    /// core into the machine it rebuilt around the same cartridge — the
+    /// fingerprint guard proves it is the same one — so the cartridge bytes
+    /// have to be handed back and the backup type re-derived from them,
+    /// which is what the vendor's `redetect_backup_type` (doc'd "Called after
+    /// a save state load") exists for. Miss any of the three and the session
+    /// dies a different way each time: no ROM means every fetch answers
+    /// open-bus garbage, no BIOS means the first interrupt vectors into an
+    /// empty array, and a lost backup type means the save chip stops
+    /// answering — the `.srm` flush refuses on a `None` type and `0x0E`
+    /// reads `0xFF`.
+    ///
+    /// Reverting the restore of the ROM/BIOS, or dropping the re-derivation,
+    /// must turn this red on the matching leg.
+    #[test]
+    fn the_backup_chip_survives_a_savestate_round_trip() {
+        exclusively(|| {
+            gba_unload_rom();
+            assert_eq!(gba_load_rom_bytes(&cartridge_with_save_chip()), GBA_OK);
+            assert_eq!(
+                gba_battery_save_type(),
+                1,
+                "the SRAM marker was detected when the cartridge was loaded"
+            );
+
+            // A device write, so there is a save byte to compare afterwards.
+            with_machine(|machine| {
+                machine
+                    .gba
+                    .cpu
+                    .bus
+                    .internal_memory
+                    .write_at(0x0E00_0000, 0x42);
+            })
+            .expect("loaded");
+            assert_eq!(
+                with_machine(|machine| machine
+                    .gba
+                    .cpu
+                    .bus
+                    .internal_memory
+                    .read_at(0x0E00_0000))
+                .expect("loaded"),
+                0x42,
+                "the SRAM window answers the byte before the round trip"
+            );
+
+            let mut size = 0u32;
+            // SAFETY: live local out-param.
+            assert_eq!(unsafe { gba_savestate_size(&mut size) }, GBA_OK);
+            let mut buffer = vec![0u8; size as usize];
+            let mut written = 0u32;
+            // SAFETY: the buffer is `size` writable bytes.
+            assert_eq!(
+                unsafe { gba_savestate_save(buffer.as_mut_ptr(), size, &mut written) },
+                GBA_OK
+            );
+
+            // Run on before the load, so the state is demonstrably not the
+            // present.
+            assert_eq!(gba_step_frame(), GBA_OK);
+
+            // SAFETY: the buffer holds `written` readable bytes.
+            assert_eq!(unsafe { gba_savestate_load(buffer.as_ptr(), written) }, GBA_OK);
+
+            with_machine(|machine| {
+                let memory = &machine.gba.cpu.bus.internal_memory;
+                assert_eq!(
+                    memory.rom.len(),
+                    0x200,
+                    "the cartridge came back with the state: a machine whose ROM \
+                     is empty answers every fetch with open-bus garbage"
+                );
+                assert_eq!(
+                    memory.bios_system_rom.len(),
+                    0x4000,
+                    "the BIOS came back with the state: an empty one traps on \
+                     the first interrupt vector"
+                );
+            })
+            .expect("loaded");
+            assert_eq!(
+                gba_battery_save_type(),
+                1,
+                "the backup type must be re-derived after the load; a lost one \
+                 stops the .srm flush"
+            );
+            assert_eq!(
+                with_machine(|machine| machine
+                    .gba
+                    .cpu
+                    .bus
+                    .internal_memory
+                    .read_at(0x0E00_0000))
+                .expect("loaded"),
+                0x42,
+                "the SRAM window must still answer the save byte after the load"
+            );
+        });
+    }
+
     /// The sample clock resumes where the state left it.
     #[test]
     fn a_loaded_machine_resumes_its_sample_clock() {
@@ -2418,14 +2557,17 @@ use gba_core::cpu::hardware::keypad::GbaButton;
 
     /// A forced save type makes the cartridge writable, and the size follows it.
     ///
-    /// The sizes are the point: SRAM 32K, Flash 64K, Flash 128K, EEPROM 32K, and
-    /// a host that sized its file from the *previous* type would write a
-    /// truncated save.
+    /// The sizes are the point: SRAM 32K, Flash 64K, Flash 128K, and EEPROM at
+    /// its floor — 512 B (GBATEK `:8665`) since the dynamic-capacity model
+    /// (v2.0.3 S3-b, E2): the ID string cannot say which chip a cartridge
+    /// carries, so a forced EEPROM starts at the smallest real size and grows
+    /// on demand up to the 8 KB ceiling. A host that sized its file from the
+    /// *previous* type would write a truncated save.
     #[test]
     fn a_forced_save_type_sizes_the_buffer() {
         exclusively(|| {
             with_loaded_machine();
-            for (code, size) in [(1, 0x8000usize), (2, 0x1_0000), (3, 0x2_0000), (4, 0x8000)] {
+            for (code, size) in [(1, 0x8000usize), (2, 0x1_0000), (3, 0x2_0000), (4, 0x0200)] {
                 assert_eq!(gba_set_save_type(code), GBA_OK, "save type {code}");
                 assert_eq!(gba_battery_save_type(), code, "save type {code} did not take");
                 let mut reported = 0u32;

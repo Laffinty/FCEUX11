@@ -145,6 +145,7 @@ pub const SCRATCH: usize = 0x0300_0000;
 
 pub mod backup;
 pub mod guards;
+pub mod lcd;
 pub mod oam;
 pub mod rom;
 pub mod swi;

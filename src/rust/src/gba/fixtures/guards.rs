@@ -12,7 +12,7 @@
 //!
 //! # How the guards read the fixtures
 //!
-//! The fixtures live in four modules next to this one, one per defect
+//! The fixtures live in five modules next to this one, one per defect
 //! domain. The guards read their **source text** with `include_str!` rather
 //! than importing them, because the thing being guarded is the *shape* of the
 //! source — an `#[ignore]` attribute and the test's name — and importing a
@@ -23,19 +23,25 @@
 
 use std::collections::BTreeSet;
 
-/// The four domain modules, as source text.
+/// The five domain modules, as source text.
 const SWI: &str = include_str!("swi.rs");
 const OAM: &str = include_str!("oam.rs");
 const BACKUP: &str = include_str!("backup.rs");
 const ROM: &str = include_str!("rom.rs");
+// S3-e's display-side locks, added by the closing batch (r16): one locks the
+// mode 5 page flip fix, one locks the GBATEK-verified-correct "palette index
+// 0 is transparent in bitmap modes" behaviour against future regressions.
+const LCD: &str = include_str!("lcd.rs");
 
 /// Every fixture the plan asks for, with the work item that owns it.
 ///
-/// The owners are the `归属` column of the v2.0.3 plan's §5 table (and of
-/// the S1-a plan's §5). The seven red ones are **reproducers**: they carry
-/// `#[ignore]` and must be red today. The last two are **green locks**: they
-/// assert the behaviour that is already correct and exist so that the S2/S3
-/// fixes cannot break it.
+/// The owners are the `归属` column of the v2.0.3 plan's §2.2 table (and of
+/// the S1-a plan's §5). The list opened with seven **reproducers** carrying
+/// `#[ignore]` (red by design, promoted to resident green locks as S2/S3
+/// fixed them — see the `REPRODUCERS` doc below); every entry in the table
+/// today is a **green lock**: it either asserts behaviour that was already
+/// correct (so the S2/S3 fixes cannot break it) or the target behaviour of a
+/// fix that has landed.
 const PLANNED: &[(&str, &[&str])] = &[
     ("swi_unimpl_1a", &["S2-b"]),
     // S2-b's Thumb fixture: a green lock from birth (the vector returns, the
@@ -58,27 +64,46 @@ const PLANNED: &[(&str, &[&str])] = &[
     ("rom_window_mirror", &["S3-d"]),
     ("eeprom_protocol_lock", &["S3-b"]),
     ("gpio_read_before_write", &["S3-c"]),
+    // S3-e (closing batch, r16): the mode 5 page flip was the one real
+    // display defect GBATEK confirmed (`:1918` bit 4 applies to modes 4,5,
+    // `:3204-3206` Frame 1 = 0600A000); the index-0 lock pins the
+    // GBATEK-verified-correct transparency (`:3198`) that the old plan
+    // wrongly called a defect — changing that behaviour would be a
+    // regression, and this lock is what turns such a change red.
+    (
+        "mode5_page_flip_reads_the_selected_frame",
+        &["S3-e"],
+    ),
+    (
+        "mode4_index0_is_transparent_under_a_lower_priority_obj",
+        &["S3-e"],
+    ),
 ];
 
 /// The ones that must be red today, and only those.
 ///
-/// Promotions so far: the two OAM reproducers (`oam_bad_shape` /
-/// `oam_gfx_mode3`) left this list on S2-a (v2.0.3 r7), and the two SWI
-/// reproducers (`swi_unimpl_1a` / `swi_unimpl_16`) left it on S2-b — their
-/// defect is fixed, their `#[ignore]` is gone, and they are resident green
-/// locks now — which is exactly what G4 must never see (a reproducer that
-/// lost its `#[ignore` without a fix).
-const REPRODUCERS: &[&str] =
-    &["eeprom_chip_capacity", "flash_status_reg", "rom_window_mirror"];
+/// **Empty since the S3-b/S3-d closing batch**: the last three reproducers —
+/// `eeprom_chip_capacity` / `flash_status_reg` (S3-b) and `rom_window_mirror`
+/// (S3-d, re-scoped to open bus) — became resident green locks in that
+/// batch, their function names and PLANNED ownership unchanged; their
+/// `#[ignore]`s are gone because their defects are fixed (or, for S3-d,
+/// re-scoped after the mirror premise was falsified by GBATEK `:14046`).
+/// Every promotion so far: the two OAM reproducers (`oam_bad_shape` /
+/// `oam_gfx_mode3`) left this list on S2-a (v2.0.3 r7), the two SWI
+/// reproducers (`swi_unimpl_1a` / `swi_unimpl_16`) on S2-b (r12), and these
+/// three on the S3-b/S3-d closing batch — which is exactly what G4 must
+/// never see happen without a fix (a reproducer that lost its `#[ignore]`
+/// while still red).
+const REPRODUCERS: &[&str] = &[];
 
-/// Every `#[test]` function in the four domain modules, with the `#[ignore]`
+/// Every `#[test]` function in the five domain modules, with the `#[ignore]`
 /// reason it carries, if any.
 ///
 /// A reason of `Some("")` means a **bare** `#[ignore]` — the test is ignored
 /// but says nothing about why.
 fn fixtures() -> Vec<(String, Option<String>)> {
     let mut out = Vec::new();
-    for source in [SWI, OAM, BACKUP, ROM] {
+    for source in [SWI, OAM, BACKUP, ROM, LCD] {
         let mut ignore: Option<String> = None;
         let mut is_test = false;
         for line in source.lines() {
