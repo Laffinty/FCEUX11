@@ -43,7 +43,17 @@ int offsetStringToInt(unsigned int type, const char* offsetBuffer, bool *convers
 	auto result = std::from_chars(p, p + std::strlen(p), offset, 16);
 	if (result.ec != std::errc() || result.ptr == p)
 	{
-		return -1;
+		// Not a hex number. Fall through with offset = -1 so the BT_C branch
+		// can resolve breakpoint keywords (NSF LOAD/INIT/PLAY, FDS NMI1-3,
+		// NES NMI/VBL/RST/IRQ/BRK) and symbol names. The pre-v0.3.5 sscanf
+		// version returned 0 (not EOF) for non-numeric input and therefore
+		// reached those branches; the v0.3.5 from_chars early return turned
+		// all of them into dead code (caught by the 2026-11-13 A1 GUI
+		// walkthrough: the NSF-1 PLAY replacement verification got "Start
+		// Address Invalid"). The BT_P/S/R branches below report
+		// conversionOk = false for offset = -1, exactly as the sscanf
+		// version did.
+		offset = -1;
 	}
 
 	if (type & BT_P)

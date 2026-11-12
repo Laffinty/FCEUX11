@@ -1405,6 +1405,38 @@
       "provenance": "fceux11-lua emu library binding tests; F11QA-recast-2026-09-21; mirror-ref-2026-09-24"
     },
     {
+      "kgmqa_id": "kgmqa-123-lua-frameadvance",
+      "legacy_id": "lua_frameadvance_test",
+      "title": "emu.frameadvance yield（F-1 回归锁）",
+      "kind": [
+        "lua-api",
+        "harness-rust"
+      ],
+      "layer": "lua",
+      "spec_source": "internal",
+      "license": "GPL-2.0",
+      "input": {
+        "binary": "f11qa_lua_runner",
+        "working_dir": ".",
+        "args": [
+          "tests/lua_scripts/test_frameadvance.lua",
+          "--frames",
+          "60"
+        ]
+      },
+      "expected": {
+        "exit_code": 0
+      },
+      "timeout_seconds": 30,
+      "tags": [
+        "lua",
+        "integration",
+        "frameadvance"
+      ],
+      "failure_means": "blocking",
+      "provenance": "V1/F-1 lock (2026-11-13): emu.frameadvance must yield at the Lua layer; pre-fix this script aborted the runner with 0xC0000409 (panic=abort). Shape mirrors kgmqa-045"
+    },
+    {
       "kgmqa_id": "kgmqa-046-lua-memory",
       "legacy_id": "lua_memory_test",
       "title": "memory 库 9 函数",
