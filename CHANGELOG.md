@@ -39,6 +39,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Known limitations — 如实登记（发布说明口径）
 
+> ⚠️ **本节是 v2.0.2_hotfix1 当时的限制**（本版自身的已知限制，不随后续版本改动）；
+> 其中数项已被 **v2.0.3** 解决（BIOS SWI `0x16`–`0x19`/`0x1F`/`0x25`/`0x27`、EEPROM 动态
+> 容量、FireRed 人工复核通过、F11QA 已由 CI 复核）⇒ **当前限制以 v2.0.3 段的
+> Known limitations 为准**。
+
 - **GBA 仍是 Alpha**：本轮只解决「能跑」，**不声称 GBA 精度已达标**。仍未实现：
   BIOS SWI `0x16–0x2A`、存档芯片型号/容量建模（`.srm` 对 EEPROM 卡恒为 32 KiB）、
   Flash 状态寄存器、ROM 窗口镜像、GPIO/RTC 探测——均属 v2.0.3 计划 S3 段。
@@ -326,8 +331,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   全过（卡死与黑屏均未复现）。**FireRed 的机器判据「出画面」由本批的 `0x01` 强制空白
   达成**：7 卡基线复跑中它从 FROZEN（1 帧、163724 恒定步数）变为 48 个变化帧哈希 +
   音频 DMA 激活；**双向变异定位实证**——摘掉 `DISPCNT=0x0080` 写入立即回 FROZEN（与
-  修复前逐字同），还原即复现（r19）。竞态根因分析与长尾条目保留；最终画面观感仍需人工；
-  F11QA 矩阵与 issue #12 回复待 push 后闭环。
+  修复前逐字同），还原即复现（r19）。竞态根因分析与长尾条目保留；
+  **最终画面观感已由业主人工复核通过（2026-11-12，见下节）**；
+  **F11QA 矩阵已由 CI 复核通过（2026-11-12，见下节）**；issue #12 回复待业主发出。
+
+### Fixed — 2026-11-12 业主手工实测：FireRed 已兼容（4 张失败卡带里的第 1 张）
+
+- **实测环境**：业主本机 `C:\Users\ikrx2\Desktop\v2.0.3实测依据`（7 张商业卡带 + 5 个自动
+  生成的 `.srm`），跑 **v2.0.3 发布构建**（`main` @ `45fec33`）。
+- **结论**：`Pokemon - FireRed Version (USA, Europe) (Rev 1).gba`（16 MB，`FLASH1M_V103`）
+  **已兼容**。原始实测报告里的症状是「**无法加载任何画面**，音频刺耳杂音」（业主报告
+  `fceux11_v2.0.3卡带兼容性实测报告.odt`），现由业主**人工复核确认可正常进入游戏**。
+- **与机器判据的衔接**：r19 已用双向变异定位证明，FireRed 的机器判据「出画面」由
+  `0x01` RegisterRamReset 的 **DISPCNT 强制空白**达成（摘掉该写入立即回 FROZEN、
+  还原即复现）⇒ 本次的人工确认把这一条从「**机器判据**」升级为「**人工观感确认**」，
+  正是计划 §四 S3 出口表里 FireRed 那一行唯一缺的一环。
+- ⚠️ **其余 3 张照旧**（Mario Kart SC / Dragon Ball / Minish Cap）：它们的**机器判据**
+  （r16/r17 的长窗口 + 输入注入）早已全过（卡死与黑屏均未复现），但**业主本次实测
+  未确认兼容** ⇒ 仍按「未复核通过」登记——**不因机器判据而记作已兼容**。
+
+### Added — 2026-11-12 CI 复核结论（GitHub 上全绿）
+
+- **`main`（发布分支）的 check-runs 全部 success**，跑在发布提交 `45fec33`
+  （`release: 版本 2.0.3`）上：
+
+  | workflow / job | run | 结论 |
+  |---|---|---|
+  | CI | #320 | ✅ success |
+  | F11QA | #95 | ✅ success |
+  | Deploy Pages | #95 | ✅ success |
+  | Push on main | #341 | ✅ success |
+  | build-windows / build / deploy / f11qa（check-runs 逐项） | — | ✅ 全 success |
+
+- ⇒ **计划里唯一「本地测不了、必须由 CI 复核」的判据闭环**：F11QA 矩阵
+  `pass_to_fail = 0` / grade ≥ B **由 CI 判定通过**（本地只有 `ctest -LE perf` 这个
+  近似门禁，36/36）。⚠️ 矩阵的逐条明细在 job 日志里，读取需鉴权 ⇒ 本次未逐行摘录。
+- ⚠️ **如实登记**：合并前，旧的 `wip203` 分支上 **CI #318 红过一次**——失败的是
+  **`build-windows`** 这个 job（同一次推送的 `f11qa` job 是绿的）；同一份内容在
+  `main` 上复跑为绿（CI #319 on 合并提交 `f20bd50`、CI #320 on 发布提交 `45fec33`，
+  两者 `build-windows` 均 success）⇒ 属**分支级的一次失败**，非代码回归；该分支
+  随后随 PR #13 合并删除。
+- **issue #12 的报告者回复仍待业主发出**（回复里需附验证结果）。
+
+### Known limitations — v2.0.3 如实登记（发布说明口径）
+
+- **GBA 仍是 Alpha**：本轮解决的是「**能跑**」，**不声称 GBA 精度已达标**。
+- **商用手写卡带**：4 张失败卡带中**仅 FireRed 经人工复核确认兼容**；其余 3 张
+  （Mario Kart SC / Dragon Ball / Minish Cap）**机器判据全过、人工未确认**。
+- **BIOS SWI 声音家族维持 S2-b 兜底**（返回 + 记录号码）：`0x1A`–`0x1E` / `0x20`–`0x24` /
+  `0x28` / `0x29` / `0x2A`；`0x26` HardReset 结构障碍挂起。
+- **FireRed 的 init 竞态根因未解**：本版是**用 `0x01` 强制空白越过**该竞争，
+  **不是修好了它** ⇒ 长尾条目保留。
+- **两处已知限制沿用**：手动 `gba_set_save_type` 覆盖随读档被还原为检测值；
+  其余 16 个带自定义 power 的 MMC3 变体仍只跑 `GenMMC3Power()`（同因，另立项）。
 
 ## [2.0.2] - 2026-11-08
 
