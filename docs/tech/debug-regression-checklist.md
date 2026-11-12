@@ -49,7 +49,9 @@
 **记录用到的 ROM 路径**（失败记录里要写）：
 
 ```
-ROM 路径：____________________________________________________________
+ROM 路径：D:\Project\FCEUX11\tests\fixtures\nestest.nes（2026-11-13 走查会话；
+NSF-1 另用 D:\Project\FCEUX11\tests\fixtures\test_nsf.nsf——其 play 例程为
+BRK+NOP sled，静音是夹具构造使然，见 §6.1 NSF-1 行）
 ```
 
 ### 2.2 打开调试器
@@ -724,27 +726,27 @@ ROM：____________________  参数：____________________
 
 | # | 项 | 场景（对应 r5 九场景） | 关键判据（一句话） | 日期 | 结果 | 备注 |
 |---|---|---|---|---|---|---|
-| B-1 | 普通断点 | watchpoint / 断点 | 在设定地址停下，标签 "Paused at Breakpoint" | | □绿 □红 □未验证 | |
-| B-2 | watchpoint（读/写） | watchpoint | 高频地址上很快停住 | | □绿 □红 □未验证 | |
-| B-3a | Break on PC（Add+Execute） | Break on PC | 恰好停在设定 PC | | □绿 □红 □未验证 | |
-| B-3b | Break on PC（Run To Cursor） | Break on PC | 右键运行到光标处停下 | | □绿 □红 □未验证 | |
-| B-4 | Bad Opcodes | Bad Op | 需非法 opcode ROM，否则记「未验证」 | | □绿 □红 □未验证 | |
-| B-5 | Cycle Count Exceeded | cycles 超限 | 停下，标签 "Cycle Count Exceedance" | | □绿 □红 □未验证 | |
-| B-6 | Instruction Count Exceeded | instructions 超限 | 停下，标签 "Instruction Count Exceedance" | | □绿 □红 □未验证 | |
-| S-1 | Step Into（F11） | Step Into | PC 每次前进一条指令 | | □绿 □红 □未验证 | |
-| S-2 | Step Over（F10） | Step Over | JSR 时跳过子程序体 | | □绿 □红 □未验证 | |
-| S-3 | Step Out（Shift+F11） | Step Out | 从子程序返回到调用者之后 | | □绿 □红 □未验证 | |
-| S-4 | Run Line / Run 128 Lines | Run Line | 扫描线按 1 / 128 前进 | | □绿 □红 □未验证 | |
-| L-1 | Code/Data Logger | CD Logger | 六个百分比读数从 0% 上升 | | □绿 □红 □未验证 | |
-| L-2 | Trace Logger | TraceLogger | 日志区持续出现新行 | | □绿 □红 □未验证 | |
-| L-3 | CD Logger + Trace Logger 同时 | CD Logger + TraceLogger | 两个窗口**都**有输出 | | □绿 □红 □未验证 | |
-| V-1 | NT Viewer（零断点） | viewer 刷新 | 图块**有内容**，不黑屏 | | □绿 □红 □未验证 | |
-| V-2 | PPU Viewer（零断点） | viewer 刷新 | pattern table 有内容 | | □绿 □红 □未验证 | |
-| V-3 | Sprite Viewer（零断点） | viewer 刷新 | OAM 区有数据 | | □绿 □红 □未验证 | |
-| V-4 | viewer + 调试器同时开 | viewer 刷新 | viewer 照常刷新 | | □绿 □红 □未验证 | |
-| LUA-1 | Lua `hitbreakpoint()` | Lua break_asap | 停下，标签 "Paused on Lua Breakpoint" | | □绿 □红 □未验证 | |
-| LUA-2 | Lua `getinstructionscount()` | **A1-b 反向项** | 每帧 delta > 0 且增长 | | □绿 □红 □未验证 | |
-| NSF-1 | NSF 播放 | NSF 播放 | 有声 + 可视化画面 | | □绿 □红 □未验证 | |
+| B-1 | 普通断点 | watchpoint / 断点 | 在设定地址停下，标签 "Paused at Breakpoint" | 2026-11-13 | **绿** | C28F 命中，"Paused at Breakpoint: 0"，列表 EC--X--（ZCode 代走查） |
+| B-2 | watchpoint（读/写） | watchpoint | 高频地址上很快停住 | 2026-11-13 | **绿** | 01FD R+W 命中（0000 在该 ROM 循环未被访问，换栈址）；Flags=ECRW-- |
+| B-3a | Break on PC（Add+Execute） | Break on PC | 恰好停在设定 PC | 2026-11-13 | **绿** | 纯 Execute C28F 精确命中（A 寄存器新值证新命中） |
+| B-3b | Break on PC（Run To Cursor） | Break on PC | 右键运行到光标处停下 | 2026-11-13 | **绿** | 右键 C291 → 恰停光标行；断点表空 = watchpoint[64] 保留槽 |
+| B-4 | Bad Opcodes | Bad Op | 需非法 opcode ROM，否则记「未验证」 | 2026-11-13 | **未验证** | nestest 勾选跑 5s 不停（无误触发=正确，负半验证绿）；正向缺非法 opcode ROM |
+| B-5 | Cycle Count Exceeded | cycles 超限 | 停下，标签 "Cycle Count Exceedance" | 2026-11-13 | **绿** | 连续+绝对 100000，「模拟器因周期计数超限暂停」，周期字段高亮 2392684496 |
+| B-6 | Instruction Count Exceeded | instructions 超限 | 停下，标签 "Instruction Count Exceedance" | 2026-11-13 | **绿** | 「模拟器因指令计数超限暂停」，指令字段高亮 799083789 |
+| S-1 | Step Into（F11） | Step Into | PC 每次前进一条指令 | 2026-11-13 | **绿** | ×4 每步恰 +1 指令（799083792→795），PC 循环内推进 |
+| S-2 | Step Over（F10） | Step Over | JSR 时跳过子程序体 | 2026-11-13 | **红** | JSR@C07E 三次激活均不停在返回地址 C081（直达主循环）；隔离态（零断点）15s 无停机。子程序有 RTS（ROM 反汇编实证）。**按 §6.3 处理，见 v2.0.4 计划 r4** |
+| S-3 | Step Out（Shift+F11） | Step Out | 从子程序返回到调用者之后 | 2026-11-13 | **绿** | NMI 处理器内步出：RTI+外层 RTS → 停 C084=调用者下一条（+74 指令与处理器长度吻合） |
+| S-4 | Run Line / Run 128 Lines | Run Line | 扫描线按 1 / 128 前进 | 2026-11-13 | **绿** | F7×3 各+1（243→246），F8 一次 +128 跨帧回绕精确（246+128 mod 262=112） |
+| L-1 | Code/Data Logger | CD Logger | 六个百分比读数从 0% 上升 | 2026-11-13 | **绿** | PRG Logged Code 0→1.01%、Data 0.02%；暂停后 3s 零变化 |
+| L-2 | Trace Logger | TraceLogger | 日志区持续出现新行 | 2026-11-13 | **绿** | 行持续增长（计数列+寄存器+反汇编），1,000,000 行，按钮翻转停止记录 |
+| L-3 | CD Logger + Trace Logger 同时 | CD Logger + TraceLogger | 两个窗口**都**有输出 | 2026-11-13 | **绿** | 双开：CD 重置归零后在 trace 开启下 4s 重涨至 1.01%（OR 语义无互斥） |
+| V-1 | NT Viewer（零断点） | viewer 刷新 | 图块**有内容**，不黑屏 | 2026-11-13 | **绿** | 图块完整渲染（无调试器、旧 PPU 门控路径 = A1-c 核心项） |
+| V-2 | PPU Viewer（零断点） | viewer 刷新 | pattern table 有内容 | 2026-11-13 | **绿** | 图案表 0 字体图块完整 |
+| V-3 | Sprite Viewer（零断点） | viewer 刷新 | OAM 区有数据 | 2026-11-13 | **绿** | nestest 不写 OAM，空 OAM 是夹具真实状态；查看器在渲染（槽位0/信息面板/调色板） |
+| V-4 | viewer + 调试器同时开 | viewer 刷新 | viewer 照常刷新 | 2026-11-13 | **绿** | 三 viewer 调试器同开照常渲染（门污染黑屏故障模式排除） |
+| LUA-1 | Lua `hitbreakpoint()` | Lua break_asap | 停下，标签 "Paused on Lua Breakpoint" | 2026-11-13 | **红（双重阻断）** | F-1 复现（abort 0xC0000409，事件日志）后 **V1 已修**（纯 Lua 包装，runner exit 0）；GUI 侧仍被新缺陷阻断（yielding 脚本运行中随机崩溃，见 v2.0.4 计划 r5⑤）；新缺陷关闭后复走 |
+| LUA-2 | Lua `getinstructionscount()` | **A1-b 反向项** | 每帧 delta > 0 且增长 | 2026-11-13 | **红（双重阻断）** | 同上（00:47:58）；同上 |
+| NSF-1 | NSF 播放 | NSF 播放 | 有声 + 可视化画面 | 2026-11-13 | **未验证（声音侧）** | 可视化绿（Test/Song 渲染）；夹具 PLAY=BRK+NOP sled 静音且 NSF CPU 坠入 $0000 BRK 循环。**另发现：PLAY 关键字被断点对话框判「起始地址无效」**（§4.5 替代验证前提不成立） |
 
 ### 6.2 覆盖对照（对照 r5 §十 记录）
 
