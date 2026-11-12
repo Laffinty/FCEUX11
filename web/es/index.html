@@ -209,28 +209,28 @@
     <div class="whatsnew-head reveal">
       <div class="kicker">Novedades</div>
       <h2>v2.0.3</h2>
-      <div class="sub">Lanzado el 2026-11-08 · rendimiento, precisión y depuración</div>
+      <div class="sub">Lanzado el 2026-11-12 · compatibilidad de los cartuchos GBA y correcciones del cargador y los mappers de FC</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3>Mucho más rápido, y mucho más fluido</h3>
-          <p>Esta versión se centra en la velocidad de los emuladores de NES y GBA. En el lado de NES se eliminaron cálculos inútiles del camino de depuración y se optimizó la lógica de reproducción de audio y vídeo, lo que reduce la carga de CPU un 27 %. El modo de audio de alta calidad es ahora casi el doble de rápido, así que incluso con los efectos de sonido más exigentes la emulación no se entrecorta. En el lado de GBA se eliminó el trabajo duplicado al generar fotogramas y al codificar las partidas guardadas: los fotogramas se generan mucho más rápido y guardar tarda la mitad. Nada de esto cambia el formato de las partidas guardadas ni lo que ves y oyes: los juegos se comportan exactamente igual, solo consumen menos CPU, así que hasta un equipo antiguo funciona con fluidez.</p>
+          <h3>Compatibilidad de los cartuchos GBA muy mejorada; varios cartuchos comerciales ya funcionan con normalidad</h3>
+          <p>Varios cartuchos comerciales escritos a mano antes se quedaban congelados al entrar en una partida, no mostraban imagen alguna o provocaban directamente el fallo del emulador. Esta versión ha identificado y corregido tres causas raíz: las llamadas al sistema del BIOS sin implementar podían dejar a la CPU dando vueltas indefinidamente dentro de una rutina del BIOS; dos valores ilegales en los atributos de los sprites podían hacer fallar el hilo de renderizado, lo que en las compilaciones de publicación significaba un fallo directo del emulador; y el modelo de capacidad del chip de guardado era incompleto, de modo que los cartuchos EEPROM generaban siempre un archivo de guardado del tamaño equivocado. Ahora se resuelven devolviendo el control con normalidad y registrando el número de llamada, tratando el sprite como no mostrado tal y como hace el hardware real, y respetando la capacidad real del chip. Pokémon FireRed ha sido confirmado como funcional de forma manual; antes no lograba cargar ninguna imagen. Otros tres cartuchos ya no reproducen el congelamiento ni la pantalla negra en las comprobaciones automáticas, pero su aspecto en pantalla todavía espera la confirmación manual final. GBA en conjunto sigue siendo una función Alpha: esta versión ataca el problema de los cartuchos que directamente no funcionan, y no afirma que la imagen y el sonido ya sean plenamente fieles al hardware real.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">02</div>
         <div class="wn-text">
-          <h3>Corregidos varios errores de emulación de hardware</h3>
-          <p>Se corrigió un defecto en la emulación de OAM DMA que distorsionaba la imagen en algunos juegos, y también el protocolo de entrada del ratón de SNES, que vuelve a funcionar correctamente. También se corrigieron varios casos de prueba que daban falsos negativos: el emulador no era el culpable, las pruebas simplemente no disponían de suficientes fotogramas; al elevar el límite de fotogramas, los resultados son mucho más fiables. También se ha iniciado una línea de trabajo específica sobre interrupciones: la gestión de interrupciones de la CPU sigue ahora el ritmo real del hardware 6502, lo que corrige desviaciones en varios juegos sensibles al timing.</p>
+          <h3>Correcciones en el lado FC para la carga de cartuchos y el registro de mappers, que eliminan los fallos de carga y las pantallas grises</h3>
+          <p>El cargador iNES rechazaba antes de plano cualquier cartucho cuyo tamaño de ROM principal no fuera una potencia de dos, un grupo bastante numeroso de cartuchos homebrew y modificados que el usuario solo veía como un error de formato de archivo ROM desconocido. Ahora la carga divide el archivo según su recuento real de bytes y solo lo rellena cuando se establece la correspondencia de memoria. Los mappers 191, 199 y 198 tenían implementación pero nunca se registraron en la tabla de mappers, por lo que necesariamente producían una pantalla gris; ahora se han registrado, y 199 y 198 ejecutan sus propias rutinas de inicialización, ya que sus registros de extensión y la disposición de la RAM de trabajo difieren de la genérica. La clave de búsqueda y la lógica de reescritura de la tabla de correcciones de ROM se habían desincronizado, lo que dejaba inefectivas las 251 correcciones; ahora es idéntica bit a bit con el FCEUX 2.6.6 / 2.7.0 original. Medido frente al original, 8 de 9 cartuchos de NES se comportan de forma idéntica, y el cartucho taiwanés 吞食天地2 alcanza ahora la misma pantalla de título que el original, donde antes solo mostraba una pantalla gris.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">03</div>
         <div class="wn-text">
-          <h3>Mejores herramientas de depuración y pruebas automáticas</h3>
-          <p>Las herramientas de línea de comandos incorporan más registros de depuración, estadísticas de rendimiento y sondas de comportamiento del hardware; además se corrigió el error de visualización del desensamblado y se completó la interfaz de scripts, para que los desarrolladores puedan localizar los fallos de los juegos con más facilidad.</p>
+          <h3>Más llamadas al sistema del BIOS implementadas y puertas de prueba mejoradas hasta ser reproducibles y demostrables</h3>
+          <p>Las tres llamadas de diff-unfilter de las que dependen los cartuchos comerciales para cargar datos comprimidos de forma diferencial (números de llamada al sistema 16 / 17 / 18) no estaban implementadas en absoluto, por lo que los cartuchos recibían datos incorrectos; las tres están implementadas ahora campo a campo según la especificación autorizada de GBATEK. El mismo lote añade las llamadas de sound bias, conversión de tono MIDI, multiboot y parada personalizada, junto con la escritura forzada de blanco que realiza la llamada RegisterRamReset tal y como especifica GBATEK, y corrige el cambio de página de los bitmaps en modo 5, que antes mostraban siempre solo la página 0. Las puertas de prueba se mejoraron en paralelo: en el lado GBA se añadieron 14 fixtures mínimos reproducibles y 3 guardas permanentes, y los reproductores rojos quedan ahora despejados; la matriz F11QA cubre 122 casos y considera únicamente la ausencia de regresiones como línea roja; cada nueva aserción se somete a pruebas de mutación, rompiendo deliberadamente la implementación para confirmar que la aserción correspondiente falla de verdad, lo que en esta ronda reveló una clase de puertas desdentadas cuyos valores esperados eran tan pequeños que ambas lecturas pasaban.</p>
         </div>
       </div>
      <div class="wn-cta reveal">

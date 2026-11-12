@@ -209,28 +209,28 @@
     <div class="whatsnew-head reveal">
       <div class="kicker">Was ist neu</div>
       <h2>v2.0.3</h2>
-      <div class="sub">Veröffentlicht am 2026-11-08 · Performance, Genauigkeit und Debugging</div>
+      <div class="sub">Veröffentlicht am 2026-11-12 · GBA-Kompatibilität sowie Korrekturen am FC-Loader und an den Mappern</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3>Deutlich schneller und flüssigeres Spielen</h3>
-          <p>Diese Version konzentriert sich auf die Geschwindigkeit der NES- und der GBA-Emulation. Auf der NES-Seite wurden sinnlose Rechenarbeiten im Debug-Pfad entfernt und die Audio- sowie die Bildausgabe optimiert, wodurch die CPU-Last insgesamt um 27 % sinkt. Der High-Quality-Audiomodus ist nun fast doppelt so schnell, sodass auch die beste Soundqualität flüssig läuft. Auf der GBA-Seite fielen doppelte Arbeiten bei der Frame-Erzeugung und beim Kodieren von Spielständen weg: Bilder entstehen deutlich schneller und das Speichern dauert nur noch die Hälfte der Zeit. Spielstände, Bild und Ton bleiben unverändert – das Verhalten der Spiele ist exakt dasselbe, nur der CPU-Verbrauch sinkt, sodass auch ältere Rechner flüssig laufen.</p>
+          <h3>Die GBA-Kompatibilität deutlich verbessert; mehrere kommerzielle Module laufen nun normal</h3>
+          <p>Mehrere kommerzielle Handwritten-Module froren zuvor beim Betreten eines Spiels ein, zeigten überhaupt kein Bild oder stürzten den Emulator direkt ab. Diese Version hat drei Grundursachen gefunden und behoben: nicht implementierte BIOS-Systemaufrufe konnten die CPU in einer BIOS-Routine endlos kreisen lassen; zwei unzulässige Werte in den Sprite-Attributen konnten den Rendering-Thread abstürzen lassen, was in Release-Builds einen harten Absturz des Emulators bedeutet; und das Kapazitätsmodell des Speicherchips war unvollständig, sodass EEPROM-Module stets eine Speicherdatei falscher Größe erzeugten. Diese Fälle werden nun behandelt, indem korrekt zurückgekehrt und die Aufrufnummer protokolliert wird, indem der Sprite genau wie auf echter Hardware als nicht dargestellt gilt und die tatsächliche Kapazität des Chips berücksichtigt wird. Pokémon FireRed wurde von Hand als funktionierend bestätigt; zuvor konnte es überhaupt kein Bild anzeigen. Drei weitere Module zeigen unter den automatisierten Prüfungen weder das Einfrieren noch den schwarzen Bildschirm, ihr Erscheinungsbild auf dem Bildschirm wartet jedoch noch auf die abschließende manuelle Bestätigung. GBA insgesamt bleibt ein Alpha-Feature: Diese Version adressiert das Problem, dass Module gar nicht laufen, und behauptet nicht, dass Bild und Ton bereits vollständig der echten Hardware entsprechen.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">02</div>
         <div class="wn-text">
-          <h3>Eine Reihe von Hardware-Emulationsfehlern behoben</h3>
-          <p>Ein Fehler in der OAM-DMA-Emulation, der bei manchen Spielen das Bild verfälschte, ist behoben, ebenso das Eingabeprotokoll der SNES-Maus, das wieder korrekt funktioniert. Außerdem wurden mehrere Testfälle korrigiert, die fälschlich als fehlgeschlagen gemeldet wurden: der Emulator war nicht falsch, den Tests liefen schlicht zu wenige Bilder; nach erhöhtem Bildlimit sind die Ergebnisse deutlich aussagekräftiger. Zudem wurde eine eigene Arbeit an der Interrupt-Behandlung begonnen – die CPU verarbeitet Interrupts nun näher an der echten 6502-Hardware, was bei etlichen zeitkritischen Spielen Abweichungen behebt.</p>
+          <h3>Korrekturen auf der FC-Seite beim Laden von Modulen und bei der Mapper-Registrierung – Ladefehler und graue Bildschirme entfallen</h3>
+          <p>Der iNES-Loader hat zuvor jedes Modul abgewiesen, dessen Haupt-ROM-Größe keine Zweierpotenz war – eine recht große Gruppe von Homebrew- und modifizierten Modulen, die der Anwender nur als Fehler des unbekannten ROM-Dateiformats zu sehen bekam. Beim Laden wird die Datei nun anhand ihrer tatsächlichen Bytezahl zerlegt und erst dann aufgefüllt, wenn die Speicherabbildung aufgebaut wird. Die Mapper 191, 199 und 198 besaßen zwar Implementierungen, waren aber nie in der Mapper-Tabelle registriert und erzeugten daher zwangsläufig einen grauen Bildschirm; die Registrierung wurde ergänzt, und 199 und 198 führen nun eigene Initialisierungsroutinen aus, da ihre Erweiterungsregister und die Aufteilung des Arbeitsspeichers von der generischen Variante abweichen. Der Zugriffsschlüssel und die Rückschreiblogik der ROM-Korrekturtabelle waren auseinandergelaufen, wodurch alle 251 Korrekturen wirkungslos blieben; sie ist nun bitgenau identisch mit dem Upstream FCEUX 2.6.6 / 2.7.0. Im Vergleich mit dem Upstream verhalten sich 8 von 9 NES-Modulen identisch, und das taiwanische Modul 吞食天地2 erreicht nun denselben Titelschirm wie im Upstream, wo es zuvor ausschließlich einen grauen Bildschirm zeigte.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">03</div>
         <div class="wn-text">
-          <h3>Stärkere Debug-Werkzeuge und automatisierte Tests</h3>
-          <p>Die Werkzeuge auf der Kommandozeile wurden um zusätzliche Debug-Ausgaben, Leistungsstatistik und Hardware-Sonden erweitert, die Anzeigefehler der Disassemblierung wurden behoben und die Skript-Schnittstelle vervollständigt – damit finden Entwickler Fehler in Spielen leichter.</p>
+          <h3>Weitere BIOS-Systemaufrufe implementiert und die Testschranken auf reproduzierbar und beweisbar umgestellt</h3>
+          <p>Die drei Diff-Unfilter-Aufrufe, auf die kommerzielle Module beim Laden von delta-komprimierten Daten angewiesen sind (Systemruf-Nummern 16 / 17 / 18), waren überhaupt nicht implementiert, sodass das Modul falsche Daten erhielt; alle drei sind nun Feld für Feld nach der maßgeblichen GBATEK-Spezifikation umgesetzt. Dieselbe Runde ergänzt die Aufrufe für Sound-Bias, MIDI-Tonhöhenumwandlung, Multiboot und benutzerdefinierten Halt sowie das erzwungene Leerschreiben, das der Aufruf RegisterRamReset gemäß GBATEK ausführt, und behebt das Seitenumschalten von Mode-5-Bitmaps, die zuvor stets nur Seite 0 zeigten. Die Testschranken wurden entsprechend mit modernisiert: auf der GBA-Seite kamen 14 minimale reproduzierbare Fixtures und 3 dauerhafte Wächter hinzu, und die roten Reproduktoren sind nun bereinigt; die F11QA-Matrix umfasst 122 Fälle und wertet allein das Ausbleiben von Regressionen als rote Linie; jede neue Zusicherung wird mutationsgetestet, indem die Implementierung absichtlich gebrochen wird, um zu bestätigen, dass die zugehörige Zusicherung tatsächlich fehlschlägt, was in dieser Runde eine Klasse zahnloser Schranken aufdeckte, deren Erwartungswerte so klein waren, dass beide Messwerte bestanden.</p>
         </div>
       </div>
      <div class="wn-cta reveal">

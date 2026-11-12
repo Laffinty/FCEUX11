@@ -209,28 +209,28 @@
     <div class="whatsnew-head reveal">
       <div class="kicker">What's new</div>
       <h2>v2.0.3</h2>
-      <div class="sub">Released 2026-11-08 · performance, accuracy, and debugging improvements</div>
+      <div class="sub">Released 2026-11-12 · GBA cartridge compatibility and FC loader/mapper fixes</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3>Much faster, and much smoother to play</h3>
-          <p>This release is mainly about speed, for both the NES and the GBA. On the NES side we removed pointless work from the debug path and streamlined the audio and video rendering logic, which brings overall CPU load down by 27%. High-quality audio mode is now close to twice as fast, so even the best sound settings stay smooth. On the GBA side we removed the duplicated work in frame generation and in encoding save files: frames are produced much faster and saving a game takes half the time. None of this changes your save format or the picture and the sound you get; games behave exactly the same, they just use less of your CPU, so even an older machine keeps up.</p>
+          <h3>GBA cartridge compatibility greatly improved; several commercial cartridges now run normally</h3>
+          <p>Several commercial hand-written cartridges previously froze when entering a game, failed to display any picture, or crashed the emulator outright. This release identified and fixed three root causes: unimplemented BIOS system calls could leave the CPU spinning forever inside a BIOS routine; two illegal values in sprite attributes could crash the rendering thread, which meant an outright crash in release builds; and the save-chip capacity model was incomplete, so EEPROM cartridges always produced a save file of the wrong size. These are now handled by returning normally and recording the call number, by treating the sprite as not displayed exactly as real hardware does, and by honouring the chip's actual capacity. Pokémon FireRed has been confirmed working by hand; it previously could not load any picture at all. Three further cartridges no longer reproduce the freeze or the black screen under automated checks, but their on-screen appearance still awaits final manual confirmation. GBA overall remains an Alpha feature: this release targets the problem of cartridges not running at all, and does not claim that picture and sound are already fully faithful to real hardware.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">02</div>
         <div class="wn-text">
-          <h3>A batch of hardware emulation bugs fixed</h3>
-          <p>An OAM DMA emulation defect that distorted the picture in some games is fixed, and so is the SNES mouse input protocol, which now reports correctly again. We also corrected several test cases that were reporting false failures: the emulator was not at fault, the tests simply were not given enough frames to run, so raising the frame limit made the results far more trustworthy. A dedicated interrupt overhaul was started as well: CPU interrupt handling now follows the real 6502 timing much more closely, which fixes the drift seen in a number of timing-sensitive games.</p>
+          <h3>FC-side fixes for cartridge loading and mapper registration, removing load failures and grey screens</h3>
+          <p>The iNES loader used to reject outright any cartridge whose main ROM size was not a power of two — a fairly large group of homebrew and modified cartridges, which the user only ever saw as an unknown ROM file format error. Loading now splits the file by its real byte count and only pads when the memory mapping is established. Mappers 191, 199 and 198 had implementations but were never registered in the mapper table, so they necessarily produced a grey screen; registration has been added, and 199 and 198 now run their own initialisation routines, since their extension registers and work-RAM layout differ from the generic one. The lookup key and the write-back logic of the ROM correction table had drifted, which left all 251 corrections ineffective; this is now bit-for-bit identical to upstream FCEUX 2.6.6 / 2.7.0. Measured against upstream, 8 of 9 NES cartridges behave identically, and the Taiwanese cartridge 吞食天地2 now reaches the same title screen as upstream, where it previously showed nothing but a grey screen.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">03</div>
         <div class="wn-text">
-          <h3>Stronger debugging tools and automated tests</h3>
-          <p>The command line tools gained extra debug logging, performance statistics and hardware behaviour probes, the wrong disassembly display was fixed, and the scripting interface was completed, so developers can track down game bugs more easily.</p>
+          <h3>More BIOS system calls implemented, and the test gates upgraded to reproducible and provable</h3>
+          <p>The three diff-unfilter calls that commercial cartridges rely on to load delta-compressed data (system call numbers 16 / 17 / 18) were not implemented at all, so the data the cartridge received was wrong; all three are now implemented field by field against the authoritative GBATEK specification. The same batch adds the sound bias, MIDI pitch conversion, multiboot and custom halt calls, together with the forced blank write that the RegisterRamReset call performs as GBATEK specifies, and fixes the page flipping of mode 5 bitmaps, which previously always showed page 0 only. The test gates were upgraded in step: on the GBA side 14 minimal reproducible fixtures and 3 permanent guards were added, and the red reproducers are now cleared; the F11QA matrix covers 122 cases and treats only the absence of regressions as a red line; every new assertion is mutation-tested by deliberately breaking the implementation to confirm that the matching assertion really fails, which in this round uncovered a class of toothless gates whose expected values were so small that both readings passed.</p>
         </div>
       </div>
      <div class="wn-cta reveal">

@@ -209,28 +209,28 @@
     <div class="whatsnew-head reveal">
       <div class="kicker">Có gì mới</div>
       <h2>v2.0.3</h2>
-      <div class="sub">Phát hành 2026-11-08 · hiệu năng, độ chính xác và gỡ lỗi</div>
+      <div class="sub">Phát hành 2026-11-12 · khả năng tương thích của cartridge GBA và các bản sửa lỗi bộ nạp cùng mapper phía FC</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3>Chạy nhanh hơn nhiều, chơi mượt hơn nhiều</h3>
-          <p>Bản này tập trung vào tốc độ của cả hai trình giả lập NES và GBA. Ở phía NES, chúng tôi loại bỏ những phép tính thừa trên đường gỡ lỗi và tinh gọn logic xử lý âm thanh cùng hình ảnh, nhờ đó tải CPU chung giảm 27%. Chế độ âm thanh cao cấp giờ nhanh gần gấp đôi, nên ngay cả khi bật hiệu ứng âm thanh chất lượng cao nhất, trình giả lập vẫn không bị giật. Ở phía GBA, chúng tôi loại bỏ phần việc bị lặp lại khi tạo khung hình và khi mã hóa tệp lưu: khung hình tạo ra nhanh hơn nhiều và thời gian lưu game chỉ còn một nửa. Không có gì trong số đó thay đổi định dạng tệp lưu, cũng không thay đổi hình ảnh và âm thanh của game — mọi game vẫn chạy y hệt trước, chỉ là dùng ít CPU hơn, nên máy cũ hơn cũng chạy mượt.</p>
+          <h3>Khả năng tương thích của cartridge GBA được cải thiện đáng kể; nhiều cartridge thương mại nay đã chạy bình thường</h3>
+          <p>Nhiều cartridge thương mại được viết tay trước đây bị treo máy khi vào game, không hiển thị bất kỳ hình ảnh nào, hoặc làm sập hẳn trình giả lập. Bản phát hành này đã xác định và khắc phục ba nguyên nhân gốc: các lệnh gọi hệ thống của BIOS chưa được hiện thực có thể khiến CPU quay vòng vô tận bên trong một thủ tục BIOS; hai giá trị không hợp lệ trong thuộc tính sprite có thể làm sập luồng kết xuất hình ảnh, nghĩa là trong bản phát hành thì trình giả lập sẽ sập hoàn toàn; và mô hình dung lượng của chip lưu còn thiếu sót, nên cartridge EEPROM luôn tạo ra tệp lưu sai kích thước. Nay đã được xử lý bằng cách trả về bình thường và ghi lại số lệnh gọi, bằng cách coi sprite là không hiển thị đúng như phần cứng thật, và bằng cách tôn trọng dung lượng thực sự của chip. Pokémon FireRed đã được xác nhận chạy được bằng kiểm thử thủ công; trước đó game này hoàn toàn không tải được bất kỳ hình ảnh nào. Ba cartridge khác nữa không còn tái hiện hiện tượng treo máy hoặc màn hình đen dưới kiểm tra tự động, nhưng hình ảnh hiển thị của chúng vẫn còn chờ xác nhận thủ công cuối cùng. Nói chung, GBA vẫn là một tính năng ở mức Alpha: bản phát hành này nhắm vào vấn đề cartridge không chạy được, và không khẳng định rằng hình ảnh và âm thanh đã hoàn toàn trung thành với phần cứng thật.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">02</div>
         <div class="wn-text">
-          <h3>Sửa một loạt lỗi mô phỏng phần cứng</h3>
-          <p>Chúng tôi đã sửa lỗi mô phỏng OAM DMA khiến hình ảnh của một số game bị méo, đồng thời sửa lại giao thức nhập chuột của SNES nên việc đọc chuột hoạt động đúng trở lại. Chúng tôi cũng sửa nhiều trường hợp kiểm thử báo lỗi giả — không phải trình giả lập sai, mà là các bài kiểm thử chưa được chạy đủ số khung hình; sau khi nới trần số khung hình, kết quả kiểm thử phản ánh thực tế hơn nhiều. Ngoài ra, chúng tôi còn mở thêm một hướng công việc riêng về xử lý ngắt: cách CPU xử lý ngắt giờ sát với nhịp thời gian thật của phần cứng 6502 hơn, giúp sửa sai lệch chạy ở một số game nhạy cảm với thời điểm.</p>
+          <h3>Sửa lỗi phía FC cho việc nạp cartridge và đăng ký mapper, loại bỏ lỗi nạp thất bại và màn hình xám</h3>
+          <p>Trình nạp iNES trước đây từ chối dứt khoát mọi cartridge có kích thước ROM chính không phải lũy thừa của hai — đây là một nhóm khá lớn các cartridge homebrew và cartridge đã sửa đổi, mà người dùng chỉ thấy dưới dạng lỗi định dạng tệp ROM không xác định. Nay việc nạp chia nhỏ tệp theo số byte thực tế và chỉ đệm thêm khi thiết lập ánh xạ bộ nhớ. Các mapper 191, 199 và 198 đã có phần hiện thực nhưng chưa từng được đăng ký trong bảng mapper, nên chắc chắn tạo ra màn hình xám; nay đã bổ sung đăng ký, và 199 cùng 198 chạy các thủ tục khởi tạo riêng, vì các thanh ghi mở rộng và bố cục work-RAM của chúng khác với bản dùng chung. Khóa tra cứu và logic ghi ngược của bảng sửa ROM đã trôi lệch, khiến cả 251 mục sửa đều không có hiệu lực; nay đã giống hệt từng bit với FCEUX 2.6.6 / 2.7.0 thượng nguồn. Đo đối chiếu với thượng nguồn, 9 cartridge NES thì có 8 chạy giống hệt, và cartridge Đài Loan 吞食天地2 nay đã tới được màn hình tiêu đề giống thượng nguồn, trong khi trước đó chỉ hiện màn hình xám.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">03</div>
         <div class="wn-text">
-          <h3>Củng cố công cụ gỡ lỗi và kiểm thử tự động</h3>
-          <p>Các công cụ dòng lệnh được bổ sung thêm nhật ký gỡ lỗi, thống kê hiệu năng và bộ dò hành vi phần cứng; lỗi hiển thị khung dịch nghĩa được sửa, và giao diện script được hoàn thiện, giúp lập trình viên dễ dàng truy tìm lỗi trong game hơn.</p>
+          <h3>Hiện thực thêm nhiều lệnh gọi hệ thống của BIOS, đồng thời nâng cấp các cổng kiểm thử để có thể tái lập và chứng minh được</h3>
+          <p>Ba lệnh gọi diff-unfilter mà cartridge thương mại dựa vào để nạp dữ liệu nén delta (số lệnh gọi hệ thống 16 / 17 / 18) hoàn toàn chưa được hiện thực, nên dữ liệu mà cartridge nhận được là sai; nay cả ba đã được hiện thực theo từng trường đối chiếu với đặc tả GBATEK chính thức. Cùng đợt này bổ sung lệnh gọi chỉnh lệch âm thanh, chuyển đổi cao độ MIDI, multiboot và dừng tùy chỉnh, cùng với lệnh ghi buộc màn hình trắng mà lệnh RegisterRamReset thực hiện theo đúng GBATEK, đồng thời sửa việc đảo trang của ảnh bitmap mode 5, trước đây luôn chỉ hiển thị trang 0. Các cổng kiểm thử cũng được nâng cấp đồng thời: phía GBA bổ sung 14 bộ fixture tối thiểu có thể tái lập và 3 chốt chặn vĩnh viễn, và các bộ tái hiện lỗi từng đỏ đã được dọn sạch; ma trận F11QA bao phủ 122 trường hợp và chỉ coi việc không có hồi quy là vạch đỏ; mọi khẳng định mới đều được kiểm thử đột biến bằng cách cố ý làm hỏng phần hiện thực để xác nhận rằng khẳng định tương ứng thực sự thất bại, và trong đợt này đã phát hiện một nhóm cổng kiểm thử không có tác dụng với giá trị kỳ vọng quá nhỏ nên cả hai kết quả đọc được đều đạt.</p>
         </div>
       </div>
      <div class="wn-cta reveal">
