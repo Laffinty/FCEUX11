@@ -35,7 +35,7 @@
 | known_limit | `dummy writes to OAM DMA / PPU region; RMW macro OK, DMA path not` | `tests/tests.json:1547` |
 
 **上位口径**：F11QA 矩阵 `108P / 12F`（grade B）不变；050 属「长期难题」，
-不阻塞本体发版（`docs/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md` §二）。
+不阻塞本体发版（`docs/history/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md` §二）。
 
 ### 1.2 缺陷本体（判据是什么）
 
@@ -136,7 +136,7 @@
 写 `trace.bin` 的调用点只有 4 处，全部在 DMA 路径上
 （`ppu.cpp:915` / `:925` / `:929` / `:935`）。它**不是**通用 CPU 总线轨迹。
 因此 T1 卡里「对比 `_ppu`（PASS）vs `_oam`（FAIL）总线轨迹」这一步
-（`docs/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md` §二 ⑥ / T1 卡原步骤）**用现有探针满足不了**
+（`docs/history/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md` §二 ⑥ / T1 卡原步骤）**用现有探针满足不了**
 ——需要新探针或换取证方法。见 §4.5。
 
 **体积自检（离线解析时的硬判据）**：`[读码]`
@@ -509,7 +509,7 @@ HBLK 段读 OAM[n][0]）。
 | **049** | `kgmqa-049-ppu-read-buffer-bisqwit` | `bisqwit/test_ppu_read_buffer.nes` | `$2007` 读缓冲 + open-bus 衰减 | Core | TODO（★5，2–4 周） |
 | **050** | `kgmqa-050-cpu-dummy-writes-bisqwit` | `bisqwit/cpu_dummy_writes_oam.nes` | OAM DMA dummy write → **实为 `$2004` 读路径** | Core | TODO（★3，4–7 天） |
 
-出处：T3 卡 §3′/§⑨（`docs/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md` §二 ⑨）、
+出处：T3 卡 §3′/§⑨（`docs/history/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md` §二 ⑨）、
 T1 卡 §⑥（review 报告 §二 ⑥）、长期演进主报告的长期难题总表（review 报告 §二）。
 
 ### 5.2 共享与独立（事实陈述）
@@ -607,9 +607,9 @@ D4 探针已在 kgmqa-110 上跑出 **11211 次 DMA burst / 2.87 M 字节 / diff
 | 文档 | 用途 |
 |---|---|
 | `docs/history/plans/FCEUX11-v2.0.2_DEBUG与性能优化-已完成项归档.md` §2.4 | D4 结论的落地记录（修复落点、锁测试、矩阵读数） |
-| `docs/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md` §二 ⑥ | 050 执行卡（步骤 / 验收 / 风险）的现状 |
-| `docs/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md` §二 ⑨ / ③ | 049 / 038 执行卡 |
-| `docs/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md` §二 ③ 与 §二 全表 | 038 的完整论证与难度重估；长期难题总表 |
+| `docs/history/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md` §二 ⑥ | 050 执行卡（步骤 / 验收 / 风险）的现状 |
+| `docs/history/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md` §二 ⑨ / ③ | 049 / 038 执行卡 |
+| `docs/history/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md` §二 ③ 与 §二 全表 | 038 的完整论证与难度重估；长期难题总表 |
 | `docs/history/surveys/cpu_bucketB/stepB_investigation_2026-08-04.md` | **历史深查报告**（SPRAM[0x36] 观察的原始出处，基线 `60136cc`） |
 | `docs/tech/f11qa-runner-protocol.md:167-190` | runner 调用骨架与产物路径 |
 | `docs/tech/precision.md:33-34` | `cpu_dummy_writes_oam` 在已知失败面里的位置 |

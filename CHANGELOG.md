@@ -373,6 +373,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   随后随 PR #13 合并删除。
 - **issue #12 的报告者回复仍待业主发出**（回复里需附验证结果）。
 
+### Changed — 文档归档（2026-11-12）
+
+- **`docs/plans/` 只留在途计划**：除 v2.0.4 遗留项计划外，原先放在 `docs/plans/` 的 4 份
+  计划全部移入 **`docs/history/plans/`**（与 v2.0 / v2.0.1 / v2.0.2 归档同址）——
+  v2.0.2 残留 review 报告、v2.0.3 GBA 卡带兼容性优化计划、v2.0.3 S1-a 夹具实施计划、
+  v2.0.3 S3-a 前置 RE 证据表；**git 记为 rename，历史可追**。
+- **全仓 13 个文件 / 38 处**指向这 4 份文件的路径引用同步改写（含 `AGENTS.md`、
+  `f11qa.yml`、`src/rust/src/gba/` 的 doc 注释、`docs/tech/*`），**改写后零残留**。
+- **语义同步**：AGENTS.md 治理文档表把 v2.0.3 计划改标「已收口归档」并指向长尾；
+  `docs/history/README.md` 的 `plans/` 清单新增 4 行；v2.0.3 计划加归档横幅
+  （**§一 仍是 GBA 线的事实底座，附录 A 仍是 GBATEK 位级基线**）；
+  v2.0.2 review 报告加归档位置与移交指针（它已是 2026-11-08 快照）。
+
 ### Known limitations — v2.0.3 如实登记（发布说明口径）
 
 - **GBA 仍是 Alpha**：本轮解决的是「**能跑**」，**不声称 GBA 精度已达标**。

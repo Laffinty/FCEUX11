@@ -64,7 +64,11 @@
 | `FCEUX11-1.17_计划.md` | 🔵 | v1.17 构建计划 — KagamiQA 统合、Rust 迁移与分级标准（2026-09 随 v1.17 发布归档） |
 | `FCEUX11-Stage3-权威性迭代与通用化路线.md` | 🟡 | Stage-3 路线草案（**P3 暂缓**，顶部有 DEFERRED 横幅） |
 | `v1.x_Modernization_Roadmap.md` | 🔵 | v1.x 现代化改造路线图（v1.1~v1.14，已收官） |
-| `FCEUX11-v2.0.2_DEBUG与性能优化-已完成项归档.md` | 🔵 | v2.0.2（DEBUG 与性能优化，NES 侧）的**已完成项**归档 —— 由原 `docs/plans/FCEUX11-v2.0.2_DEBUG与性能优化计划.md` 与 `docs/plans/long-term-evolution/` 经独立 code review 拆分而来；含归档当刻实跑的 ctest / cargo / F11QA 矩阵读数与附录 A 环境变量全表。**未完成项见 `docs/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md`** |
+| `FCEUX11-v2.0.2_DEBUG与性能优化-已完成项归档.md` | 🔵 | v2.0.2（DEBUG 与性能优化，NES 侧）的**已完成项**归档 —— 由原 `docs/plans/FCEUX11-v2.0.2_DEBUG与性能优化计划.md` 与 `docs/plans/long-term-evolution/` 经独立 code review 拆分而来；含归档当刻实跑的 ctest / cargo / F11QA 矩阵读数与附录 A 环境变量全表。**未完成项见 `docs/history/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md`** |
+| `FCEUX11-v2.0.2_残留精度与调试待办-review报告.md` | 🔵 | v2.0.2（NES 侧）的**残留待办 review 报告**（2026-11-08 快照，17 个待核点）。⚠️ **已被 v2.0.3 收口后逐条复核并接管** ⇒ 当前状态与性价比裁决见 `docs/plans/FCEUX11-v2.0.4_残留精度与调试待办-遗留项计划.md` |
+| `FCEUX11-v2.0.3_GBA卡带兼容性优化计划.md` | 🔵 | v2.0.3 **GBA 卡带兼容性线**的三段式总计划（S1 可复现门禁 → S2 止血 → S3 修根因，r1–r20）+ FC 侧 S4/S5。⚠️ 主体随 v2.0.3 发布收口（PR #13 已并入 `main`）；**GBA 线的长尾项**（SWI 声音家族、其余 3 张卡、FireRed init 竞态）由 `docs/plans/FCEUX11-v2.0.4_残留精度与调试待办-遗留项计划.md` §六 与 AGENTS.md「长尾」节承接 |
+| `FCEUX11-v2.0.3_S1a_最小可复现夹具-实施计划.md` | 🔵 | S1-a 的**实施计划与逐格变异读数**（9 条夹具 + 3 条守卫的施工单，r1–r5） |
+| `FCEUX11-v2.0.3_S3a前置RE-GBATEK与SWI证据表.md` | 🔵 | S3-a「SWI `0x16–0x2A` 补齐」的**前置 RE 证据表**（GBATEK 逐号依据；`0x16`–`0x18` 已落地，见 v2.0.3 计划 §九 r15） |
 
 ### 2.2 `reports/` — 执行 / 审计 / 验收报告
 

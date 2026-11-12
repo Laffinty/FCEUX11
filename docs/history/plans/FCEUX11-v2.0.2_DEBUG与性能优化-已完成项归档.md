@@ -4,7 +4,7 @@
 > **来源**：`docs/plans/FCEUX11-v2.0.2_DEBUG与性能优化计划.md`（已删除）
 > ＋ `docs/plans/long-term-evolution/`（README / 主报告 / T0–T4 五张执行卡，已删除）。
 > **本文件的定位**：两份计划中**已确认 100% 完成**的部分的事实源。内容冻结，不再续写；
-> 未完成部分见 `docs/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md`。
+> 未完成部分见 `docs/history/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md`。
 > **归档当刻 HEAD**：`2960998`（v2.0.2 收口批次，r26 之后）
 
 ---
@@ -122,7 +122,7 @@
 
 ## 四、指向 review 报告的遗留（**不在本文件**）
 
-以下内容**未完成**，已移入 `docs/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md`：
+以下内容**未完成**，已移入 `docs/history/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md`：
 
 - **A1** 的手工 GUI 验收（代码已落地，**验收未闭合**）
 - **A4-1** 的否决护栏（计划承诺写进 `src/video.cpp` 注释，**实际未写**）

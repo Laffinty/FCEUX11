@@ -73,4 +73,4 @@ R4 grade B 需要 blocking FAIL 明显下降。建议路径：
 4. 再评估 037 中断轮询下沉（工程量大，单独立项）
 
 > 后续 13 项的逐项完成度、易→难排序与两处纪律修正，见
-> `docs/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md`（§二 逐项校准后的真实状态）。
+> `docs/history/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md`（§二 逐项校准后的真实状态）。
