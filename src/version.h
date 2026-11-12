@@ -56,6 +56,18 @@
 #define FCEU_COMPILER_DETAIL ""
 #endif
 
+// v2.0.3（2026-11-12）— GBA 卡带兼容性线（三段式收口）+ FC 侧 S4/S5：
+// BIOS SWI 0x16–0x18/0x19/0x1F/0x25/0x27 真实现 + 未实现 SWI 兜底（返回 + 记录）、
+// OAM 禁止值容错、EEPROM 动态容量、mode 5 页面翻转、apply_state 读档修复、
+// issue #12 两缺陷 + 修正表/hash 深层修复。详见 CHANGELOG 2.0.3 与
+// v2.0.3 计划 §九 r1–r19。GBA 仍是 Alpha，不阻塞本体发版。
+//
+// ⚠️ **整版数值随惯例递增**（20202 → 20203，与 v2.0.0/2.0.1/2.0.2 同口径）：
+// 该数值进 FCSX 存档头（`state.cpp:397`）与 FM2 录像头（`movie_record.cpp:591`），
+// 但两侧读取器都只把它当**信息性字段**回读（movie.rs `parse().unwrap_or(0)`、
+// state_file.rs `load_v1` 原样返回、均不与当前版本比对）⇒ v2.0.2 产出的
+// 存档/录像在本版**仍可正常读取**。只有 hotfix 才冻结数值（见 hotfix1 注）。
+//
 // v2.0.2 — 以 DEBUG（调试能力/排查效率）与性能优化为主的一次迭代：
 // A 线（调试门控/批量步进/逐字节对拍/HQ 渲染器 SIMD 化）、B 线（无头 trace、
 // profiler 开关、lua memory 导出）、C 线（GBA 帧导出与 savestate 编码加速），
@@ -70,21 +82,22 @@
 // ⚠️ **数值口径不动**：`FCEU_VERSION_NUMERIC` 仍为 20202 —— 它进 FCSX 电影模式
 // 存档头（`state.cpp:397`）与录像头（`movie_record.cpp:591`），改了会让
 // v2.0.2 产出的存档/录像与本版**互读失败**。hotfix 编号只由 `FCEU_HOTFIX_TAG` 承载。
+// （v2.0.3 起整版恢复递增口径，并经读取侧核实：版本字段信息性、从不拒绝比对。）
 inline constexpr int FCEU_VERSION_MAJOR = 2;
 inline constexpr int FCEU_VERSION_MINOR = 0;
-inline constexpr int FCEU_VERSION_PATCH = 2;
-inline constexpr int FCEU_VERSION_TWEAK = 1;	// hotfix 计数；**不参与** NUMERIC
+inline constexpr int FCEU_VERSION_PATCH = 3;
+inline constexpr int FCEU_VERSION_TWEAK = 0;	// hotfix 计数；**不参与** NUMERIC
 
 inline constexpr int FCEU_VERSION_NUMERIC = (FCEU_VERSION_MAJOR * 10000) + (FCEU_VERSION_MINOR * 100) + FCEU_VERSION_PATCH;
 inline constexpr int FCEU_VERSION_MAJOR_DECODE(int x) { return x / 10000; }
 inline constexpr int FCEU_VERSION_MINOR_DECODE(int x) { return (x / 100) % 100; }
 inline constexpr int FCEU_VERSION_PATCH_DECODE(int x) { return x % 100; }
 
-// v2.0.2_hotfix1
-#define FCEU_HOTFIX_TAG "_hotfix1"
+// v2.0.3 — 整版发布，无 hotfix 后缀
+#define FCEU_HOTFIX_TAG ""
 
-#define FCEU_VERSION_STRING "2.0.2" FCEU_HOTFIX_TAG " " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
-#define FCEU_DISPLAY_VERSION "v2.0.2" FCEU_HOTFIX_TAG
+#define FCEU_VERSION_STRING "2.0.3" FCEU_HOTFIX_TAG " " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
+#define FCEU_DISPLAY_VERSION "v2.0.3" FCEU_HOTFIX_TAG
 #define FCEU_NAME_AND_VERSION FCEU_NAME " " FCEU_DISPLAY_VERSION
 
 // FCEUX11 Contributors — Derivative work based on FCEUX

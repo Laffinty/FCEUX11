@@ -76,7 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   其余 16 个（12/37/44/45/47/49/52/114/115/165/195/205/245/249/250/254/406）仍只跑
   `GenMMC3Power()`，它们自己的 `MxxPower` 从不执行 —— 本轮只修了 198 与 199。
 
-## [Unreleased] — v2.0.3 GBA 卡带兼容性线
+## [2.0.3] - 2026-11-12 — GBA 卡带兼容性线（三段式收口）+ FC 侧 S4/S5
 
 ### Added — S1 可复现门禁落地（S1-a，最小可复现夹具）
 
