@@ -517,6 +517,23 @@ if(FCEUX11_BUILD_TESTS)
                 "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
     endif()
 
+    # v2.0.4 V19 — GUID parse-failure zeroing (C++ half). Pure utils+Rust
+    # calls (FCEU_Guid::fromString); no core init, no fixtures. Registered
+    # below the shared PATH block above, so it carries its own
+    # ENVIRONMENT_MODIFICATION (same pattern as pixbuf_pool_test).
+    # Mutation legs are documented at the bottom of the test file.
+    fceux11_add_test_executable(fceux11_guid_test
+        f11qa/utils/guid_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME guid_test
+             COMMAND fceux11_guid_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    if(WIN32)
+        set_tests_properties(guid_test PROPERTIES ENVIRONMENT_MODIFICATION
+                "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+    endif()
+
     # -------------------------------------------------------------------------
     # v0.3.0 — Performance baseline benchmarks (Google Benchmark preferred)
     # -------------------------------------------------------------------------
