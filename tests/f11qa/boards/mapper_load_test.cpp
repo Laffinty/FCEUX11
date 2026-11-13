@@ -2,12 +2,14 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cstdint>
 
 #include "types.h"
 #include "fceu.h"
 #include "driver.h"
 #include "ines.h"
 #include "x6502.h"
+#include "ppu.h"             // NTARAM -- mapper 218's CHR-RAM -> NTARAM mapping lock
 #include "boards/registry.h"
 #include "boards/mmc3.h"
 
@@ -29,6 +31,8 @@ static const MapperTestCase tests[] = {
     // The old loader rounded the PRG size up to 16 banks, so this file was
     // rejected as "Unknown ROM file format".
     { "fixtures/mapper_mmc3_191_nonpow2.nes", 191 },
+    // v2.0.4 V9: mapper 218 wires CHR-RAM's 1K pages into NTARAM.
+    { "fixtures/mapper_mapper218.nes", 218 },
 };
 
 static const int NUM_TESTS = sizeof(tests) / sizeof(tests[0]);
@@ -129,6 +133,62 @@ static bool check_mapper198_power(const char* path) {
         return false;
     }
     return true;
+}
+
+// v2.0.4 V9: mapper 218 (the CHR-RAM -> NTARAM board) maps CHR-RAM's 1K
+// pages into NTARAM through VPageR[] (src/boards/datalatch.cpp).  The PPU
+// reaches CHR with `VPage[v >> 10][v]` (src/ppu.cpp:285): the page comes
+// from the top bits of the 12-bit CHR address, but the byte offset is the
+// FULL address, unmasked.  A correct mapping therefore needs every VPageR[]
+// entry to be an OFFSET base pointer (upstream commit 6738471).
+//
+// The lock asserts the OBSERVABLE result -- every CHR access lands inside
+// NTARAM[0x800] -- and deliberately does NOT restate the pointer formula, so
+// the test cannot agree with a wrong implementation (the "test and
+// implementation are wrong together" trap this repo has hit before).
+//
+// With the old formula (the 1K page number used as a byte offset) the
+// mapping leaves NTARAM: the fixture's mirrorAs2Bits is 0, so the page map is
+// 0,1,0,1,0,1,0,1 and 6145 of the 8192 CHR addresses land outside NTARAM,
+// the last one 0x1800 bytes past its end.
+static bool check_mapper218_chr_mapping(const char* path) {
+    FCEUGI* gi = fceu11::LoadGame(path, 1, true);
+    if (!gi) {
+        printf("FAIL: %s did not load\n", path);
+        return false;
+    }
+    if (gi->mappernum != 218) {
+        printf("FAIL: %s loaded as mapper %d\n", path, gi->mappernum);
+        fceu11::CloseGame();
+        return false;
+    }
+
+    const uintptr_t nt_lo = reinterpret_cast<uintptr_t>(&NTARAM[0]);
+    const uintptr_t nt_hi = nt_lo + sizeof(NTARAM);
+    uint32_t outside = 0;
+    uint32_t first_bad = 0;
+    uintptr_t max_over = 0;
+    for (uint32_t v = 0; v < 0x2000u; ++v) {
+        const uintptr_t addr = reinterpret_cast<uintptr_t>(VPageR[v >> 10]) + v;
+        if (addr < nt_lo || addr >= nt_hi) {
+            if (outside == 0u) first_bad = v;
+            ++outside;
+            const uintptr_t over = (addr >= nt_hi) ? (addr - nt_hi) : (nt_lo - addr);
+            if (over > max_over) max_over = over;
+        }
+    }
+
+    bool ok = true;
+    if (outside) {
+        printf("FAIL: %s: %u of 8192 CHR addresses fall outside NTARAM "
+               "(first at 0x%04X, worst is %llu bytes out)\n",
+               path, outside, first_bad, (unsigned long long)max_over);
+        ok = false;
+    } else {
+        printf("      all 8192 CHR addresses land inside NTARAM\n");
+    }
+    fceu11::CloseGame();
+    return ok;
 }
 
 // v2.0.3 S5-A2: the rule that carries the CRC-based ROM correction into the
@@ -236,6 +296,15 @@ int main() {
     // that is what puts the board's WRAM at $5000.
     printf("[extra] Checking mapper 198's power function ... ");
     if (check_mapper198_power("fixtures/mapper_mapper198.nes")) {
+        printf("OK\n");
+    } else {
+        failed = true;
+    }
+
+    // v2.0.4 V9: mapper 218's CHR-RAM -> NTARAM mapping has to stay inside
+    // NTARAM for every CHR address (upstream commit 6738471).
+    printf("[extra] Checking mapper 218's CHR-RAM -> NTARAM mapping ... ");
+    if (check_mapper218_chr_mapping("fixtures/mapper_mapper218.nes")) {
         printf("OK\n");
     } else {
         failed = true;

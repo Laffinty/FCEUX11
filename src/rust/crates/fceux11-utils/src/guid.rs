@@ -99,11 +99,49 @@ pub unsafe extern "C" fn fceux11_rust_guid_to_string(guid: *const FceuGuid) -> *
     })
 }
 
+/// Decode one ASCII hex digit. `None` for any byte that is not one.
+fn hex_digit_value(b: u8) -> Option<u32> {
+    match b {
+        b'0'..=b'9' => Some((b - b'0') as u32),
+        b'a'..=b'f' => Some((b - b'a' + 10) as u32),
+        b'A'..=b'F' => Some((b - b'A' + 10) as u32),
+        _ => None,
+    }
+}
+
+/// Parse `bytes[start .. start + len]` as a big-endian hex number.
+///
+/// Byte based on purpose: slicing a `&str` by byte range panics when the range
+/// splits a multi-byte UTF-8 char. The semantics match
+/// `uN::from_str_radix(.., 16).unwrap_or(0)`: one bad digit makes the whole
+/// group 0 (not just that digit), and a leading '+' is accepted as a sign.
+fn parse_hex_group(bytes: &[u8], start: usize, len: usize) -> u32 {
+    let group = match bytes.get(start..start + len) {
+        Some(g) => g,
+        None => return 0,
+    };
+    let digits = match group.first() {
+        Some(b'+') => &group[1..],
+        _ => group,
+    };
+    let mut value: u32 = 0;
+    for &b in digits {
+        match hex_digit_value(b) {
+            Some(v) => value = (value << 4) | v,
+            None => return 0,
+        }
+    }
+    value
+}
+
 /// C ABI: Parse a hex string into a GUID.
 ///
 /// # Safety
 /// `guid` must point to a valid, writable `FceuGuid`.
 /// `str` must point to a null-terminated string in the format "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX".
+///
+/// v2.0.4 (V24): the parse never panics and every failure path leaves a
+/// zeroed GUID behind.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fceux11_rust_guid_scan(guid: *mut FceuGuid, str: *const c_char) {
     if guid.is_null() || str.is_null() {
@@ -113,52 +151,54 @@ pub unsafe extern "C" fn fceux11_rust_guid_scan(guid: *mut FceuGuid, str: *const
     let cstr = unsafe { std::ffi::CStr::from_ptr(str) };
     let s = match cstr.to_str() {
         Ok(s) => s,
-        Err(_) => return,
+        Err(_) => {
+            // Not valid UTF-8: fail closed with a zeroed GUID.
+            guid.data = [0u8; 16];
+            return;
+        }
     };
 
     // Parse "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
     // The C++ code uses strtoul (big-endian parse) + FCEU_en32lsb (little-endian store),
     // which effectively byte-swaps each group. We replicate this by parsing big-endian
     // hex values and storing as little-endian bytes.
-
-    let clean: String = s.chars().filter(|c| *c != '-').collect();
+    //
+    // v2.0.4 (V24): the parse works on raw bytes only. Slicing a `&str` by byte
+    // range panics when the range splits a multi-byte UTF-8 char, and this
+    // function is `extern "C"` (a panic cannot unwind out of it) => the process
+    // would abort. No `&str` range slice is taken below.
+    let clean: Vec<u8> = s.bytes().filter(|b| *b != b'-').collect();
     if clean.len() != 32 {
+        guid.data = [0u8; 16];
+        return;
+    }
+    // A GUID is an ASCII hex string: any non-ASCII byte (e.g. a multi-byte
+    // UTF-8 char) means the input is not a GUID at all => fail closed with a
+    // zeroed GUID instead of trying to interpret those bytes.
+    if !clean.iter().all(|b| b.is_ascii()) {
+        guid.data = [0u8; 16];
         return;
     }
 
-    fn parse_hex_u32(s: &str, start: usize) -> u32 {
-        let end = start + 8;
-        u32::from_str_radix(&s[start..end], 16).unwrap_or(0)
-    }
-
-    fn parse_hex_u16(s: &str, start: usize) -> u16 {
-        let end = start + 4;
-        u16::from_str_radix(&s[start..end], 16).unwrap_or(0)
-    }
-
-    fn parse_hex_byte(s: &str, start: usize) -> u8 {
-        u8::from_str_radix(&s[start..start + 2], 16).unwrap_or(0)
-    }
-
     // Group 1: 8 hex digits -> u32 (big-endian parse) -> store as little-endian bytes
-    let v0 = parse_hex_u32(&clean, 0);
+    let v0 = parse_hex_group(&clean, 0, 8);
     guid.data[0..4].copy_from_slice(&v0.to_le_bytes());
 
     // Group 2: 4 hex digits -> u16 (big-endian parse) -> store as little-endian bytes
-    let v1 = parse_hex_u16(&clean, 8);
+    let v1 = parse_hex_group(&clean, 8, 4) as u16;
     guid.data[4..6].copy_from_slice(&v1.to_le_bytes());
 
     // Group 3: 4 hex digits -> u16 (big-endian parse) -> store as little-endian bytes
-    let v2 = parse_hex_u16(&clean, 12);
+    let v2 = parse_hex_group(&clean, 12, 4) as u16;
     guid.data[6..8].copy_from_slice(&v2.to_le_bytes());
 
     // Group 4: 4 hex digits -> u16 (big-endian parse) -> store as little-endian bytes
-    let v3 = parse_hex_u16(&clean, 16);
+    let v3 = parse_hex_group(&clean, 16, 4) as u16;
     guid.data[8..10].copy_from_slice(&v3.to_le_bytes());
 
     // Group 5: 12 hex digits -> 6 bytes (direct, no endian conversion needed)
     for i in 0..6 {
-        guid.data[10 + i] = parse_hex_byte(&clean, 20 + i * 2);
+        guid.data[10 + i] = parse_hex_group(&clean, 20 + i * 2, 2) as u8;
     }
 }
 
@@ -206,5 +246,100 @@ mod tests {
 
             assert_eq!(result, test_str);
         }
+    }
+
+    /// Scan `s` into `guid` through the C ABI entry point.
+    ///
+    /// `CString` is used so the NUL terminator is guaranteed; a plain `&str`
+    /// literal is not required to be NUL terminated.
+    fn scan_str(guid: &mut FceuGuid, s: &str) {
+        let c = std::ffi::CString::new(s).unwrap();
+        unsafe {
+            fceux11_rust_guid_scan(guid, c.as_ptr());
+        }
+    }
+
+    #[test]
+    fn test_guid_scan_multibyte_does_not_panic() {
+        // v2.0.4 (V24): the byte layout is picked so that the old implementation
+        // sliced a `String` in the middle of the 3-byte UTF-8 char. After the
+        // two '-' separators are dropped the group-2 cut lands on byte 12,
+        // which is inside the char => "byte index 12 is not a char boundary"
+        // => panic => abort (this function is `extern "C"`, it cannot unwind).
+        //
+        //   "12345678901"        11 ASCII bytes
+        //   "\u{20AC}"            3 bytes (E2 82 AC)
+        //   "0123456789abcdefgh" 18 ASCII bytes
+        //   => 11 + 3 + 18 = 32 bytes once the separators are removed.
+        let input = "12345678901-\u{20AC}-0123456789abcdefgh";
+        assert_eq!(input.bytes().filter(|b| *b != b'-').count(), 32);
+
+        // Prefilled with a non-zero pattern: the all-zero assertion below
+        // proves the failure path really wrote the zeros.
+        let mut guid = FceuGuid { data: [0xA5; 16] };
+        scan_str(&mut guid, input);
+        assert_eq!(guid.data, [0u8; 16]);
+    }
+
+    #[test]
+    fn test_guid_scan_byte_layout_unchanged() {
+        // The expected bytes are derived by hand from the "big-endian parse +
+        // little-endian store" rule (the C++ strtoul + FCEU_en32lsb
+        // semantics), not from the function under test:
+        //
+        //   group 1 "01234567"     -> 0x01234567 -> LE 67 45 23 01
+        //   group 2 "89ab"         -> 0x89ab     -> LE ab 89
+        //   group 3 "cdef"         -> 0xcdef     -> LE ef cd
+        //   group 4 "0123"         -> 0x0123     -> LE 23 01
+        //   group 5 "456789abcdef" -> 45 67 89 ab cd ef
+        let input = "01234567-89ab-cdef-0123-456789abcdef";
+        let expected: [u8; 16] =
+            *b"\x67\x45\x23\x01\xab\x89\xef\xcd\x23\x01\x45\x67\x89\xab\xcd\xef";
+        let mut guid = FceuGuid { data: [0xA5; 16] };
+        scan_str(&mut guid, input);
+        assert_eq!(guid.data, expected);
+
+        // The C++ visible representation is the same string again.
+        unsafe {
+            let ptr = fceux11_rust_guid_to_string(&guid);
+            let cstr = unsafe { std::ffi::CStr::from_ptr(ptr) };
+            assert_eq!(cstr.to_str().unwrap(), input);
+        }
+    }
+
+    #[test]
+    fn test_guid_scan_invalid_length_zeroes_guid() {
+        // 33 hex digits after the separators are dropped => rejected.
+        let mut guid = FceuGuid { data: [0xA5; 16] };
+        scan_str(&mut guid, "01234567-89ab-cdef-0123-456789abcdef0");
+        assert_eq!(guid.data, [0u8; 16]);
+    }
+
+    #[test]
+    fn test_guid_scan_non_utf8_zeroes_guid() {
+        // 0xFF is not valid UTF-8 => the string is rejected.
+        let raw = b"01234567-89ab-cdef-0123-456789abcde\xff\0";
+        let cstr = std::ffi::CStr::from_bytes_with_nul(raw).unwrap();
+        let mut guid = FceuGuid { data: [0xA5; 16] };
+        unsafe {
+            fceux11_rust_guid_scan(&mut guid, cstr.as_ptr());
+        }
+        assert_eq!(guid.data, [0u8; 16]);
+    }
+
+    #[test]
+    fn test_guid_scan_invalid_hex_digit_keeps_group_zero() {
+        // The lax behaviour of the old implementation is kept as-is: one bad
+        // digit only zeroes the group that holds it, the other groups still
+        // parse. Tightening this is a separate work item.
+        //
+        //   group 5 = "456789abcdeZ" -> the last pair "eZ" is invalid -> 0x00,
+        //   the five pairs before it still parse.
+        let input = "01234567-89ab-cdef-0123-456789abcdeZ";
+        let expected: [u8; 16] =
+            *b"\x67\x45\x23\x01\xab\x89\xef\xcd\x23\x01\x45\x67\x89\xab\xcd\x00";
+        let mut guid = FceuGuid { data: [0xA5; 16] };
+        scan_str(&mut guid, input);
+        assert_eq!(guid.data, expected);
     }
 }

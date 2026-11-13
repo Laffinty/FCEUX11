@@ -514,8 +514,13 @@ void Mapper218_Init(CartInfo *info)
 		0,0,0,0,1,1,1,1, //mirrorAs2Bits==2
 		0,0,0,0,0,0,0,0  //mirrorAs2Bits==3
 	};
+	//Mapper 218 wires CHR-RAM's 1K pages into NTARAM: each entry is an OFFSET
+	//base pointer (*0x400 = 1K page stride, - i*0x400 = in-page compensation),
+	//so the PPU's unmasked 12-bit CHR index lands inside NTARAM[0x800].  The old
+	//form used the page number as a byte offset and ran past the array
+	//(upstream issue #851 segfault).  Fix is upstream commit 6738471, verbatim.
 	for(int i=0;i<8;i++)
-		VPageR[i] = &NTARAM[mapping[info->mirrorAs2Bits*8+i]];
+		VPageR[i] = &NTARAM[mapping[info->mirrorAs2Bits*8+i] * 0x400] - i * 0x400;
 
 	PPUCHRRAM = 0xFF;
 }
