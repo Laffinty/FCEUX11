@@ -954,7 +954,7 @@ KG_OTHER = [
     # J. static-license (kgmqa-117) — v1.8 新增（Python 实现避免引入 nlohmann/json）
     ('kgmqa-117-mirror-snapshot-check', None, None,
      'mirror snapshot 一致性 + license accepted set 校验',
-     ['static-license'], 'core', 'docs/plans/FCEUX11-v1.8_F11QA-构建计划.md',
+     ['static-license'], 'core', 'docs/history/plans/FCEUX11-v1.8_F11QA-构建计划.md',
      'python', ['tests/f11qa/mirror_snapshot_check.py',
                '--manifest', 'tests/fixtures/f11qa_mirror_pin.json'], 'tests', 60,
      ['license', 'mirror', 'snapshot'], 'blocking',

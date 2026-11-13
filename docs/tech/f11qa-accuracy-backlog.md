@@ -1,6 +1,10 @@
 # F11QA v1.8 精度攻关 backlog（2026-09-26 启动）
 
-> 实测矩阵 **106P / 14F**（v1.8 收口时点；内部逻辑检测 42P/0F）。
+> 实测矩阵 **106P / 14F**（v1.8 收口时点）。⚠️ **内部逻辑检测 42P/0F 是过期措辞**
+> （review 报告 §3.4）：A 类（regression-equivalence）实测读数为 **42 pass / 1 fail**，
+> 那 1 个 FAIL 是 `kgmqa-115-bench-tolerance`（墙钟 bench，PASS/FAIL 不具跨机可比性），
+> 按业主 2026-11-07 裁决已移出精度判定（blocking→advisory、冻结基线 true→false）
+> ⇒ **不判红、不影响 grade**。清单现为 **123 条**（A 类 44 / B 类 79）。
 > 流水线与 baseline 已稳：`pass_to_fail=0`、内部逻辑检测 全绿。
 > **当前进度（2026-09-27，v1.18.2）**：矩阵 **108P / 12F**，grade **B**，
 > 已清 **① 056**（`8010a3f`）与 **② 078**（v1.18.2），blargg 147P/30F，advisory 10.0%。
@@ -35,7 +39,7 @@
 > 两者都是 tepples 的 **survey ROM**（不实现 blargg `$6000` 协议，改 mapper 也不会转 PASS）。
 > 本组**实际只剩 093** 可攻。详见
 > [`已完成项归档`](../history/plans/FCEUX11-v2.0.2_DEBUG与性能优化-已完成项归档.md) §2.5
-> 与 [`review 报告`](../plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md) §二。
+> 与 [`review 报告`](../history/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md) §二。
 
 | id | 套件 | 现象 |
 |---|---|---|
@@ -74,3 +78,44 @@ R4 grade B 需要 blocking FAIL 明显下降。建议路径：
 
 > 后续 13 项的逐项完成度、易→难排序与两处纪律修正，见
 > `docs/history/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md`（§二 逐项校准后的真实状态）。
+
+## 4. 事实登记：冻结基线与实测的未授权漂移（**只登记，不改**）
+
+> 登记于 2026-11-13（v2.0.4 V4 批次）。**本节不改任何期望值 / 基线 / 判定 / 门禁口径**——
+> 基线重钉与 `approved` 翻转都属**期望值变更**，按 AGENTS.md r15 口径需**同级评审**。
+
+### 4.1 计数差（条数以当前实际为准）
+
+| 项 | 数值 | 出处 |
+|---|---|---|
+| 冻结基线 `generated_at` | `2026-09-26T15:01:47Z` | `tests/fixtures/f11qa_baseline_frozen.json` 顶层字段 |
+| 冻结基线 `results` 条数 | **121** | 同上（`results` 键计数） |
+| `tests/tests.json` 用例数 | **123**（kgmqa-001 ~ kgmqa-123） | `tests/tests.json` 的 `cases` 计数（解析计数，非人工估） |
+| 差 | **2** | 基线外的两条 = `kgmqa-121-apu-frame-timing`、`kgmqa-123-lua-frameadvance`（后者 2026-11-13 随 V1 落地新增） |
+
+> ⚠️ 计划文档里的「121 vs 122」是 V1 落地前的旧数 ⇒ **以本表的 121 vs 123 为准**。
+
+### 4.2 049 / 050 / 051 的基线漂移（`approved: false`）
+
+| 用例 | 冻结基线 | 实测（2026-11-10 矩阵产物） | 漂移记录 |
+|---|---|---|---|
+| `kgmqa-049-ppu-read-buffer-bisqwit` | `passed=false` | **PASS** | `baseline_drift[0].approved = false` |
+| `kgmqa-050-cpu-dummy-writes-bisqwit` | `passed=false` | **PASS** | `baseline_drift[1].approved = false` |
+| `kgmqa-051-cpu-exec-space-bisqwit` | `passed=false` | **PASS** | `baseline_drift[2].approved = false` |
+
+- 出处：矩阵产物 `build/f11qa_migration_matrix.json:651-679`（`baseline_drift` 数组）——
+  三条为 `field: passed` / `old: FAIL` → `new: PASS` / `approved: false`；
+  第四条是 `kgmqa-121-apu-frame-timing` 的 `field: existence`（`absent` → `present`，
+  `approved: false`）。
+- ⚠️ **精确表述**：这三条**在**冻结基线里（值为 `false`）；不在基线的是**翻转后的值**——
+  即「基线已过时但翻转未获授权」，而不是「基线里没有这几条」。
+- ⚠️ 矩阵产物生成于 **2026-11-10**、`engine.git_rev = 502150e`，**早于**发布提交 `45fec33`
+  ⇒ 它不是 HEAD 的读数（v2.0.4 计划 r1 ⑥ 已登记此事）。
+- ⚠️ **049 尤其不宜翻**：它的 PASS 建立在**帧预算放宽**（600 → 2000 帧）之上，不是精度修复
+  ⇒ 翻基线会让 049 看起来像「精度已达标」，而它实际不具备（review 报告 §1.6）。
+
+### 4.3 本节明确不做的事
+
+- ❌ 不翻转 049 / 050 / 051 的基线，不改任何 `approved`。
+- ❌ 不重钉冻结基线（`generated_at` / 条数 / `passed` 值一律不动）。
+- ❌ 不改任何 `expected` / `failure_means` / `pass_to_fail` / `new_test` / `test_set_diff`。

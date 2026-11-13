@@ -766,6 +766,14 @@ static INLINE void DMCDMA(void)
 
 void FCEU_SoundCPUHook(int cycles)
 {
+ // B2(b) (v2.0.2): the FCEU_PROFILE_FUNC probe for this function is
+ // intentionally absent -- this is a per-instruction hot path and the R4
+ // decision ruled it out.  Do not add a probe here without an explicit
+ // decision on the per-instruction cost.  The tree currently carries 6
+ // probes (fceu.cpp "Emulate Single Frame", ppu_rendering.cpp "RefreshLine"
+ // and "DoLine", sdl-sound.cpp "WriteSound", ConsoleWindow.cpp "VideoXfer"
+ // and "updatePeriodic"); the older "4/5" count in the v2.0.2 review report
+ // is obsolete.  See the v2.0.4 build plan item V3.
  // R6 Step 3 (2026-08-01, defect-1 deep probe): two new sample probes
  // to localize the fhcnt cumulative-drift vs quarter-boundary timing.
  //  (a) HOOK_SAMPLE: every 4096th hook call (~0.1s) records fhcnt to

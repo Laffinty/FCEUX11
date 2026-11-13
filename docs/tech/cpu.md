@@ -70,13 +70,21 @@
 
 ### 2.4 中断模型（关键近似）
 
-- 中断**只在 while 循环顶部（指令边界）检查**（x6502.cpp:515-579）：无指令内轮询、
-  无 interrupt hijack、无 branch-delay——`cpu_int_2/3/4/5` 全部 FAIL 的直接原因。
+- 中断**采用两拍模型**：中断线在**指令内**的 poll 点被采样（`x6502.cpp:1094-1116`，置
+  `g_intl_pending`），在**下一个指令边界**才派发（`x6502.cpp:969`、`1004-1040`）——
+  与硬件「指令内采样、指令结束才起序列」一致（见 §1.2）。
+- **向量级 hijack 已实现**：BRK 执行时若 NMI 线已置位，序列被劫持为 NMI 服务
+  （`x6502.cpp:848` `X6502_NmiHijacked()`，由 `ops.inc:44` 调用）——B 位保留、向量取
+  `$FFFA`、不重复压栈。
+- **仍未建模**：branch-delay（taken branch 把中断响应推迟到分支目标之后）与周期级
+  线断言时刻精度 ⇒ `kgmqa-037` 仍 FAIL 0x01（7/10 行）的根因是后者（G5），不是
+  轮询/hijack 模型本身。
 - 优先级链：RESET（取 FFFC/FFFD）→ `FCEU_IQNMI2`（延迟一档的 NMI）→ NMI（7 周期，
   push `(_P&~B)|U`，取 FFFA/FFFB）→ IRQ（仅当上一条指令结束时的 P（`mooPI`）无
   I 标志）。
-- NMI 一边界延迟由 `g_e1_nmi_fresh` 实现（latch 在边界 B 及之后置位 → 下一条边界
-  可见；依据 e1_vbl 调查 04-nmi_control #11，x6502.cpp:416-447）。
+- NMI 的一边界延迟由**两拍采样**天然产生（poll 点采样 → 下一条指令边界才派发），
+  不再有 `g_e1_nmi_fresh` 之类的门闩——D1 S2 已把它退役（`x6502.cpp:839-843`）；
+  依据 e1_vbl 调查 04-nmi_control #11 与调查页 §10。
 - 每条指令前 `_PI = _P` 实现 I 标志延迟一拍；指令后以 `tcount` 调 mapper
   `MapIRQHook` 与 `FCEU_SoundCPUHook`。
 - `X6502_IRQBegin/End(w)`（:385-393）= `_IRQlow` 置/清位；`FCEU_IQTEMP` 0x800 是
@@ -122,8 +130,10 @@
 
 - 指令级：`instr_v5_*`/`all_instrs`（组合挂、单组过的 accuracy gap）、`instr_timing`
   （周期表+边界加罚不精确）。
-- 中断：`cpu_int_2/3/4/5`——指令边界轮询、无 hijack/branch-delay 的结构性近似；
-  补齐需要把中断轮询下沉到指令内固定周期点。
+- 中断：两拍轮询 + 向量级 hijack 已落地（见 §2.4）；残留缺口 = branch-delay 未建模 +
+  周期级线断言时刻精度（G5）⇒ `kgmqa-037` 仍 FAIL 0x01。`cpu_int_2/3/4/5` 是 blargg
+  L2 ROM（登记在 `tests/fixtures/blargg_known_fail.json`，非 kgmqa 用例），kgmqa 侧的
+  对应用例是 `kgmqa-037`。
 - Dummy write：`cpu_dummy_writes_oam/ppu`、`cpu_exec_space_ppuio`、`instr_misc*`。
 - 复位/RAM：`cpu_reset_ram/regs`。
 

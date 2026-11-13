@@ -9,10 +9,21 @@
 > |---|---|---|
 > | `tests/tests.json` 清单条目 | 120（kgmqa-001 ~ kgmqa-120） | v1.8 扁平清单 |
 > | 迁移矩阵 PASS / FAIL | 106 / 14 | `f11qa_migration_matrix.json`（grade B） |
-> | 内部逻辑检测（CTest） | 42P / 0F | ctest 全绿 |
+> | 内部逻辑检测（A 类 / regression-equivalence） | **42 pass / 1 fail**（非 42P / 0F） | `oracle_breakdown.A_regression`，矩阵产物 `build/f11qa_migration_matrix.json`（2026-11-10 产物，122 条清单时） |
 > | 硬件一致性检测（blargg 177 ROM） | 145 PASS / 32 FAIL | `f11qa_blargg_runner --manifest` |
 > | advisory known-limit 占比 | 14/120 = 11.7%（cap 15%） | R4 gate + precision.md §4 |
 > | 发布评级 | **B (release)** | grade.rs；R4 四项硬门禁全过 |
+>
+> ⚠️ **「内部逻辑检测 42P / 0F」是过期措辞**（review 报告 §3.4）：A 类实测读数是
+> **42 pass / 1 fail**，那 1 个 FAIL 是 `kgmqa-115-bench-tolerance`（墙钟 bench，
+> PASS/FAIL 不具跨机可比性）——按业主 2026-11-07 裁决已移出精度判定
+> （`failure_means` blocking→advisory、冻结基线 true→false）⇒ **不判红、不影响 grade**
+> （`grade_reasons` = "10 advisory known-limit failure(s), all within frozen baseline"）。
+> ⚠️ **条数漂移**：上表其余数字仍是 `f19fa7d` 的 CI 快照（120 条清单），本次未动；
+> `tests/tests.json` 现为 **123 条**（A 类 **44** / B 类 **79**；A/B 派生规则 =
+> `kind` 含 `rom-suite` → B，否则 A，见 `src/rust/crates/f11qa/src/cli/run_subprocess.rs:49-53`）。
+> 第 44 条 A 类 `kgmqa-123-lua-frameadvance`（V1/F-1 锁，2026-11-13 落地）晚于 2026-11-10
+> 那次读数，**本地无读数** ⇒ 下次矩阵实跑后须复核 A 类读数。
 >
 > **CI 状态**：push 到 `main` / `wip1.8` 自动触发 `f11qa.yml`；R4 gate 要求
 > `total==120`、`fail_to_pass==0`、vendor_state 三态、advisory≤15%、grade∉{D,E}。

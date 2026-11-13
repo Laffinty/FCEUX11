@@ -1066,7 +1066,7 @@
       "mirror_path": "blargg/cpu/cpu_interrupts_v2_2-nmi_and_brk.nes",
       "vendor_state": "vendored",
       "protocol": "$6000",
-      "known_limit": "CPU interrupt polling only at instruction boundary (x6502.cpp:515-579); hijack/branch-delay not modeled"
+      "known_limit": "Two-stage polling and vector-level hijack ARE modeled (D1 S2, 2026-11-07): the interrupt lines are sampled at the poll point inside the instruction (x6502.cpp:1094-1116, g_intl_pending) and dispatched at the next instruction boundary (x6502.cpp:969, 1004-1040); a BRK that finds the NMI line asserted is hijacked at the vector level (x6502.cpp:848 X6502_NmiHijacked, called from ops.inc:44). NOT modeled: branch-delay (a taken branch postponing the interrupt response) and cycle-exact line assertion timing - the residual gap that keeps this case FAIL 0x01 (7/10 rows) is the VBL NMI assertion-instant quantization (G5), not the polling/hijack model. See docs/history/surveys/cpu_interrupt_hijack/README.md section 10."
     },
     {
       "kgmqa_id": "kgmqa-038-instr-misc-blargg",
@@ -1106,7 +1106,7 @@
       "mirror_path": "blargg/cpu/instr_misc.nes",
       "vendor_state": "vendored",
       "protocol": "$6000",
-      "known_limit": "instr_misc combined opcode group; singles pass, combo fails (accuracy gap)"
+      "known_limit": "deferred, not an active work item. The S0a/S1 discrimination experiment (2026-09-28) was negative: neither the FCEUX11_BUSDB switch nor adding a dummy read to GetABIRD changed the result, so neither the presence of dummy reads nor the open-bus value is the blocker. Root cause still open: Cpu::set_db() has ZERO call sites (src/bus.h:47), so the CPU data bus (DB) never changes and every open-bus reader sees a constant - the open-bus path is dead. S2 needs redefinition; lead candidate: GetIX (LDA/STA (z,x)) has neither a dummy read nor a cross-page cycle, and it is one of the 8 forms the ROM declares as tested."
     },
     {
       "kgmqa_id": "kgmqa-039-oam-stress-blargg",
@@ -1849,7 +1849,7 @@
       "mirror_path": "blargg/cpu/instr_timing_instr_timing.nes",
       "vendor_state": "vendored",
       "protocol": "$6000",
-      "known_limit": "instruction cycle table combined test; singles pass"
+      "known_limit": "RESOLVED (v1.18.1) - this case now PASSes, no residual known limit. Fix: CycTable[0xE2] 3->2 and opcode 0xBB (LAS/LAR) moved from RMW_ABY to LD_ABY so the cross-page +1 penalty is charged and no bogus write-back is performed (src/ops_table.inc:60-63). Frozen baseline entry passed=true; matrix artifact 2026-11-10 shows PASS."
     },
     {
       "kgmqa_id": "kgmqa-057-instr-test-v3-blargg",
@@ -2694,7 +2694,7 @@
       "mirror_path": "lidnariq/serom/serom.nes",
       "vendor_state": "vendored",
       "protocol": "$6000",
-      "known_limit": "MMC1 SEROM/SHROM bank-size constraint not modeled"
+      "known_limit": "RESOLVED (v1.18.2) - this case now PASSes, no residual known limit. Fix: NES 2.0 mapper 001 submapper 5 (Fixed PRG = SEROM/SHROM/SH1ROM, PRG A14 wired straight to CPU A14) is implemented via MMC1_SUBMAPPER_FIXED_PRG / isFixedPRG (src/boards/mmc1.cpp:48-53, 69, 137). Frozen baseline entry passed=true; matrix artifact 2026-11-10 shows PASS."
     },
     {
       "kgmqa_id": "kgmqa-079-exram-quietust",
@@ -3820,7 +3820,7 @@
       "mirror_path": "rainwarrior/mset/mset.nes",
       "vendor_state": "vendored",
       "protocol": "$6000",
-      "known_limit": "SNES mouse input scan protocol"
+      "known_limit": "The SNES mouse protocol itself is IMPLEMENTED (commit 05bfc1f): byte0 signature alternates 0xFF/0x00, dy gets the same x1/x2/x4 sensitivity scaling as dx, and the 6-bit magnitude saturates with a bit6 overflow flag (src/input/snesmouse.cpp:71-102); locked by tests/f11qa/core/input_snesmouse_test.cpp (T1-T6). Residual limit: the end-to-end 0xFC result still requires real mouse interaction (owner ruling: defer, recorded as a known limit), so the case remains FAIL, advisory, frozen baseline false."
     },
     {
       "kgmqa_id": "kgmqa-108-mict-rainwarrior",
@@ -4127,7 +4127,7 @@
         "static-license"
       ],
       "layer": "core",
-      "spec_source": "docs/plans/FCEUX11-v1.8_F11QA-构建计划.md",
+      "spec_source": "docs/history/plans/FCEUX11-v1.8_F11QA-构建计划.md",
       "license": "GPL-2.0",
       "input": {
         "binary": "python",
