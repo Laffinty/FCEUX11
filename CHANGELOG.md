@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — v2.0.4（在途）
+
+> **在途段**：随 v2.0.4 的工作累加，**发版时并入正式版本段**。
+> 对应计划：`docs/plans/FCEUX11-v2.0.4_残留精度与调试待办-构建计划.md`（批 2 = V3/V4、
+> 批 4 = V9/V24 等）。
+
+### Fixed — 崩溃与内存安全（批 4）
+
+- **mapper 218 的 CHR-RAM 映射越界**（V9）：`src/boards/datalatch.cpp` 的 `Mapper218_Init`
+  原来把「1K 页号」当**字节偏移**用 ⇒ PPU 的未掩码 12 位 CHR 地址会走出 `NTARAM[0x800]`
+  （上游 issue #851 的段错误；本仓因 `PPUCHRRAM=0xFF` 还会**越界写**，落点覆盖命名表指针表）。
+  改用上游 commit `6738471` 的写法（逐字照抄）：每个 `VPageR[i]` 改为带 1K 页步距与页内补偿的
+  **偏移基址**。新增回归夹具 `tests/fixtures/mapper_mapper218.nes` + 锁测试
+  （断言「每个 CHR 地址的有效落点都在 NTARAM 内」——**不复述指针公式** ⇒ 不会与实现同错；
+  还原旧写法 ⇒ 8192 个地址中 6145 个越界、最深 0x1800 字节 ⇒ 必红）。
+- **畸形 `.fm2` 的 GUID 字段可令进程中止**（V24）：`fceux11_rust_guid_scan` 按**字节**切片
+  `String`，长度恰为 32 字节但含多字节 UTF-8 时切点落在字符中间 ⇒ panic；
+  该函数是 `extern "C"` ⇒ panic 不可 unwind ⇒ **进程 abort**（`0xC0000409`）。
+  改为全程按字节处理（`clean` 改 `Vec<u8>` + 按字节取组），三条失败路径统一把 GUID **置零**，
+  并加 5 条锁测试（46 → 51 项）。⚠️ 唯一可观察行为变化：含非 ASCII 字节的 GUID 输入
+  由「部分解析结果」变为「全零」（非 ASCII 输入本就不是 GUID）。
+
+### Changed — 护栏与文本登记（批 2）
+
+- **A4-1 的否决结论进代码**（V3）：`src/video.cpp` 的 64 KiB/帧后缓冲拷贝处补注释 ——
+  savestate chunk-8 是**任意帧异步消费** ⇒ 消费计数门控会令金标漂移、且谓词恒真
+  ⇒ **勿再在此加消费计数门控**。（此前该结论只活在文档里。）
+- **`FCEU_SoundCPUHook` 的「有意省略探点」登记**（V3）：该每指令热路径按 R4 裁决**不加**
+  `FCEU_PROFILE_FUNC`；注释登记此事，并把探点清单口径修正为 **6 个**（旧「4/5」口径作废）。
+- **清单与文档的过期描述修订批**（V4）：`tests/tests.json` 的 **5 条 `known_limit`** 改为与事实相符
+  （037 的向量级 hijack **已建模**；038 的真根因是 `Cpu::set_db()` 零调用点；056 / 078 **已 RESOLVED**；
+  107 的 SNES 鼠标协议**已实现**、残留端到端项）；`docs/tech/{cpu,F11QA,f11qa-accuracy-backlog}.md`
+  的过期措辞订正；v1.8 计划的失效引用改指 `docs/history/plans/`（**生成器与产物一起改**）；
+  删除从不参与构建的死文件 `src/tests/CMakeLists.txt`。
+  ⚠️ **未改任何期望值 / 基线 / 判定**（`expected` / `failure_means` / `pass_to_fail` 零改动）。
+
 ## [2.0.2_hotfix1] - 2026-11-10
 
 > v2.0.2 的 hotfix 发布。**数值版本口径不动**（`FCEU_VERSION_NUMERIC` 仍为 `20202`
