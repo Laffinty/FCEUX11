@@ -26,6 +26,7 @@
 #include <stdint.h>
 #include <stdarg.h>
 #include <string.h>
+#include <atomic>
 #include <string>
 #include <memory>
 
@@ -60,11 +61,11 @@
 gwavi_t  *gwavi = NULL;
 bool      recordEnable = false;
 bool      recordAudio  = true;
-int       vbufHead = 0;
-int       vbufTail = 0;
+std::atomic<int> vbufHead(0);
+std::atomic<int> vbufTail(0);
 int       vbufSize = 0;
-int       abufHead = 0;
-int       abufTail = 0;
+std::atomic<int> abufHead(0);
+std::atomic<int> abufTail(0);
 int       abufSize = 0;
 // v1.13 Purify F3a: std::unique_ptr<T[]> RAII (was raw malloc/free)
 std::unique_ptr<uint32_t[]> rawVideoBuf;
@@ -505,10 +506,10 @@ int aviRecordOpenFile( const char *filepath )
 	abufSize    = 96000;
 	rawAudioBuf = std::make_unique<int16_t[]>(abufSize);
 
-	vbufHead = 0;
-	vbufTail = 0;
-	abufHead = 0;
-	abufTail = 0;
+	vbufHead.store(0, std::memory_order_relaxed);
+	vbufTail.store(0, std::memory_order_relaxed);
+	abufHead.store(0, std::memory_order_relaxed);
+	abufTail.store(0, std::memory_order_relaxed);
 
 	recordEnable = true;
 	return 0;
@@ -530,7 +531,7 @@ int aviRecordAddFrame( void )
 
 	numPixels  = nes_shm->video.ncol.load(std::memory_order_acquire) * nes_shm->video.nrow.load(std::memory_order_acquire);
 
-	availSize = (vbufTail - vbufHead);
+	availSize = (vbufTail.load(std::memory_order_acquire) - vbufHead.load(std::memory_order_relaxed));
 	if ( availSize <= 0 )
 	{
 		availSize += vbufSize;
@@ -540,14 +541,14 @@ int aviRecordAddFrame( void )
 	{
 		msleep(1);
 
-		availSize = (vbufTail - vbufHead);
+		availSize = (vbufTail.load(std::memory_order_acquire) - vbufHead.load(std::memory_order_relaxed));
 		if ( availSize <= 0 )
 		{
 			availSize += vbufSize;
 		}
 	}
 
-	i = 0; head = vbufHead;
+	i = 0; head = vbufHead.load(std::memory_order_relaxed);
 
 	while ( i < numPixels )
 	{
@@ -555,7 +556,7 @@ int aviRecordAddFrame( void )
 
 		head = (head + 1) % vbufSize;
 	}
-	vbufHead = head;
+	vbufHead.store(head, std::memory_order_release);
 
 	return 0;
 }
@@ -583,18 +584,18 @@ int aviRecordAddAudioFrame( int32_t *buf, int numSamples )
 		// up to abufTail (buffer full), yield a millisecond to give the
 		// consumer time to drain; on a second full check, drop the sample
 		// rather than corrupt.
-		int next = (abufHead + 1) % abufSize;
-		if (next == abufTail) {
+		int next = (abufHead.load(std::memory_order_relaxed) + 1) % abufSize;
+		if (next == abufTail.load(std::memory_order_acquire)) {
 			msleep(1);
-			next = (abufHead + 1) % abufSize;
-			if (next == abufTail) {
+			next = (abufHead.load(std::memory_order_relaxed) + 1) % abufSize;
+			if (next == abufTail.load(std::memory_order_acquire)) {
 				// still full after a brief wait — emit silent rather
 				// than scribble past the buffer boundary.
 				continue;
 			}
 		}
-		rawAudioBuf[ abufHead ] = buf[i];
-		abufHead = next;
+		rawAudioBuf[ abufHead.load(std::memory_order_relaxed) ] = buf[i];
+		abufHead.store(next, std::memory_order_release);
 	}
 
 	return 0;
@@ -614,7 +615,8 @@ int aviRecordClose(void)
 	// v1.13 Purify F3a: std::unique_ptr<T[]> RAII; .reset() replaces free+NULL
 	rawVideoBuf.reset();
 	rawAudioBuf.reset();
-	vbufTail = abufTail = 0;
+	vbufTail.store(0, std::memory_order_relaxed);
+	abufTail.store(0, std::memory_order_relaxed);
 	vbufSize = abufSize = 0;
 
 	return 0;

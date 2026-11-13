@@ -110,12 +110,16 @@ void AviRecordDiskThread_t::run(void)
 	while ( !isInterruptionRequested() )
 	{
 
-		while ( (numPixelsReady < numPixels) && (vbufTail != vbufHead) )
-		{
-			videoOut[ numPixelsReady ] = rawVideoBuf[ vbufTail ]; numPixelsReady++;
+		int vhead = vbufHead.load(std::memory_order_acquire);
+		int vtail = vbufTail.load(std::memory_order_relaxed);
 
-			vbufTail = (vbufTail + 1) % vbufSize;
+		while ( (numPixelsReady < numPixels) && (vtail != vhead) )
+		{
+			videoOut[ numPixelsReady ] = rawVideoBuf[ vtail ]; numPixelsReady++;
+
+			vtail = (vtail + 1) % vbufSize;
 		}
+		vbufTail.store(vtail, std::memory_order_release);
 
 		if ( numPixelsReady >= numPixels )
 		{
@@ -164,7 +168,7 @@ void AviRecordDiskThread_t::run(void)
 
 			numPixelsReady = 0;
 
-			audioSamplesAvail = abufHead - abufTail;
+			audioSamplesAvail = abufHead.load(std::memory_order_acquire) - abufTail.load(std::memory_order_relaxed);
 
 			if ( audioSamplesAvail < 0 )
 			{
@@ -176,17 +180,21 @@ void AviRecordDiskThread_t::run(void)
 			{
 				numSamples = 0;
 
-				while ( abufHead != abufTail )
-				{
-					audioOut[ numSamples ] = rawAudioBuf[ abufTail ]; numSamples++;
+				int audioHead = abufHead.load(std::memory_order_acquire);
+				int audioTail = abufTail.load(std::memory_order_relaxed);
 
-					abufTail = (abufTail + 1) % abufSize;
+				while ( audioHead != audioTail )
+				{
+					audioOut[ numSamples ] = rawAudioBuf[ audioTail ]; numSamples++;
+
+					audioTail = (audioTail + 1) % abufSize;
 
 					if ( numSamples >= audioChunkSize )
 					{
 						break;
 					}
 				}
+				abufTail.store(audioTail, std::memory_order_release);
 
 				if ( numSamples > 0 )
 				{
@@ -211,7 +219,7 @@ void AviRecordDiskThread_t::run(void)
 		}
 	}
 
-	audioSamplesAvail = abufHead - abufTail;
+	audioSamplesAvail = abufHead.load(std::memory_order_acquire) - abufTail.load(std::memory_order_relaxed);
 
 	if ( audioSamplesAvail < 0 )
 	{
@@ -223,12 +231,16 @@ void AviRecordDiskThread_t::run(void)
 	{
 		numSamples = 0;
 
-		while ( abufHead != abufTail )
-		{
-			audioOut[ numSamples ] = rawAudioBuf[ abufTail ]; numSamples++;
+		int audioHead = abufHead.load(std::memory_order_acquire);
+		int audioTail = abufTail.load(std::memory_order_relaxed);
 
-			abufTail = (abufTail + 1) % abufSize;
+		while ( audioHead != audioTail )
+		{
+			audioOut[ numSamples ] = rawAudioBuf[ audioTail ]; numSamples++;
+
+			audioTail = (audioTail + 1) % abufSize;
 		}
+		abufTail.store(audioTail, std::memory_order_release);
 
 		if ( numSamples > 0 )
 		{

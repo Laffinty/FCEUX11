@@ -13,6 +13,7 @@
 #include <vfw.h>
 #endif
 
+#include <atomic>
 #include <string>
 #include <memory>
 
@@ -46,11 +47,11 @@ extern int      audioSampleRate;
 
 extern bool      recordEnable;
 extern bool      recordAudio;
-extern int       vbufHead;
-extern int       vbufTail;
+extern std::atomic<int> vbufHead;
+extern std::atomic<int> vbufTail;
 extern int       vbufSize;
-extern int       abufHead;
-extern int       abufTail;
+extern std::atomic<int> abufHead;
+extern std::atomic<int> abufTail;
 extern int       abufSize;
 extern std::unique_ptr<uint32_t[]> rawVideoBuf;
 extern std::unique_ptr<int16_t[]>   rawAudioBuf;
