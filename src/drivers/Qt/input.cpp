@@ -55,6 +55,8 @@
 
 #include <cstring>
 #include <cstdio>
+#include <atomic>
+#include <thread>
 
 /** GLOBALS **/
 int NoWaiting = 0;
@@ -148,7 +150,24 @@ static void UpdateMahjong(void);
 static void UpdateFTrainer(void);
 static void UpdateTopRider(void);
 
-static uint32 JSreturn = 0;
+// v2.0.4 V15: the gamepad state is written by the GUI thread (UpdateGamepad,
+// via FCEUD_UpdateInput) and read by the emulation thread (the core
+// dereferences joyports[port].ptr == &JSreturnEmu at $4016). The old single
+// plain `uint32 JSreturn` shared across both threads was a data race (formal
+// UB; the compiler may cache/reorder the load). Upstream FCEUX split it: an
+// atomic cell for the GUI side, a plain snapshot for the emu side, and a
+// per-frame handoff on the emulation thread (emuThreadPollInputs, called from
+// fceuWrapper.cpp at the top of the per-frame GameInfo block).
+static std::atomic<uint32_t> JSreturnGui = 0;
+static uint32_t JSreturnEmu = 0;
+
+// v2.0.4 V15 acceptance (1) probe: UpdateGamepad (GUI thread) and
+// emuThreadPollInputs (emulation thread) must never run on the same thread.
+// The writer records its thread id (hashed); the poller compares it against
+// its own and flags any overlap once through the message log. A hit means
+// FCEUD_UpdateInput got wired onto the emulation thread and the snapshot
+// handoff is being bypassed. 0 = writer has not run yet.
+static std::atomic<std::size_t> g_v15GuiWriterTid{0};
 
 #include "keyscan.h"
 static uint8_t g_keyState[SDL_NUM_SCANCODES];
@@ -212,8 +231,28 @@ const uint8_t *QtSDL_getKeyboardState( int *bufSize )
 
 uint32 GetGamepadPressedImmediate(void)
 {
-	//printf("JSreturn: 0x%08X\n", JSreturn);
-	return JSreturn;
+	//printf("JSreturn: 0x%08X\n", JSreturnGui);
+	return JSreturnGui.load(std::memory_order_relaxed);
+}
+
+// Atomically retrieve inputs (must be called EMU thread)
+void emuThreadPollInputs()
+{
+	const std::size_t tid = std::hash<std::thread::id>{}(std::this_thread::get_id());
+
+	// v2.0.4 V15 acceptance (1): the GUI writer and the emu poller must be
+	// distinct threads. Check is advisory: warn once, do not stop emulation.
+	const std::size_t guiTid = g_v15GuiWriterTid.load(std::memory_order_relaxed);
+	if (guiTid != 0 && guiTid == tid)
+	{
+		static std::atomic<bool> warned{false};
+		if (!warned.exchange(true, std::memory_order_relaxed))
+		{
+			FCEU_printf("V15: UpdateGamepad and emuThreadPollInputs ran on the same thread - input snapshot handoff is bypassed\n");
+		}
+	}
+
+	JSreturnEmu = JSreturnGui.load(std::memory_order_relaxed);
 }
 
 #define keyonly(__a) _keyonly(MKK(__a))
@@ -1581,7 +1620,9 @@ UpdateGamepad(void)
 	//   if((JS & (0x30<<x) ) == (0x30<<x) ) JS&=~(0x30<<x);
 	//  }
 
-	JSreturn = JS;
+	JSreturnGui.store(JS, std::memory_order_relaxed);
+	// v2.0.4 V15 acceptance (1) probe: record the writer's thread id.
+	g_v15GuiWriterTid.store(std::hash<std::thread::id>{}(std::this_thread::get_id()), std::memory_order_relaxed);
 }
 
 static ButtConfig powerpadsc[2][12] = {
@@ -1802,7 +1843,7 @@ void InitInputInterface()
 			break;
 		case SI_GAMEPAD:
 		case SI_SNES:
-			InputDPtr = &JSreturn;
+			InputDPtr = &JSreturnEmu;
 			break;
 		case SI_ARKANOID:
 			InputDPtr = MouseData;

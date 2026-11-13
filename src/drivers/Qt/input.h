@@ -157,6 +157,11 @@ int DTestButtonJoy(ButtConfig *bc);
 
 void FCEUD_UpdateInput(void);
 
+// v2.0.4 V15: per-frame handoff of the GUI-written gamepad state to the
+// emulation thread's snapshot (JSreturnGui -> JSreturnEmu). Must be called
+// from the emulation thread, once per frame, before the core runs.
+void emuThreadPollInputs(void);
+
 void UpdateInput(Config *config);
 
 const char* ButtonName(const ButtConfig* bc);
