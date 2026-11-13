@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > **在途段**：随 v2.0.4 的工作累加，**发版时并入正式版本段**。
 > 对应计划：`docs/plans/FCEUX11-v2.0.4_残留精度与调试待办-构建计划.md`（批 2 = V3/V4、
-> 批 4 = V9/V24 等）。
+> 批 4 = V9/V11/V13/V15/V24、批 5 = V19 等）。
 
 ### Fixed — 崩溃与内存安全（批 4）
 
@@ -26,6 +26,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   改为全程按字节处理（`clean` 改 `Vec<u8>` + 按字节取组），三条失败路径统一把 GUID **置零**，
   并加 5 条锁测试（46 → 51 项）。⚠️ 唯一可观察行为变化：含非 ASCII 字节的 GUID 输入
   由「部分解析结果」变为「全零」（非 ASCII 输入本就不是 GUID）。
+- **VRC7 跨进程读档的 OPLL 悬空指针**（V11）：`FCEUSTATE_INDIRECT` 把含 12 个裸指针的 `OPLL`
+  结构逐字落盘，跨进程读档后 `sintbl` 等指针悬空 ⇒ 解引用崩溃/杂音（上游 `vrc7.cpp` 至 master
+  **未修**，本仓修完即领先）。`StateRestore` 补 `OPLL_forceRefresh(VRC7Sound)`——只重建派生量、
+  不动 phase/patch ⇒ 音色连续；放 `StateRestore` 而非 `Sync()`，避免每次 PRG/CHR 写触发。
+- **AVI 环形缓冲索引的跨线程数据竞争**（V13）：`vbufHead/vbufTail/abufHead/abufTail` 四个裸
+  `int` 被模拟线程（生产）与 Qt 磁盘线程（消费）无同步共享 ⇒ 消费端可能空转、尾帧丢失。
+  改 `std::atomic<int>`，内存序照上游 master：对端索引 acquire 读 / 自有索引 relaxed 读 /
+  写端一律 release 存 / 重置 relaxed；生产端（`AviRecord.cpp`）、消费端（`AviRecordDiskThread.cpp`）、
+  extern 声明（`AviVideoCodec.h`）三处共 27 个可变访问点全部转 `.load/.store`。
+- **手柄状态的 GUI 写 / 模拟线程读数据竞争**（V15）：裸 `uint32 JSreturn` 被 GUI 线程写、
+  被模拟线程在 `$4016` 读路径解引用。照上游 1:1 拆分：GUI 侧 `std::atomic<uint32_t> JSreturnGui`
+  + 模拟线程侧快照 `JSreturnEmu`，每帧在 `fceuWrapper.cpp` 帧首经 `emuThreadPollInputs()`
+  原子移交；附常驻轻量探针（写者与 poller 同线程 ⇒ 去重告警一次，防未来接线绕过移交）。
+  movie 回放路径不受影响（回放期核心整体跳过 driver Update）。
+
+### Fixed — 正确性与防御性修正（批 5）
+
+- **GUID 解析失败返回栈垃圾**（V19）：`FCEU_Guid::fromString` 的 `FCEU_Guid ret;` 是无用户
+  构造函数的聚合 ⇒ 解析失败时 `data[16]` 为栈上不确定值，会流入 movie GUID 比较
+  （误报「savestate 属于另一个 movie」）并被写进 `.fm2` 文件。Rust 侧失败置零已随 V24 落地；
+  C++ 侧补值初始化 `FCEU_Guid ret{};`（与上游 master 的 memset 同保证）构成双保险；
+  顺带删除零调用的死代码 `hexToByte`（grep 归零）。新增 `guid_test`（ctest 计数 36 → 37）：
+  垃圾输入 → 全零 + 同输入连调两次一致 + 合法 UUID 按手拼常量与 `toString` 往返的阳性对照
+  （防「什么都不写也全绿」的哑弹）。⚠️ 双层零化在 C++ 可达输入上互相掩盖 ⇒ 变异验证须
+  **双腿齐拆**（C++ `ret{}` + Rust 置零）才见红——已实测，还原后全绿。
 
 ### Changed — 护栏与文本登记（批 2）
 
