@@ -36,7 +36,7 @@ pub fn load_manifest(path: &Path) -> Result<BTreeMap<String, TestManifest>, QaEr
         message: format!(
             "Cannot parse manifest '{}': {}\n  hint: tests.json must be F11QA v1.8 schema \
              ({{\"schema_version\": \"1.8\", \"cases\": [...]}}); see \
-             docs/plans/FCEUX11-v1.8_F11QA-构建计划.md §六",
+             docs/history/plans/FCEUX11-v1.8_F11QA-构建计划.md §六",
             path.display(),
             e
         ),

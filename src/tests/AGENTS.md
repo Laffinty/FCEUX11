@@ -119,7 +119,7 @@ python fixtures/generate_test_roms.py
 
 ## Adding a New Test Executable
 
-When creating a brand-new test target (e.g., `ppu_render_test`), copy the pattern from `src/tests/CMakeLists.txt`:
+When creating a brand-new test target (e.g., `ppu_render_test`), copy the pattern from `tests/CMakeLists.txt` (the live one; `src/tests/CMakeLists.txt` was a dead duplicate and was removed on 2026-11-13 — it was never included by `src/CMakeLists.txt`):
 
 ```cmake
 add_executable(fceux11_ppu_render_test

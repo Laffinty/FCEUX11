@@ -43,7 +43,17 @@ int offsetStringToInt(unsigned int type, const char* offsetBuffer, bool *convers
 	auto result = std::from_chars(p, p + std::strlen(p), offset, 16);
 	if (result.ec != std::errc() || result.ptr == p)
 	{
-		return -1;
+		// Not a hex number. Fall through with offset = -1 so the BT_C branch
+		// can resolve breakpoint keywords (NSF LOAD/INIT/PLAY, FDS NMI1-3,
+		// NES NMI/VBL/RST/IRQ/BRK) and symbol names. The pre-v0.3.5 sscanf
+		// version returned 0 (not EOF) for non-numeric input and therefore
+		// reached those branches; the v0.3.5 from_chars early return turned
+		// all of them into dead code (caught by the 2026-11-13 A1 GUI
+		// walkthrough: the NSF-1 PLAY replacement verification got "Start
+		// Address Invalid"). The BT_P/S/R branches below report
+		// conversionOk = false for offset = -1, exactly as the sscanf
+		// version did.
+		offset = -1;
 	}
 
 	if (type & BT_P)
@@ -456,7 +466,10 @@ int condition(watchpointinfo* wp)
 
 //---------------------
 
-volatile int codecount = 0, datacount = 0, undefinedcount = 0;
+// V14 (2026-11-14): was `volatile int` — see debug.h. The RMW below goes
+// through the Rust FFI (composite logic, not a fetch_add): load relaxed ->
+// hand the local int32_t copy to the FFI -> store relaxed.
+std::atomic<int> codecount{0}, datacount{0}, undefinedcount{0};
 unsigned char *cdloggerdata = NULL;
 unsigned int cdloggerdataSize = 0;
 static int indirectnext = 0;
@@ -468,14 +481,14 @@ void LogCDVectors(int which){
 	int j = GetPRGAddress(which);
 	if (j == -1) return;
 
-	int32_t cc = codecount;
-	int32_t dc = datacount;
-	int32_t uc = undefinedcount;
+	int32_t cc = codecount.load(std::memory_order_relaxed);
+	int32_t dc = datacount.load(std::memory_order_relaxed);
+	int32_t uc = undefinedcount.load(std::memory_order_relaxed);
 	fceux11_rust_debug_log_cd_vectors(
 		cdloggerdata, cdloggerdataSize, j, &cc, &dc, &uc);
-	codecount = cc;
-	datacount = dc;
-	undefinedcount = uc;
+	codecount.store(cc, std::memory_order_relaxed);
+	datacount.store(dc, std::memory_order_relaxed);
+	undefinedcount.store(uc, std::memory_order_relaxed);
 }
 
 bool break_on_unlogged_code = false;
@@ -486,9 +499,9 @@ void LogCDData(uint8 *opcode, uint16 A, int size)
 	int j_pc = GetPRGAddress(_PC);
 	int j_a  = GetPRGAddress(A);
 
-	int32_t cc = codecount;
-	int32_t dc = datacount;
-	int32_t uc = undefinedcount;
+	int32_t cc = codecount.load(std::memory_order_relaxed);
+	int32_t dc = datacount.load(std::memory_order_relaxed);
+	int32_t uc = undefinedcount.load(std::memory_order_relaxed);
 
 	FceuLogCdDataResult r = fceux11_rust_debug_log_cd_data(
 		cdloggerdata, cdloggerdataSize,
@@ -496,13 +509,14 @@ void LogCDData(uint8 *opcode, uint16 A, int size)
 		opcode[0],
 		optype[opcode[0]],
 		opwrite[opcode[0]],
+		GameInfo && GameInfo->type == GIT_FDS,
 		static_cast<uintptr_t>(size),
 		indirectnext != 0,
 		&cc, &dc, &uc);
 
-	codecount = cc;
-	datacount = dc;
-	undefinedcount = uc;
+	codecount.store(cc, std::memory_order_relaxed);
+	datacount.store(dc, std::memory_order_relaxed);
+	undefinedcount.store(uc, std::memory_order_relaxed);
 	indirectnext = r.indirect_out ? 1 : 0;
 
 	if (break_on_unlogged_code && r.new_code_hit)

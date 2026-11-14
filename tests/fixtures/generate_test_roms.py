@@ -203,6 +203,9 @@ INES_MAPPERS = [
     ("mapper30",  30),
     ("mapper31",  31),
     ("mapper35",  35),
+    # v2.0.4 V9: mapper 218 regression fixture -- locks the CHR-RAM ->
+    # NTARM 1K-page mapping in src/boards/datalatch.cpp (upstream 6738471).
+    ("mapper218",  218),
 ]
 
 PRG_SIZE = 1   # 1 x 16 KB

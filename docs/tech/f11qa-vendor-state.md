@@ -6,7 +6,7 @@
 >
 > **关联**：
 > - 镜像源：`https://github.com/Laffinty/f11qa-rom-mirror`（HEAD `d50a7691ad4792cc8c4d9b8ab2b0a903d096d8aa`，295 SHA-256SUMS 条目）
-> - 主计划：`docs/plans/FCEUX11-v1.8_F11QA-构建计划.md` §三 §3.6 F 节 + §四 §4.2
+> - 主计划：`docs/history/plans/FCEUX11-v1.8_F11QA-构建计划.md` §三 §3.6 F 节 + §四 §4.2
 > - Schema 校验：`scripts/phase2_validate_tests_json.py`（kgmqa_id / kind / mirror_ref / mirror_path / vendor_state 四元组强校验）
 
 ---

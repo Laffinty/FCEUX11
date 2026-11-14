@@ -196,6 +196,9 @@ pub struct FceuLogCdDataResult {
 /// * `a_prg_addr` — `GetPRGAddress(A)`; `-1` if unmapped.
 /// * `optype_byte` — `optype[opcode[0]]` (`src/x6502.cpp:597`).
 /// * `opwrite_byte` — `opwrite[opcode[0]]`.
+/// * `is_fds` — C++ `GameInfo->type == GIT_FDS`. Only FDS resets a write
+///   destination's CDL slot (upstream 2.7.0 `debug.cpp:577-588`); cartridge
+///   PRG ROM writes leave the logged bits and the counters alone (v2.0.4 V23).
 /// * `indirect_in` — previous value of C++ `indirectnext` (file-static).
 ///
 /// Returns the three flags the C++ caller acts on.
@@ -209,6 +212,7 @@ pub fn log_cd_data(
     opcode0: u8,
     optype_byte: u8,
     opwrite_byte: u8,
+    is_fds: bool,
     size: usize,
     indirect_in: bool,
     codecount: &mut i32,
@@ -271,8 +275,13 @@ pub fn log_cd_data(
                     }
                     result.new_data_hit = true;
                 }
-            } else {
-                // Write — clear the slot, adjusting counters.
+            } else if is_fds {
+                // Write — clear the slot, adjusting counters. FDS only:
+                // upstream 2.7.0 debug.cpp:577-588 gates this on
+                // `GameInfo->type == GIT_FDS` — only the disk system's
+                // writable PRG space resets its CDL slot; a cartridge PRG ROM
+                // write (mapper register at $8000-$FFFF) must leave the
+                // logged bits alone (v2.0.4 V23).
                 if cdloggerdata[j] & 1 != 0 {
                     *codecount -= 1;
                 }
@@ -496,6 +505,7 @@ pub unsafe extern "C" fn fceux11_rust_debug_log_cd_data(
     opcode0: u8,
     optype_byte: u8,
     opwrite_byte: u8,
+    is_fds: bool,
     size: usize,
     indirect_in: bool,
     codecount: *mut i32,
@@ -523,6 +533,7 @@ pub unsafe extern "C" fn fceux11_rust_debug_log_cd_data(
         opcode0,
         optype_byte,
         opwrite_byte,
+        is_fds,
         size,
         indirect_in,
         cc,
@@ -727,7 +738,8 @@ mod tests {
             let mut dc = 0;
             let mut uc = 3; // pretend 3 bytes were undefined
             let r = log_cd_data(
-                &mut buf, 0x10, -1, 0x8000, 0, 0xEA, 0, 0, 3, false, &mut cc, &mut dc, &mut uc,
+                &mut buf, 0x10, -1, 0x8000, 0, 0xEA, 0, 0, false, 3, false, &mut cc, &mut dc,
+                &mut uc,
             );
             assert!(r.new_code_hit);
             assert!(!r.new_data_hit);
@@ -748,7 +760,8 @@ mod tests {
             buf[0x10] = 0x01; // already code
             let (mut cc, mut dc, mut uc) = (0, 0, 0);
             let r = log_cd_data(
-                &mut buf, 0x10, -1, 0x8000, 0, 0xEA, 0, 0, 1, false, &mut cc, &mut dc, &mut uc,
+                &mut buf, 0x10, -1, 0x8000, 0, 0xEA, 0, 0, false, 1, false, &mut cc, &mut dc,
+                &mut uc,
             );
             assert!(!r.new_code_hit);
             assert_eq!(cc, 0);
@@ -761,7 +774,7 @@ mod tests {
             let mut buf = vec![0u8; 256];
             let (mut cc, mut dc, mut uc) = (0, 0, 0);
             let r = log_cd_data(
-                &mut buf, -1, -1, 0x8000, 0, 0x6C, 0, 0, 3, false, &mut cc, &mut dc, &mut uc,
+                &mut buf, -1, -1, 0x8000, 0, 0x6C, 0, 0, false, 3, false, &mut cc, &mut dc, &mut uc,
             );
             assert!(r.indirect_out);
         }
@@ -774,7 +787,8 @@ mod tests {
             let (mut cc, mut dc, mut uc) = (0, 0, 0);
             // Read instruction (opwrite=0) targeting addr 0x50, mapped at j=0x50
             let r = log_cd_data(
-                &mut buf, -1, 0x50, 0x8000, 0x50, 0xAD, 0, 0, 3, false, &mut cc, &mut dc, &mut uc,
+                &mut buf, -1, 0x50, 0x8000, 0x50, 0xAD, 0, 0, false, 3, false, &mut cc, &mut dc,
+                &mut uc,
             );
             assert!(r.new_data_hit);
             assert!(buf[0x50] & 2 != 0);
@@ -782,22 +796,57 @@ mod tests {
     }
 
     #[test]
-    fn lcd_write_clears_slot() {
+    fn lcd_write_non_fds_keeps_slot() {
         unsafe {
+            // Fixture assembled by field: one slot carrying both the code bit
+            // (0x01) and the data bit (0x02) ⇒ 1 counted code byte, 1 counted
+            // data byte, 0 undefined bytes.
+            const CODE_BIT: u8 = 0x01;
+            const DATA_BIT: u8 = 0x02;
             let mut buf = vec![0u8; 256];
-            buf[0x50] = 0x03; // both code and data set
-            let mut cc = 1;
-            let mut dc = 1;
-            let mut uc = 0;
-            // Write opcode (opwrite=1) at 0x50, no PC mapping
+            buf[0x50] = CODE_BIT | DATA_BIT;
+            let mut cc = 1; // the one code byte above
+            let mut dc = 1; // the one data byte above
+            let mut uc = 0; // the slot is fully logged ⇒ nothing undefined
+            // Write opcode (opwrite=1) at 0x50, no PC mapping, not FDS.
             let r = log_cd_data(
-                &mut buf, -1, 0x50, 0x8000, 0x50, 0x8D, 0, 1, 3, false, &mut cc, &mut dc, &mut uc,
+                &mut buf, -1, 0x50, 0x8000, 0x50, 0x8D, 0, 1, false, 3, false, &mut cc, &mut dc,
+                &mut uc,
             );
+            // Cartridge PRG ROM writes leave the slot and the counters alone
+            // (upstream 2.7.0 debug.cpp:577 clears only for FDS). A mapper
+            // register write at $8000-$FFFF must not erase logged CDL bits.
+            assert_eq!(buf[0x50], CODE_BIT | DATA_BIT);
+            assert_eq!(cc, 1);
+            assert_eq!(dc, 1);
+            assert_eq!(uc, 0);
+            // new_data_hit is false on the write branch.
+            assert!(!r.new_data_hit);
+        }
+    }
+
+    #[test]
+    fn lcd_write_fds_clears_slot() {
+        unsafe {
+            // Same fixture as the non-FDS leg, assembled by field.
+            const CODE_BIT: u8 = 0x01;
+            const DATA_BIT: u8 = 0x02;
+            let mut buf = vec![0u8; 256];
+            buf[0x50] = CODE_BIT | DATA_BIT;
+            let mut cc = 1; // the one code byte above
+            let mut dc = 1; // the one data byte above
+            let mut uc = 0; // the slot is fully logged ⇒ nothing undefined
+            // Write opcode (opwrite=1) at 0x50, no PC mapping, FDS.
+            let r = log_cd_data(
+                &mut buf, -1, 0x50, 0x8000, 0x50, 0x8D, 0, 1, true, 3, false, &mut cc, &mut dc,
+                &mut uc,
+            );
+            // FDS write destinations reset the slot and fall the counts back
+            // (upstream 2.7.0 debug.cpp:577-588).
             assert_eq!(buf[0x50], 0);
             assert_eq!(cc, 0);
             assert_eq!(dc, 0);
-            assert_eq!(uc, 1);
-            // new_data_hit is false on the write branch.
+            assert_eq!(uc, 1); // the cleared slot is undefined again
             assert!(!r.new_data_hit);
         }
     }
@@ -901,6 +950,7 @@ mod tests {
                 0,
                 0,
                 0,
+                false,
                 0,
                 false,
                 std::ptr::null_mut(),

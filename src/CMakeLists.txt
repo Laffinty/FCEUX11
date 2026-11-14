@@ -589,6 +589,14 @@ target_include_directories(fceux11_boards PUBLIC ${CMAKE_SOURCE_DIR}/src)
 add_library(fceux11_core STATIC ${SRC_CORE})
 target_link_libraries(fceux11_core PUBLIC fceux11_boards fceux11_utils ${ZLIB_LIBRARIES} SDL2::SDL2)
 target_include_directories(fceux11_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
+# v2.0.4 V8 (A7 alias experiment): when enabled, x6502.cpp includes the
+# experiment table src/ops_table_a7.inc (register macros routed through the
+# handler parameter) instead of the canonical src/ops_table.inc.  OFF (default)
+# keeps the canonical build byte-identical.
+if(FCEUX11_X6502_ALIAS_VARIANT)
+    target_compile_definitions(fceux11_core PRIVATE FCEUX11_X6502_ALIAS_VARIANT)
+    message(STATUS "FCEUX11: A7 alias experiment variant enabled (ops_table_a7.inc)")
+endif()
 # M3-fix: MSVC LTCG linker (c2.dll) crashes when materialising the 512 KiB
 # kSpriteIdxLUT from IL during link-time code gen — produces a 2 MB zero file
 # for fceux11_ppu_rendering_lut_test (the only consumer). Compile this source
@@ -719,6 +727,21 @@ add_subdirectory(rust)
 if(FCEUX11_RUST_ENABLED)
     add_definitions(-DFCEUX11_RUST_ENABLED)
     target_link_libraries(fceux11_utils PUBLIC ${FCEUX11_RUST_STATIC_LIB})
+    # v2.0.4 r17 (2026-11-15): the Rust staticlib's native import libraries
+    # (currently `synchronization` for WaitOnAddress/WakeByAddress*).
+    #
+    # They MUST be listed here, next to the staticlib, for two reasons:
+    #   * rustc emits no /DEFAULTLIB directive for them, so MSVC's link.exe
+    #     will not resolve the __imp_* symbols on its own;
+    #   * link order matters -- the import library has to appear AFTER the
+    #     staticlib that references it. Keeping both in one call keeps them
+    #     adjacent in the generated link line.
+    #
+    # PUBLIC => every consumer of fceux11_utils (engine, GUI app, all test
+    # and F11QA runner executables) inherits them. See src/rust/CMakeLists.txt
+    # for the `cargo rustc --print native-static-libs` contract and the
+    # Rust-upgrade procedure.
+    target_link_libraries(fceux11_utils PUBLIC ${FCEUX11_RUST_NATIVE_LIBS})
     # v1.16 R4-fix (2026-08-07): target_link_libraries above only adds a
     # LINK-step dependency on the .lib — it does NOT schedule the source
     # .cpp scanning/compilation of fceux11_utils (and the PUBLIC propagates

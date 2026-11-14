@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include "utils/safe_string.h"
 #include <math.h>
+#include <atomic>
 
 #ifdef WIN32
 #include <windows.h>
@@ -111,11 +112,11 @@ static bool recBufEnabled = false;
 static bool externalTraceStart = false;
 static std::unique_ptr<traceRecord_t[]> logBuf;
 static int logBufMax = 3000000;
-// logBufHead and logBufTail are volatile because they are shared use by both the emulation and disk logger threads.
+// logBufHead and logBufTail are atomic because they are shared use by both the emulation and disk logger threads.
 // Ensure that the compiler doesn't do any thread caching optimizations on them so that changes to these
 // variables are immediately visible by the other thread.
-static volatile int logBufHead = 0;
-static volatile int logBufTail = 0;
+static std::atomic<unsigned int> logBufHead = 0;
+static std::atomic<unsigned int> logBufTail = 0;
 static bool overrunWarningArmed = true;
 static TraceLoggerDialog_t *traceLogWindow = NULL;
 static void pushMsgToLogBuffer(const char *msg);
@@ -999,11 +1000,13 @@ static void pushToLogBuffer(traceRecord_t &rec)
 
 	if ( logBuf )
 	{
-		int nextHead, delayCount = 0;
-		logBuf[logBufHead] = rec;
-		nextHead = (logBufHead + 1) % logBufMax;
+		bool overrun = false;
+		unsigned int delayCount = 0;
+		const unsigned int head = logBufHead.load(std::memory_order_relaxed);
+		const unsigned int nextHead = (head + 1) % logBufMax;
+		logBuf[head] = rec;
 
-		while (nextHead == logBufTail)
+		while (nextHead == logBufTail.load(std::memory_order_acquire))
 		{
 			SDL_Delay(1);
 
@@ -1011,15 +1014,17 @@ static void pushToLogBuffer(traceRecord_t &rec)
 
 			if ( delayCount > 10000 )
 			{
+				overrun = true;
 				break;
 			}
 		}
-		logBufHead = nextHead;
+
+		logBufHead.store(nextHead, std::memory_order_release);
 
 		if ( overrunWarningArmed )
 		{	// Don't spam with buffer overrun warning messages,
 			// we will print once if this happens.
-			if (logBufHead == logBufTail)
+			if (overrun)
 			{
 				if ( traceLogWindow )
 				{
@@ -2193,7 +2198,8 @@ void TraceLogDiskThread_t::run(void)
 
 		size = logBufMax * sizeof(traceRecord_t);
 
-		logBufHead = logBufTail = 0;
+		logBufHead.store(0, std::memory_order_relaxed);
+		logBufTail.store(0, std::memory_order_relaxed);
 
 		logBuf = std::make_unique<traceRecord_t[]>(logBufMax);
 	}
@@ -2203,9 +2209,12 @@ void TraceLogDiskThread_t::run(void)
 	{
 		isPaused = fceu11::IsEmulationPaused() ? true : false;
 
-		while (logBufHead != logBufTail)
+		unsigned int head = logBufHead.load(std::memory_order_acquire);
+		unsigned int tail = logBufTail.load(std::memory_order_relaxed);
+
+		while (head != tail)
 		{
-			logBuf[logBufTail].convToText(line);
+			logBuf[tail].convToText(line);
 
 			i=0;
 			while ( line[i] != 0 )
@@ -2214,7 +2223,7 @@ void TraceLogDiskThread_t::run(void)
 			}
 			buf[idx] = '\n'; idx++;
 
-			logBufTail = (logBufTail + 1) % logBufMax;
+			tail = (tail + 1) % logBufMax;
 
 			if ( idx >= blockSize )
 			{
@@ -2231,6 +2240,8 @@ void TraceLogDiskThread_t::run(void)
 				dataNeedsFlush = true;
 			}
 		}
+
+		logBufTail.store(tail, std::memory_order_release);
 
 		if (isPaused)
 		{

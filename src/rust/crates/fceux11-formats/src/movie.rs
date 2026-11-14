@@ -312,7 +312,16 @@ fn install_value(md: &mut FceuMovieData, key: &str, val: &str) -> Result<(), &'s
         "saveram" => {
             md.saveram = decode_base64_or_hex(val).unwrap_or_default();
         }
-        "length" => md.load_frame_count = val.parse().unwrap_or(-1),
+        // v2.0.4 V20 (upstream issue #858 / commit 9f45054e): reject negative
+        // "length" values from malformed headers. -1 is the "unbounded"
+        // sentinel, so a rejected value collapses onto it and the >= 0 guards
+        // (this file :389/:492/:513, movie_playback.cpp:144) keep their
+        // meaning. Parse failures already fell to -1 via unwrap_or; negatives
+        // now join them (plan step 1: `if n >= 0 { n } else { -1 }`).
+        "length" => {
+            let n = val.parse().unwrap_or(-1);
+            md.load_frame_count = if n >= 0 { n } else { -1 };
+        }
         _ => {}
     }
     Ok(())
@@ -1555,6 +1564,41 @@ mod tests {
             let dumped = dump_fm2(&md, false);
             let loaded = load_fm2(&dumped, false).unwrap();
             assert_eq!(loaded.records.len(), 1);
+        }
+    }
+
+    // v2.0.4 V20 (upstream issue #858 / commit 9f45054e): a negative "length"
+    // in a malformed FM2 header must NOT be stored verbatim. -1 is the
+    // "unbounded" sentinel, so a rejected value collapses onto it and the
+    // three `>= 0` guards (this file :389/:492/:513) plus the C++ read-only
+    // decision (movie_playback.cpp:144) keep their meaning — a stored
+    // negative defeats all of them and turns a read-only TAS project into an
+    // editable one. fail_to_fail: before the fix this test went RED because
+    // `unwrap_or(-1)` only catches parse failures, negatives were accepted.
+    #[test]
+    fn test_fm2_negative_length_rejected() {
+        unsafe {
+            // End-to-end through the real header parse path: key/value lines
+            // split at the first whitespace, so "length -2" reaches
+            // install_value as ("length", "-2").
+            let loaded = load_fm2(b"version 3\nlength -2\n", false).unwrap();
+            assert_eq!(loaded.load_frame_count, -1);
+
+            // Direct install_value coverage: a negative value and a
+            // non-numeric value both collapse onto the -1 sentinel
+            // (plan step 1 unifies the two cases).
+            let mut md = FceuMovieData::default();
+            install_value(&mut md, "length", "-2").unwrap();
+            assert_eq!(md.load_frame_count, -1);
+            install_value(&mut md, "length", "not-a-number").unwrap();
+            assert_eq!(md.load_frame_count, -1);
+
+            // Positive control (discipline 5: expectation from the contract,
+            // not from the implementation): a valid non-negative length
+            // still parses to its exact value.
+            let mut md2 = FceuMovieData::default();
+            install_value(&mut md2, "length", "1234").unwrap();
+            assert_eq!(md2.load_frame_count, 1234);
         }
     }
 

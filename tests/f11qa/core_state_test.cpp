@@ -171,6 +171,55 @@ int main() {
         else printf("OK:   DebugView::break_asap() == ::break_asap (%p)\n", static_cast<void*>(&v.break_asap()));
     }
 
+    // Breakpoint keyword resolution lock (2026-11-13, A1 GUI walkthrough S-2
+    // session finding): the v0.3.5 from_chars refactor of offsetStringToInt
+    // early-returned on non-hex input, making every breakpoint keyword branch
+    // (NSF LOAD/INIT/PLAY, FDS NMI1-3, NES NMI/VBL/RST/IRQ/BRK) dead code.
+    // Symptom: the Add-Breakpoint dialog rejected "PLAY" with "Start Address
+    // Invalid". The fix falls through to the BT_C keyword/symbol path on hex
+    // parse failure. Mutation check: revert the fall-through to an early
+    // return and the PLAY/LOAD/INIT assertions below go red.
+    printf("\n--- offsetStringToInt keyword lock ---\n");
+    {
+        static FCEUGI nsfGi;
+        nsfGi.type = GIT_NSF;
+        FCEUGI* savedGameInfo = ::GameInfo;
+        ::GameInfo = &nsfGi;
+        NSF_HEADER savedNsf = ::NSFHeader;
+        ::NSFHeader.PlayAddressLow = 0x34;
+        ::NSFHeader.PlayAddressHigh = 0x12; // PLAY = $1234
+        ::NSFHeader.LoadAddressLow = 0x00;
+        ::NSFHeader.LoadAddressHigh = 0x80; // LOAD = $8000
+        ::NSFHeader.InitAddressLow = 0x03;
+        ::NSFHeader.InitAddressHigh = 0x80; // INIT = $8003
+
+        bool ok = false;
+        int v = offsetStringToInt(BT_C, "PLAY", &ok);
+        if (!ok || v != 0x1234) { printf("FAIL: PLAY keyword -> ok=%d v=0x%04X (want ok=1 v=0x1234)\n", (int)ok, (unsigned)v); failed = true; }
+        else printf("OK:   PLAY -> $%04X\n", (unsigned)v);
+
+        v = offsetStringToInt(BT_C, "LOAD", &ok);
+        if (!ok || v != 0x8000) { printf("FAIL: LOAD keyword -> ok=%d v=0x%04X (want ok=1 v=0x8000)\n", (int)ok, (unsigned)v); failed = true; }
+        else printf("OK:   LOAD -> $%04X\n", (unsigned)v);
+
+        v = offsetStringToInt(BT_C, "INIT", &ok);
+        if (!ok || v != 0x8003) { printf("FAIL: INIT keyword -> ok=%d v=0x%04X (want ok=1 v=0x8003)\n", (int)ok, (unsigned)v); failed = true; }
+        else printf("OK:   INIT -> $%04X\n", (unsigned)v);
+
+        // Hex parsing must be unaffected by the fall-through.
+        v = offsetStringToInt(BT_C, "C123", &ok);
+        if (!ok || v != 0xC123) { printf("FAIL: hex C123 -> ok=%d v=0x%04X\n", (int)ok, (unsigned)v); failed = true; }
+        else printf("OK:   hex C123 -> $%04X\n", (unsigned)v);
+
+        // Pure garbage must still be rejected.
+        v = offsetStringToInt(BT_C, "ZZZZ", &ok);
+        if (ok) { printf("FAIL: garbage ZZZZ -> ok=1 (want 0)\n"); failed = true; }
+        else printf("OK:   garbage ZZZZ rejected\n");
+
+        ::GameInfo = savedGameInfo;
+        ::NSFHeader = savedNsf;
+    }
+
     // Static-check: facade version marker
     static_assert(fceu11::State::census_version_v1_2 == 1,
                   "Census facade version marker must be 1");

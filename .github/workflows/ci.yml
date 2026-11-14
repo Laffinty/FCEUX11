@@ -36,6 +36,20 @@ jobs:
       # cache was never preserved between runs.
       VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg_bincache
 
+      # v2.0.4 r17 (2026-11-15): Rust 工具链**锁定**到具体版本。
+      #
+      # 之前这里是 `stable`（每次自动跟最新）。2026-11-14 stable 从 1.99.1
+      # 跳到 1.100.0，而 1.100 的 std 改用 WaitOnAddress / WakeByAddress*
+      # 做线程挂起 ⇒ fceux11_rust.lib 里多出三个 __imp_* 未定义符号 ⇒
+      # 本仓链接行缺 synchronization.lib ⇒ 所有链接 Rust 静态库的可执行
+      # 文件全部 LNK1120 ⇒ 构建中断。
+      # **本仓代码零改动**，纯粹是工具链漂移打穿了链接契约。
+      #
+      # 锁定后，工具链升级变成「显式决定」而不是「被外部悄悄改掉」。
+      # 升级步骤（先看 native-static-libs 清单，再改版本号）：
+      #   见 src/rust/CMakeLists.txt 顶部的契约注释。
+      RUST_TOOLCHAIN: '1.100.0'
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -141,7 +155,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
           targets: x86_64-pc-windows-msvc
 
       # v1.16 R4-0: defensive — vcpkg creates the binary-cache dir on demand on

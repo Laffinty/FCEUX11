@@ -21,22 +21,16 @@ std::string FCEU_Guid::toString()
 
 FCEU_Guid FCEU_Guid::fromString(std::string str)
 {
-    FCEU_Guid ret;
+    // v2.0.4 (V19): value-initialize so a failed parse can never return
+    // stack garbage. Upstream master does the same via
+    // memset(data,0,sizeof(data)) on the failure path of scan(); here the
+    // guarantee lives in the initialization because the parse itself is
+    // delegated to Rust (fceux11_rust_guid_scan), which zeroes its own
+    // failure paths — this `ret{}` is the belt-and-suspenders underneath.
+    // See docs/plans/FCEUX11-v2.0.4_残留精度与调试待办-构建计划.md §V19.
+    FCEU_Guid ret{};
     ret.scan(str);
     return ret;
-}
-
-uint8 FCEU_Guid::hexToByte(char** ptrptr)
-{
-    char a = toupper(**ptrptr);
-    (*ptrptr)++;
-    char b = toupper(**ptrptr);
-    (*ptrptr)++;
-    if (a >= 'A') a = a - 'A' + 10;
-    else a -= '0';
-    if (b >= 'A') b = b - 'A' + 10;
-    else b -= '0';
-    return ((unsigned char)a << 4) | (unsigned char)b;
 }
 
 void FCEU_Guid::scan(std::string& str)

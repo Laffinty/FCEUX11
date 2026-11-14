@@ -452,12 +452,12 @@ int fce11_trace_capture(traceRecord_t &rec, uint8 *opcode, int size, uint32_t op
 	// TODO: loops folding mame-lyke style
 	if (rec.romAddr != -1)
 	{
-		if (((opts & LOG_NEW_INSTRUCTIONS) && (oldcodecount != codecount)) ||
-			((opts & LOG_NEW_DATA) && (olddatacount != datacount)))
+		if (((opts & LOG_NEW_INSTRUCTIONS) && (oldcodecount != codecount.load(std::memory_order_relaxed))) ||
+			((opts & LOG_NEW_DATA) && (olddatacount != datacount.load(std::memory_order_relaxed))))
 		{
 			//something new was logged
-			oldcodecount = codecount;
-			olddatacount = datacount;
+			oldcodecount = codecount.load(std::memory_order_relaxed);
+			olddatacount = datacount.load(std::memory_order_relaxed);
 			if (unloggedlines > 0)
 			{
 				//snprintf(str_result, sizeof(str_result), "(%d lines skipped)", unloggedlines);

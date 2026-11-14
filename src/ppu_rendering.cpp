@@ -172,16 +172,16 @@ void makeppulut(void) {
 #define RENDER_LOG(tmp)
 #define RENDER_LOGP(tmp)
 #else
-extern volatile int rendercount, vromreadcount, undefinedvromcount;
+extern std::atomic<int> rendercount, vromreadcount, undefinedvromcount;
 extern int LogAddress;
 #define RENDER_LOG(tmp) {  \
-	if (undefinedvromcount) { \
+	if (undefinedvromcount.load(std::memory_order_relaxed)) { \
 		if (tmp >= 0x2000) { \
 			if ((tmp & 0x3000) != 0x2000) \
-				undefinedvromcount--; \
+				undefinedvromcount.fetch_sub(1, std::memory_order_relaxed); \
 		} else { \
-			rendercount--; \
-			vromreadcount--; \
+			rendercount.fetch_sub(1, std::memory_order_relaxed); \
+			vromreadcount.fetch_sub(1, std::memory_order_relaxed); \
 		} \
 	} \
 }

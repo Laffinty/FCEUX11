@@ -32,6 +32,34 @@ static bool g_initialised = false;
 static bool g_rom_loaded  = false;
 
 // ---------------------------------------------------------------------------
+// Famicom microphone injection state (v2.0.4 V6 / kgmqa-108)
+//
+// The mic is not an ESI port device — it is the P2 Start button routed into
+// the $4016 D2 level read by replaceP2StartWithMicrophone (the preserved key
+// mapping). The bridge therefore owns a persistent port-1 gamepad buffer:
+// FCEU_UpdateInput() hands joyports[1].ptr to UpdateGP every frame, which
+// shifts byte1 into joy[1], and JPRead reads joy[1]&8. Setting bit3 of byte1
+// (= 0x0800 in the little-endian uint32 buffer) is "P2 Start pressed" = "mic
+// pressed" — the same path the Qt driver's JSreturn feeds.
+// ---------------------------------------------------------------------------
+static uint32_t g_famicom_p2_pad = 0;  // persistent port-1 gamepad state
+
+// Byte layout per controller (UpdateGamepad, Qt input.cpp): bit0=A .. bit3=
+// Start .. bit7=Right. Controller 2 lives at byte1 of the port-1 dword.
+static constexpr uint32_t FAMICOM_P2_START_BIT = 0x0800u;
+
+// v2.0.4 V6: reserved `sut_input` device value for the manifest chain. The
+// Rust side forwards `sut_input: [port0, port1]` verbatim as
+// `port=type` pairs (rom_runner.rs --sut-input → blargg.rs → direct.rs
+// kagami_bridge_set_input), so a manifest can carry the mic without any
+// Rust change: `sut_input: [1, 64]`. 0x40 lies outside the ESI enum
+// (git.h fceu11::InputDevice: 0..10; SI_UNSET = -1) and cannot collide
+// with any SI_* value; the bridge intercepts it BEFORE FCEUI_SetInput, so
+// the out-of-enum value never reaches the core. Semantics: "Famicom P2
+// with microphone, pressed" (= kagami_bridge_set_famicom_mic(1, 1)).
+static constexpr int KAGAMI_SUT_FAMICOM_P2_MIC = 0x40;
+
+// ---------------------------------------------------------------------------
 // Init / Kill
 // ---------------------------------------------------------------------------
 int kagami_bridge_init(void) {
@@ -84,6 +112,12 @@ int kagami_bridge_set_input(int port, int esi_type) {
         std::fprintf(stderr, "kagami_bridge_set_input: not initialised\n");
         return -2;
     }
+    // v2.0.4 V6: manifest `sut_input` mic encoding — see the
+    // KAGAMI_SUT_FAMICOM_P2_MIC comment above. Intercepted before the
+    // ESI cast so the out-of-enum value never reaches the core.
+    if (esi_type == KAGAMI_SUT_FAMICOM_P2_MIC) {
+        return kagami_bridge_set_famicom_mic(port, 1);
+    }
     // Same shape as the init-time SI_NONE default; the SI_SNES_MOUSE branch
     // of SetInputStuff (input.cpp:522) does not depend on GameInfo.
     // ptr must NOT be nullptr for real device drivers: FCEU_UpdateInput()
@@ -94,6 +128,39 @@ int kagami_bridge_set_input(int port, int esi_type) {
     // the "idle device" state.
     static int32 zero_input[3] = {0, 0, 0};
     FCEUI_SetInput(port, static_cast<ESI>(esi_type), zero_input, 0);
+    return 0;
+}
+
+// ---------------------------------------------------------------------------
+// Famicom microphone injection (v2.0.4 V6 / kgmqa-108) — see f11qa_bridge.h
+// ---------------------------------------------------------------------------
+int kagami_bridge_set_famicom_mic(int port, int on) {
+    if (port != 1) {
+        std::fprintf(stderr,
+                     "kagami_bridge_set_famicom_mic: bad port %d "
+                     "(mic is P2 / second pad only)\n",
+                     port);
+        return -1;
+    }
+    if (!g_initialised) {
+        std::fprintf(stderr, "kagami_bridge_set_famicom_mic: not initialised\n");
+        return -2;
+    }
+    // Core symbol lives in src/input.cpp (declared for the Qt driver in
+    // src/drivers/Qt/input.h:145). Protocol enable persists for the session:
+    // it is the key mapping, not the per-read level.
+    extern bool replaceP2StartWithMicrophone;
+    replaceP2StartWithMicrophone = true;
+    if (on) {
+        g_famicom_p2_pad |= FAMICOM_P2_START_BIT;
+    } else {
+        g_famicom_p2_pad &= ~FAMICOM_P2_START_BIT;
+    }
+    // Attach the gamepad driver with OUR persistent buffer (the init default
+    // is SI_NONE/nullptr). The SI_GAMEPAD branch of SetInputStuff does not
+    // depend on GameInfo (same shape as kagami_bridge_set_input), and
+    // SetInputStuff is idempotent, so re-calling per press/release is safe.
+    FCEUI_SetInput(1, static_cast<ESI>(SI_GAMEPAD), &g_famicom_p2_pad, 0);
     return 0;
 }
 

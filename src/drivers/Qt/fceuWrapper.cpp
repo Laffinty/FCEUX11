@@ -1397,6 +1397,12 @@ int  fceuWrapperUpdate( void )
 
 	if ( GameInfo )
 	{
+		// v2.0.4 V15: snapshot the GUI-written gamepad state for this frame.
+		// Must run here on the emulation thread, before the core step, so the
+		// core's $4016 reads dereference a same-thread snapshot (JSreturnEmu)
+		// instead of racing the GUI writer (JSreturnGui).
+		emuThreadPollInputs();
+
 		// v2.0 S2-b4 stage 1: the frame step branches on which machine is
 		// active. A GBA session must not reach `DoFun`, which is hard-wired to
 		// the NES core and its globals (`XBuf`, `WaveFinal`), and must not

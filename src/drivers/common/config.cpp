@@ -26,6 +26,20 @@
 /*								*/
 /****************************************************************/
 
+// v2.0.4 V16 guard — THIS FILE IS DEAD: it is not in src/CMakeLists.txt's
+// build list (only src/config.cpp, drivers/common/configSys.cpp,
+// drivers/Qt/config.cpp and TasEditor/taseditor_config.cpp are compiled), and
+// LoadFCEUConfig / SaveFCEUConfig_old have no callers in the repo. The whole
+// old CFGSTRUCT config system died with the Qt frontend migration.
+//
+// DO NOT "FIX" StringToBytes AT :306 AND EXPECT ANY EFFECT — the change would
+// never be compiled (v2.0.4 V16's original draft proposed exactly that). The
+// live fix for the "0X"-prefix byte count is in src/utils/xstring.cpp
+// (upstream issue #857 / commit 683c3f0); see also the dead-code guard at
+// MovieData::installValue in src/movie_fm2.cpp. Do not revive this file
+// without re-auditing its StringToBytes usage against HexStringToBytesLength
+// semantics.
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

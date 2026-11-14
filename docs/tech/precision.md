@@ -28,8 +28,13 @@ baseline 更新需与代码变更同等级 review**）。177 ROM：PASS 144 / FA
 
 - 指令级 `instr_timing`/`instr_misc*`：组合挂、单组过的 accuracy gap。
   （`instr_v3_*`/`instr_v5_*`/`all_instrs` 组合项已清零。）
-- `cpu_int_2/3/4/5`：**结构性近似**——中断只在指令边界轮询（无 hijack/branch-delay，
-  `x6502.cpp:515-579`）；修复要把轮询下沉到指令内固定周期点。
+- `cpu_int_2/3/4/5`：**两段式已建模**——中断线在指令内的轮询点采样
+  （`x6502.cpp:1094-1116`，`g_intl_pending`），在下一指令边界派发
+  （`x6502.cpp:969`、`:1004-1040`）；BRK 发现 NMI 线有效时在向量级被劫持
+  （`x6502.cpp:848` `X6502_NmiHijacked`）。**未建模**：branch-delay（转移指令推迟中断响应）
+  与周期精确的线路断言时刻；残留差距是 VBL NMI 断言时刻量化（G5），不是轮询/劫持模型。
+  （2026-11-14 更正：原文「中断只在指令边界轮询（无 hijack/branch-delay）」与事实相反，
+  见 `tests/tests.json` kgmqa-037 的 `known_limit`。）
 - `cpu_dummy_writes_oam`、`cpu_exec_space_ppuio`：差距在
   $4014 OAM DMA 与 PPU 区路径，不在 RMW 宏。
 - `cpu_reset_regs`：复位状态细节。

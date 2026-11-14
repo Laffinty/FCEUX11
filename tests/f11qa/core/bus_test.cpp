@@ -636,6 +636,81 @@ void test_bus_fetch_channel(TestContext& ctx) {
                   "read_fetch == read on PRG (mapper-0, side-effect-free domain)");
 }
 
+// ---------------------------------------------------------------------------
+// V10 (v2.0.4): setup_chr_mapping 的掩码钳制回归锁。
+//
+// 上游 cart.cpp:135-138 的四行 `if (CHRmaskN[chip] >= (unsigned int)(-1))
+// CHRmaskN[chip] = 0;` 曾被 hotfix1 ad2914d（P2-3 的错误推理）删除：芯片
+// 尺寸小于该档 bank 粒度时 `(size >> N) - 1` 在 uint32_t 上溢出成
+// UINT32_MAX，此后任何 setchrN(V≠0) 会算出 bank = V & 0xFFFFFFFF = V 的
+// 野指针（chr_ptr_ + V*8192）。NES 2.0 且 CHR-RAM < 8K 的卡带（如上游
+// #851 的 oam3.nes，mapper 7、1K CHR-RAM）的 $2007 写因此越出堆块。
+//
+// 断言（期望值独立推导，非实现重算）：
+//   * 1K 芯片：mask1 = (1024>>10)-1 = 0（天然值，钳制不触发）；
+//     mask2/4/8 = (1024>>11/12/13)-1 = 0xFFFFFFFF → 钳到 0。
+//   * 8K 芯片：mask1/2/4/8 = 7/3/1/0 全部天然值 —— 钳制必须是有条件的，
+//     防「无条件清零」式过度修复转红。
+//   * size == 0：hotfix1 P2-3 早退语义保持（全零掩码）。
+// 变异腿（纪律 3）：
+//   M1 删除四行钳制 ⇒ 1K 组红（mask2/4/8 = 0xFFFFFFFF）；
+//   M2 钳制改无条件清零 ⇒ 8K 组红（mask1 7→0）；
+//   M3 钳制挪到 mask 计算之前 ⇒ 1K 组红（下溢值被重新计算出来）。
+// ---------------------------------------------------------------------------
+static void test_setup_chr_mapping_clamp(TestContext& ctx) {
+    using fceu11::g_bus;
+
+    // Snapshot chip 0 so the loaded ROM's mapping is bit-identical after
+    // the test (setup_chr_mapping is the sole writer of these fields, and
+    // it is a pure function of (p, size, ram), so the restore below is exact).
+    uint8_t* saved_ptr  = g_bus.chr_ptr()[0];
+    uint32_t saved_size = g_bus.chr_size()[0];
+    uint32_t saved_m1   = g_bus.chr_mask1()[0];
+    uint32_t saved_m2   = g_bus.chr_mask2()[0];
+    uint32_t saved_m4   = g_bus.chr_mask4()[0];
+    uint32_t saved_m8   = g_bus.chr_mask8()[0];
+    uint8_t  saved_ram  = g_bus.chr_ram()[0];
+
+    // --- the V10 impact face: a 1K CHR chip ---
+    static uint8_t tiny[1024];
+    memset(tiny, 0, sizeof(tiny));
+    SetupCartCHRMapping(0, tiny, 1024, 1);
+    FCEU11_EXPECT(ctx, g_bus.chr_ptr()[0] == tiny && g_bus.chr_size()[0] == 1024,
+                  "1K chip: real pointer/size stored (clamp must not touch metadata)");
+    FCEU11_EXPECT(ctx, g_bus.chr_ram()[0] == 1,
+                  "1K chip: ram flag passes through the clamp untouched");
+    FCEU11_EXPECT(ctx, g_bus.chr_mask1()[0] == 0,
+                  "1K chip: mask1 = (1024>>10)-1 = 0 is a natural value, not a clamp artifact");
+    FCEU11_EXPECT(ctx, g_bus.chr_mask2()[0] == 0,
+                  "1K chip: mask2 underflow ((1024>>11)-1 = 0xFFFFFFFF) is clamped to 0 (V10)");
+    FCEU11_EXPECT(ctx, g_bus.chr_mask4()[0] == 0,
+                  "1K chip: mask4 underflow ((1024>>12)-1 = 0xFFFFFFFF) is clamped to 0 (V10)");
+    FCEU11_EXPECT(ctx, g_bus.chr_mask8()[0] == 0,
+                  "1K chip: mask8 underflow ((1024>>13)-1 = 0xFFFFFFFF) is clamped to 0 (V10)");
+
+    // --- an 8K chip: every mask is a natural value; a conditional clamp
+    //     must leave them exactly alone ---
+    static uint8_t full[8192];
+    memset(full, 0, sizeof(full));
+    SetupCartCHRMapping(0, full, 8192, 0);
+    FCEU11_EXPECT(ctx, g_bus.chr_mask1()[0] == 7 && g_bus.chr_mask2()[0] == 3
+                       && g_bus.chr_mask4()[0] == 1 && g_bus.chr_mask8()[0] == 0,
+                  "8K chip: mask1/2/4/8 = 7/3/1/0 all natural (clamp is conditional, not a blanket zero)");
+
+    // --- size == 0: the hotfix1 P2-3 early-exit semantics are kept ---
+    SetupCartCHRMapping(0, static_cast<uint8_t*>(nullptr), 0, 0);
+    FCEU11_EXPECT(ctx, g_bus.chr_size()[0] == 0 && g_bus.chr_mask1()[0] == 0
+                       && g_bus.chr_mask8()[0] == 0,
+                  "size==0 early exit still yields all-zero masks (hotfix1 P2-3 semantics kept)");
+
+    // --- restore the ROM's own chip-0 mapping (exact, see snapshot note) ---
+    SetupCartCHRMapping(0, saved_ptr, saved_size, saved_ram);
+    g_bus.chr_mask1()[0] = saved_m1;
+    g_bus.chr_mask2()[0] = saved_m2;
+    g_bus.chr_mask4()[0] = saved_m4;
+    g_bus.chr_mask8()[0] = saved_m8;
+}
+
 int main() {
     std::setvbuf(stdout, nullptr, _IONBF, 0);
 
@@ -679,6 +754,10 @@ int main() {
     // the test is side-effect heavy ($2002/$4015/$4016 reads), so nothing
     // that asserts on PPU/controller state may follow it in this process.
     test_bus_fetch_channel(ctx);
+
+    // V10 (v2.0.4): CHR mask clamp regression lock. Runs last and restores
+    // the chip-0 mapping it touched (see the function's snapshot note).
+    test_setup_chr_mapping_clamp(ctx);
 
     fceu11::CloseGame();
     core_shutdown();

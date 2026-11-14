@@ -45,6 +45,19 @@
 #include <QShortcut>
 #include <QUrl>
 
+#ifdef __FCEU_PROFILER_ENABLE__
+// v2.0.4 V7 (B2(d)): report dialog extras — stdio for the CRT temp file
+// (tmpfile/fread) the report is dumped through, and the read-only viewer's
+// widget classes + monospace font. Explicit includes (not transitive) so
+// the profiler build does not depend on what other headers happen to pull.
+#include <QDialog>
+#include <QFontDatabase>
+#include <QPlainTextEdit>
+#include <QPushButton>
+#include <QVBoxLayout>
+#include <stdio.h>
+#endif
+
 #include "../../fceu.h"
 #include "../../fds.h"
 #include "../../file.h"
@@ -161,6 +174,20 @@ consoleWin_t::consoleWin_t(QWidget *parent)
 #endif
 
 	createMainMenu();
+
+#ifdef __FCEU_PROFILER_ENABLE__
+	// v2.0.4 V7 (B2(d)): profiler summary report trigger under
+	// Advanced -> Misc Tools, next to Frame Timing (its closest kin).
+	// Registered here rather than in createMainMenu() (Qt/ConsoleMenu.cpp)
+	// so that the whole trigger — action, slot and menu entry — lives
+	// inside one #ifdef and a non-profiler build carries no trace of the
+	// menu item at all.
+	profilerReportAct = new QAction(tr("&Profiler Report ..."), this);
+	profilerReportAct->setStatusTip(tr("Show Function Profiler Summary Report"));
+	connect( profilerReportAct, SIGNAL(triggered()), this, SLOT(openProfilerReport(void)) );
+
+	advMiscMenu->addAction( profilerReportAct );
+#endif
 
 	g_config->getOption( "SDL.PauseOnMainMenuAccess", &mainMenuPauseWhenActv );
 	g_config->getOption( "SDL.AutoHideMenuFullsreen", &autoHideMenuFullscreen );
@@ -847,6 +874,15 @@ void consoleWin_t::retranslateUi(void)
 	if (frameTimingAct) frameTimingAct->setText(tr("&Frame Timing ..."));
 	if (paletteEditorAct) paletteEditorAct->setText(tr("&Palette Editor ..."));
 	if (aviRiffViewerAct) aviRiffViewerAct->setText(tr("&AVI RIFF Viewer ..."));
+#ifdef __FCEU_PROFILER_ENABLE__
+	// v2.0.4 V7 (B2(d)): keep the profiler menu entry in step with the
+	// language switch, same as its Misc Tools neighbours above.
+	if (profilerReportAct)
+	{
+		profilerReportAct->setText(tr("&Profiler Report ..."));
+		profilerReportAct->setStatusTip(tr("Show Function Profiler Summary Report"));
+	}
+#endif
 
 	if (openMovAct) openMovAct->setText(tr("Movie &Play"));
 	if (playMovBeginAct) playMovBeginAct->setText(tr("Movie Play From &Beginning"));
@@ -961,5 +997,112 @@ void consoleWin_t::retranslateUi(void)
 		Hotkeys[i].refreshText();
 	}
 }
+//-----------------------------------------------------------------------------
+// v2.0.4 V7 (B2(d)): Profiler summary report menu trigger
+// (Advanced -> Misc Tools -> Profiler Report).
+//
+// Only compiled into __FCEU_PROFILER_ENABLE__ builds: src/CMakeLists.txt
+// adds -D__FCEU_PROFILER_ENABLE__, and the QAction registration in the
+// consoleWin_t ctor above is guarded by the same macro, so a non-profiler
+// build has neither the menu item nor this slot.
+//
+// Thread semantics (plan V7 step 3): the profiler records are owned by the
+// thread that ran the probe. The emulation thread only executes probes
+// while it holds the wrapper mutex (fceuWrapperUpdate, Qt/fceuWrapper.cpp),
+// so holding FCEU_WRAPPER_LOCK() here guarantees no emulation-thread writer
+// exists while FCEU_profiler_report reads the records cross-thread. The
+// GUI-thread probes (transferVideoBuffer / updatePeriodic) run on this very
+// thread and cannot race the reader. On top of that exclusion, emulation is
+// paused while the report is collected and restored right after — the same
+// family pattern as mainMenuOpen / mainMenuClose (Qt/ConsoleFile.cpp), which
+// pause the machine for the duration of an operation and restore the prior
+// state afterwards. profiler.h documents the exit-time call as safe because
+// the emu thread has stopped (fceu.cpp:707); the wrapper lock is the
+// interactive equivalent of that guarantee, the pause is the family idiom.
+//-----------------------------------------------------------------------------
+#ifdef __FCEU_PROFILER_ENABLE__
+void consoleWin_t::openProfilerReport(void)
+{
+	bool    wasPaused = fceu11::IsEmulationPaused() ? true : false;
+	bool    reportOk  = false;
+	QString reportText;
+
+	if (!wasPaused)
+	{
+		fceu11::ToggleEmulationPause();
+	}
+
+	{
+		FCEU_WRAPPER_LOCK();
+
+		// FCEU_profiler_report takes a FILE*, so dump the report to a CRT
+		// temp file (unnamed, unique, deleted by the CRT on fclose) and read
+		// the text back from the same handle. Nothing is left on disk.
+		FILE *fp = tmpfile();
+
+		if (fp != NULL)
+		{
+			if (FCEU_profiler_report(fp) >= 0)
+			{
+				std::string buf;
+				char        chunk[4096];
+				size_t      n;
+
+				fflush(fp);
+				rewind(fp);
+
+				while ( (n = fread(chunk, 1, sizeof(chunk), fp)) > 0 )
+				{
+					buf.append(chunk, n);
+				}
+
+				reportText = QString::fromLocal8Bit( buf.data(), (int)buf.size() );
+				reportOk   = true;
+			}
+
+			fclose(fp);
+		}
+
+		FCEU_WRAPPER_UNLOCK();
+	}
+
+	if (!wasPaused)
+	{
+		fceu11::ToggleEmulationPause();
+	}
+
+	if (!reportOk)
+	{
+		QMessageBox::warning( this, tr("Profiler"),
+			tr("Failed to generate the profiler report.") );
+		return;
+	}
+
+	// Read-only modal viewer. The report is a fixed-width text table
+	// (sum / %total / avg / min / max / calls / func [file:line]), so it
+	// gets the system fixed font. No persistent panel — the plan lists
+	// that as a non-goal.
+	QDialog dlg(this);
+	dlg.setWindowTitle( tr("Function Profiler Report") );
+
+	QVBoxLayout *lay = new QVBoxLayout(&dlg);
+
+	QPlainTextEdit *text = new QPlainTextEdit(&dlg);
+	text->setPlainText(reportText);
+	text->setReadOnly(true);
+	text->setLineWrapMode(QPlainTextEdit::NoWrap);
+	text->setFont( QFontDatabase::systemFont(QFontDatabase::FixedFont) );
+
+	QPushButton *closeBtn = new QPushButton( tr("&Close"), &dlg );
+	closeBtn->setDefault(true);
+	connect( closeBtn, SIGNAL(clicked()), &dlg, SLOT(accept()) );
+
+	lay->addWidget( text, 1 );
+	lay->addWidget( closeBtn, 0, Qt::AlignRight );
+
+	dlg.resize(920, 640);
+	dlg.exec();
+}
+#endif  // __FCEU_PROFILER_ENABLE__
 //-----------------------------------------------------------------------------
 

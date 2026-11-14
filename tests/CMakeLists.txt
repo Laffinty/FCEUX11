@@ -226,6 +226,34 @@ if(FCEUX11_BUILD_TESTS)
     # Same CI-launch pathology as apu_frame_timing_test above; see that note.
     set_tests_properties(input_snesmouse_test PROPERTIES TIMEOUT 300)
 
+    # v2.0.4 V6 — Famicom microphone protocol lock tests (kgmqa-108 chain).
+    # Loads fixtures/nestest.nes so PowerNES installs the $4016/$4017 read
+    # handler (JPRead), then asserts the level-read mic report on $4016 D2:
+    # pressed=1 on EVERY read (no per-read toggle), released=0, the
+    # controller-I shift sequence untouched, $4017 never carries the bit,
+    # P1-side Start never produces it (P2-only peripheral), and the
+    # replaceP2StartWithMicrophone gate (P2 Start key mapping, preserved).
+    # Mutation legs are documented at the top of the test file.
+    fceux11_add_test_executable(fceux11_input_famicom_mic_test
+        f11qa/input_famicom_mic_test.cpp
+        git_info_stub.cpp
+    )
+    # v2.0.4 r14: this target's LTCG link CRASHES on MSVC 14.51 (link.exe
+    # exits -1 with no LNK message, leaving a 2 MiB unusable .exe -- the same
+    # "c2.dll materialises a bogus 2 MB image" family that src/bus.cpp and
+    # src/ppu_sprite_lut.cpp already dodge with /GL-).  Reproduced twice on
+    # this machine (ninja step 47/48 of a plain `cmake --build build`).
+    # Remedy = the repo's existing precedent: compile the offending
+    # translation unit without whole-program optimisation.  The libraries it
+    # links stay /GL, so the linker still runs LTCG for them -- the crash is
+    # in this TU's own IL, and the test target is the only consumer.
+    set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/f11qa/input_famicom_mic_test.cpp
+        PROPERTIES COMPILE_FLAGS "/GL-")
+    add_test(NAME input_famicom_mic_test
+             COMMAND fceux11_input_famicom_mic_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    set_tests_properties(input_famicom_mic_test PROPERTIES TIMEOUT 300)
+
     fceux11_add_test_executable(fceux11_mapper_core_test
         f11qa/core/mapper_test.cpp
         git_info_stub.cpp
@@ -488,7 +516,7 @@ if(FCEUX11_BUILD_TESTS)
             cpu_test ppu_test apu_test bus_test mapper_core_test
         savestate_core_test golden_savestate_test bench_tolerance_test
         ppu_frame_diff_test apu_wav_diff_test apu_wav_hq_diff_test
-        apu_frame_timing_test input_snesmouse_test
+        apu_frame_timing_test input_snesmouse_test input_famicom_mic_test
         cart_class_test fds_load_test
         driver_callbacks_test core_driver_boundary_test
         ppu_rendering_lut_test ppu_phase_c_test ppu_phase_d_test
@@ -514,6 +542,41 @@ if(FCEUX11_BUILD_TESTS)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     if(WIN32)
         set_tests_properties(pixbuf_pool_test PROPERTIES ENVIRONMENT_MODIFICATION
+                "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+    endif()
+
+    # v2.0.4 V19 — GUID parse-failure zeroing (C++ half). Pure utils+Rust
+    # calls (FCEU_Guid::fromString); no core init, no fixtures. Registered
+    # below the shared PATH block above, so it carries its own
+    # ENVIRONMENT_MODIFICATION (same pattern as pixbuf_pool_test).
+    # Mutation legs are documented at the bottom of the test file.
+    fceux11_add_test_executable(fceux11_guid_test
+        f11qa/utils/guid_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME guid_test
+             COMMAND fceux11_guid_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    if(WIN32)
+        set_tests_properties(guid_test PROPERTIES ENVIRONMENT_MODIFICATION
+                "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+    endif()
+
+    # v2.0.4 V16 — StringToBytes "0X"-prefix byte count (hex over-read,
+    # upstream issue #857 / commit 683c3f0). Pure utils calls (StringToBytes
+    # only); no core init, no fixtures. Registered with its own
+    # ENVIRONMENT_MODIFICATION, same pattern as guid_test above. Gate count
+    # grows 38 -> 39. Mutation legs are documented at the bottom of the
+    # test file.
+    fceux11_add_test_executable(fceux11_xstring_test
+        f11qa/utils/xstring_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME xstring_test
+             COMMAND fceux11_xstring_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    if(WIN32)
+        set_tests_properties(xstring_test PROPERTIES ENVIRONMENT_MODIFICATION
                 "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
     endif()
 
@@ -643,6 +706,45 @@ if(FCEUX11_BUILD_TESTS)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     if(WIN32)
         set_tests_properties(lua_bit_test_headless PROPERTIES ENVIRONMENT_MODIFICATION
+                "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+    endif()
+
+    # v2.0.4 r15 — regression lock for the lua runner's HONESTY.
+    # A script that dies with a Lua error (or never completes) must make the
+    # runner exit non-zero.  Before this lock the runner silently `break`ed on
+    # a failed emulation step and reported "script completed (all assertions
+    # passed)" -- which is exactly why the kgmqa-123 frameadvance gate was blind
+    # to the whole yield/resume path (it was also invoked without a ROM, so the
+    # emulation step failed on the very first iteration).
+    # WILL_FAIL inverts ctest's exit-code check: the OLD behaviour (exit 0)
+    # makes this case FAIL, the NEW behaviour (non-zero) makes it pass.
+    add_test(NAME lua_runner_rejects_failed_script
+             COMMAND f11qa_lua_runner
+             ${CMAKE_SOURCE_DIR}/scripts/repro/lua_error_probe.lua
+             --rom ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/nestest.nes
+             --frames 10
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    set_tests_properties(lua_runner_rejects_failed_script PROPERTIES WILL_FAIL TRUE TIMEOUT 60)
+    if(WIN32)
+        set_tests_properties(lua_runner_rejects_failed_script PROPERTIES ENVIRONMENT_MODIFICATION
+                "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+    endif()
+
+    # v2.0.4 r15 — second regression lock, targeting the *other* half of the
+    # same defect: a script that never completes (here: yields forever) and is
+    # run WITHOUT a ROM.  The runner's emulation step then fails on the first
+    # iteration.  The OLD runner broke out of its frame loop silently there and
+    # exited 0 -- i.e. "all assertions passed" for a script that never ran a
+    # single frame.  That is precisely the hole kgmqa-123 fell into, so this
+    # case is the mutation leg: revert the runner change and it goes RED.
+    add_test(NAME lua_runner_rejects_incomplete_script
+             COMMAND f11qa_lua_runner
+             ${CMAKE_SOURCE_DIR}/scripts/repro/lua_never_completes.lua
+             --frames 60
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    set_tests_properties(lua_runner_rejects_incomplete_script PROPERTIES WILL_FAIL TRUE TIMEOUT 60)
+    if(WIN32)
+        set_tests_properties(lua_runner_rejects_incomplete_script PROPERTIES ENVIRONMENT_MODIFICATION
                 "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
     endif()
 

@@ -15,6 +15,7 @@
 #include "rust/fceux11_rust.h"
 
 #include <cstdlib>
+#include <cstring>
 
 extern SFORMAT FCEUVSUNI_STATEINFO[];
 extern BMAPPINGLocal bmap[];
@@ -48,9 +49,18 @@ int iNES_Init(int num) {
 				}
 				if (CHRRAMSize > 0)
 				{
-					int mCHRRAMSize = (CHRRAMSize < 1024) ? 1024 : CHRRAMSize;
+					// v2.0.4 V10 (upstream commit 8510fb8): setchr8() maps a
+					// full 8k window from the start of the chip even when the
+					// chip is smaller, so anything under 8k has to be padded
+					// or PPU $2007 writes walk off the end of the buffer.
+					int mCHRRAMSize = (CHRRAMSize < 8192) ? 8192 : CHRRAMSize;
 					if ((UNIFchrrama = VROM = (uint8*)FCEU_malloc(mCHRRAMSize)) == NULL) return 2;
+					// Real size only: the RAMInitOption pattern on the live
+					// CHR bytes must not change (movie stability for >=8k carts).
 					FCEU_MemoryRand(VROM, CHRRAMSize);
+					// Padding beyond the real size is zeroed deterministically
+					// (double insurance; FCEU_malloc already zeroes the block).
+					memset(VROM + CHRRAMSize, 0, mCHRRAMSize - CHRRAMSize);
 					SetupCartCHRMapping(0, VROM, CHRRAMSize, 1);
 					AddExState(VROM, CHRRAMSize, 0, "CHRR");
 				}

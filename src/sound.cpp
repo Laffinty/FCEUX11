@@ -156,7 +156,7 @@ static uint32 ChannelBC[5];
 int movieSyncHackOn=0,resetDMCacc=0,movieConvertOffset1,movieConvertOffset2;
 
 #ifdef WIN32
-extern volatile int datacount, undefinedcount;
+extern std::atomic<int> datacount, undefinedcount;
 extern int debug_loggingCD;
 extern unsigned char *cdloggerdata;
 #endif
@@ -191,9 +191,9 @@ void LogDPCM(int romaddress, int dpcmsize){
 			cdloggerdata[dpcmstart] |= (romaddress >> 11) & 0x0c;
 
 			if(!(cdloggerdata[dpcmstart] & 2)){
-				datacount++;
+				datacount.fetch_add(1, std::memory_order_relaxed);
 				cdloggerdata[dpcmstart] |= 2;
-				if(!(cdloggerdata[dpcmstart] & 1))undefinedcount--;
+				if(!(cdloggerdata[dpcmstart] & 1))undefinedcount.fetch_sub(1, std::memory_order_relaxed);
 			}
 		}
 	}
@@ -766,6 +766,14 @@ static INLINE void DMCDMA(void)
 
 void FCEU_SoundCPUHook(int cycles)
 {
+ // B2(b) (v2.0.2): the FCEU_PROFILE_FUNC probe for this function is
+ // intentionally absent -- this is a per-instruction hot path and the R4
+ // decision ruled it out.  Do not add a probe here without an explicit
+ // decision on the per-instruction cost.  The tree currently carries 6
+ // probes (fceu.cpp "Emulate Single Frame", ppu_rendering.cpp "RefreshLine"
+ // and "DoLine", sdl-sound.cpp "WriteSound", ConsoleWindow.cpp "VideoXfer"
+ // and "updatePeriodic"); the older "4/5" count in the v2.0.2 review report
+ // is obsolete.  See the v2.0.4 build plan item V3.
  // R6 Step 3 (2026-08-01, defect-1 deep probe): two new sample probes
  // to localize the fhcnt cumulative-drift vs quarter-boundary timing.
  //  (a) HOOK_SAMPLE: every 4096th hook call (~0.1s) records fhcnt to

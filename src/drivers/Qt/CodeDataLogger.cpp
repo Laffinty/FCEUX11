@@ -365,12 +365,22 @@ void CodeDataLoggerDialog_t::autoResumeCdlStateChange(int state)
 void CodeDataLoggerDialog_t::updatePeriodic(void)
 {
 	char str[768];
-	float fcodecount = codecount;
-	float fdatacount = datacount;
-	float frendercount = rendercount;
-	float fvromreadcount = vromreadcount;
-	float fundefinedcount = undefinedcount;
-	float fundefinedvromcount = undefinedvromcount;
+	// V14 (2026-11-14): the six CDL counters are std::atomic<int> now (written
+	// on the emu thread, read here on the Qt main thread) — take one relaxed
+	// snapshot per counter per tick; both the %x integer and the percentage
+	// below derive from the same load (the old code read the global twice).
+	int codecount_snapshot = codecount.load(std::memory_order_relaxed);
+	int datacount_snapshot = datacount.load(std::memory_order_relaxed);
+	int rendercount_snapshot = rendercount.load(std::memory_order_relaxed);
+	int vromreadcount_snapshot = vromreadcount.load(std::memory_order_relaxed);
+	int undefinedcount_snapshot = undefinedcount.load(std::memory_order_relaxed);
+	int undefinedvromcount_snapshot = undefinedvromcount.load(std::memory_order_relaxed);
+	float fcodecount = codecount_snapshot;
+	float fdatacount = datacount_snapshot;
+	float frendercount = rendercount_snapshot;
+	float fvromreadcount = vromreadcount_snapshot;
+	float fundefinedcount = undefinedcount_snapshot;
+	float fundefinedvromcount = undefinedvromcount_snapshot;
 	float fromsize = cdloggerdataSize;
 	float fvromsize = (cdloggerVideoDataSize != 0) ? cdloggerVideoDataSize : 1;
 
@@ -389,22 +399,22 @@ void CodeDataLoggerDialog_t::updatePeriodic(void)
 
 	if (cdloggerdataSize > 0)
 	{
-		snprintf( str, sizeof(str), "0x%06x  %.2f%%", codecount, (fcodecount / fromsize) * 100);
+		snprintf( str, sizeof(str), "0x%06x  %.2f%%", codecount_snapshot, (fcodecount / fromsize) * 100);
 		prgLoggedCodeLabel->setText(tr(str));
 
-		snprintf( str, sizeof(str), "0x%06x  %.2f%%", datacount, (fdatacount / fromsize) * 100);
+		snprintf( str, sizeof(str), "0x%06x  %.2f%%", datacount_snapshot, (fdatacount / fromsize) * 100);
 		prgLoggedDataLabel->setText(tr(str));
 
-		snprintf( str, sizeof(str), "0x%06x  %.2f%%", undefinedcount, (fundefinedcount / fromsize) * 100);
+		snprintf( str, sizeof(str), "0x%06x  %.2f%%", undefinedcount_snapshot, (fundefinedcount / fromsize) * 100);
 		prgUnloggedLabel->setText(tr(str));
 
-		snprintf( str, sizeof(str), "0x%06x  %.2f%%", rendercount, (frendercount / fvromsize) * 100);
+		snprintf( str, sizeof(str), "0x%06x  %.2f%%", rendercount_snapshot, (frendercount / fvromsize) * 100);
 		chrLoggedCodeLabel->setText(tr(str));
 
-		snprintf( str, sizeof(str), "0x%06x  %.2f%%", vromreadcount, (fvromreadcount / fvromsize) * 100);
+		snprintf( str, sizeof(str), "0x%06x  %.2f%%", vromreadcount_snapshot, (fvromreadcount / fvromsize) * 100);
 		chrLoggedDataLabel->setText(tr(str));
 
-		snprintf( str, sizeof(str), "0x%06x  %.2f%%", undefinedvromcount, (fundefinedvromcount / fvromsize) * 100);
+		snprintf( str, sizeof(str), "0x%06x  %.2f%%", undefinedvromcount_snapshot, (fundefinedvromcount / fvromsize) * 100);
 		chrUnloggedLabel->setText(tr(str));
 	}
 	else
@@ -578,7 +588,7 @@ void CodeDataLoggerDialog_t::SaveStrippedROM(int invert)
 		return;
 	}
 
-	if (codecount == 0)
+	if (codecount.load(std::memory_order_relaxed) == 0)
 	{
 		printf("Unable to Generate Stripped ROM. Get Something Logged and try again.");
 		return;
@@ -839,8 +849,11 @@ void ResetCDLog(void)
 	}
 	FCEU_WRAPPER_LOCK();
 
-	codecount = datacount = rendercount = vromreadcount = 0;
-	undefinedcount = cdloggerdataSize;
+	codecount.store(0, std::memory_order_relaxed);
+	datacount.store(0, std::memory_order_relaxed);
+	rendercount.store(0, std::memory_order_relaxed);
+	vromreadcount.store(0, std::memory_order_relaxed);
+	undefinedcount.store(static_cast<int>(cdloggerdataSize), std::memory_order_relaxed);
 
 	if (cdloggerdata != NULL)
 	{
@@ -848,7 +861,7 @@ void ResetCDLog(void)
 	}
 	if (cdloggerVideoDataSize != 0)
 	{
-		undefinedvromcount = cdloggerVideoDataSize;
+		undefinedvromcount.store(static_cast<int>(cdloggerVideoDataSize), std::memory_order_relaxed);
 
 		if (cdloggervdata != NULL)
 		{
@@ -859,7 +872,7 @@ void ResetCDLog(void)
 	{
 		if (GameInfo->type != GIT_NSF)
 		{
-			undefinedvromcount = 8192;
+			undefinedvromcount.store(8192, std::memory_order_relaxed);
 			if (cdloggervdata != NULL)
 			{
 				memset(cdloggervdata, 0, 8192);
@@ -886,11 +899,11 @@ bool LoadCDLog(const char *nameo)
 		if (j == EOF)
 			break;
 		if ((j & 1) && !(cdloggerdata[i] & 1))
-			codecount++; //if the new byte has something logged and
+			codecount.fetch_add(1, std::memory_order_relaxed); //if the new byte has something logged and
 		if ((j & 2) && !(cdloggerdata[i] & 2))
-			datacount++; //and the old one doesn't. Then increment
+			datacount.fetch_add(1, std::memory_order_relaxed); //and the old one doesn't. Then increment
 		if ((j & 3) && !(cdloggerdata[i] & 3))
-			undefinedcount--; //the appropriate counter.
+			undefinedcount.fetch_sub(1, std::memory_order_relaxed); //the appropriate counter.
 		cdloggerdata[i] |= j;
 	}
 
@@ -902,11 +915,11 @@ bool LoadCDLog(const char *nameo)
 			if (j == EOF)
 				break;
 			if ((j & 1) && !(cdloggervdata[i] & 1))
-				rendercount++; //if the new byte has something logged and
+				rendercount.fetch_add(1, std::memory_order_relaxed); //if the new byte has something logged and
 			if ((j & 2) && !(cdloggervdata[i] & 2))
-				vromreadcount++; //if the new byte has something logged and
+				vromreadcount.fetch_add(1, std::memory_order_relaxed); //if the new byte has something logged and
 			if ((j & 3) && !(cdloggervdata[i] & 3))
-				undefinedvromcount--; //the appropriate counter.
+				undefinedvromcount.fetch_sub(1, std::memory_order_relaxed); //the appropriate counter.
 			cdloggervdata[i] |= j;
 		}
 	}

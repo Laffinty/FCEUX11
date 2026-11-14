@@ -242,8 +242,35 @@ void MovieRecord::dump(MovieData* md, EMUFILE* os, int index)
 
 void MovieData::truncateAt(int frame)
 {
+	// v2.0.4 V20 (upstream issue #858 / commit 9f45054e): negative frame would
+	// convert to a huge size_t and make resize() throw std::length_error.
+	// All five current call sites pass non-negative values
+	// (movie_playback.cpp:277, movie_record.cpp:225/:635,
+	// TasEditor/bookmarks.cpp:351, TasEditor/splicer.cpp:378), so this is
+	// latent-defect hardening, not a live fix — same shape as the upstream
+	// "negative clamps to zero".
+	if (frame < 0)
+		frame = 0;
 	records.resize(frame);
 }
+
+// ----------------------------------------------------------------------------
+// v2.0.4 V16 guard — MovieData::installValue is DEAD CODE: it has no callers
+// anywhere in the repo (the live FM2 parser is the Rust one, entered at
+// movie_fm2.cpp fceux11_rust_movie_load_fm2 below; drivers/common/config.cpp,
+// the other StringToBytes consumer, is likewise not in src/CMakeLists.txt's
+// build list). It is kept on purpose — not deleted — to avoid dragging
+// movie.h:251 and the fm2-extraction history (movie_fm2.h header note) along.
+//
+// DO NOT REVIVE this function without re-checking both things it depends on:
+//   1. StringToBytes (src/utils/xstring.cpp): v2.0.4 V16 fixed the "0X"
+//      prefix byte count there (upstream issue #857 / commit 683c3f0); the
+//      hex byte count must stay consistent with HexStringToBytesLength
+//      (xstring.cpp:313-318), which already returned size/2-1 == (size-2)/2.
+//   2. The "length" key below: the Rust parser now rejects negative values
+//      onto the -1 "unbounded" sentinel (v2.0.4 V20, formats/src/movie.rs);
+//      a revived C++ parser must keep that contract.
+// ----------------------------------------------------------------------------
 
 void MovieData::installValue(std::string& key, std::string& val)
 {

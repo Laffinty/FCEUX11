@@ -200,12 +200,20 @@ fn scan_captured(stdout_str: &str, stderr_str: &str) -> (bool, String, usize) {
         has_error = true;
     }
     // stderr: Lua runtime errors.
+    // v2.0.4 r15: the marker list used to cover only generic Lua wording.
+    // An error raised by the engine itself (mlua error text, runner
+    // diagnostics) did not match any of them, so a script that died with a
+    // Lua error was reported as "all assertions passed".  The engine's own
+    // prefixes are matched explicitly now.
     if stderr_str.contains("runtime error")
         || stderr_str.contains("stack traceback")
         || stderr_str.contains("assertion failed")
         || stderr_str.contains("ERROR:")
         || stderr_str.contains("PANIC:")
         || stderr_str.contains("syntax error")
+        || stderr_str.contains("Lua frame_boundary error")
+        || stderr_str.contains("Lua script load error")
+        || stderr_str.contains("lua_runner:")
     {
         has_error = true;
     }
@@ -373,23 +381,57 @@ fn run_script_inner(
         }
 
         // --- Frame loop ---
+        // v2.0.4 r15: the loop used to `break` silently when the emulation
+        // step failed and to report a timeout as a success.  Both made the
+        // harness report "script completed (all assertions passed)" for a
+        // script that never ran a single frame -- the kgmqa-123 gate was
+        // therefore blind to the whole yield/resume path (it was invoked
+        // without a ROM, so `kagami_bridge_emulate_frame()` failed on the
+        // very first iteration).  Every exit from this loop now states
+        // explicitly whether the script ran to completion.
         let mut frame_count = 0i32;
+        let mut outcome_code = 0i32;
         while fceux11_lua_running() != 0 {
             if max_frames > 0 && frame_count >= max_frames {
-                eprintln!("lua_runner: timeout after {} frames", max_frames);
+                eprintln!(
+                    "lua_runner: script did not complete within {} frames",
+                    max_frames
+                );
                 fceux11_lua_stop();
+                outcome_code = -6;
                 break;
             }
             if kagami_bridge_emulate_frame() != 0 {
+                // A script that already finished on its own (e.g. a pure API
+                // test that needs no ROM) may legitimately run without
+                // emulation.  It only counts as a failure when the script is
+                // still alive -- i.e. it was waiting for a frame boundary that
+                // never came.
+                if fceux11_lua_running() != 0 {
+                    eprintln!(
+                        "lua_runner: emulation failed after {} frames while the script was still running",
+                        frame_count
+                    );
+                    outcome_code = -5;
+                    break;
+                }
                 break;
             }
             fceux11_lua_frame_boundary();
             frame_count += 1;
         }
 
+        // The script must have finished on its own.  If the engine still
+        // reports it as running, the script was suspended (e.g. it yielded
+        // and was never resumed) -- that is NOT a completed script.
+        if outcome_code == 0 && fceux11_lua_running() != 0 {
+            eprintln!("lua_runner: script still running after the frame loop");
+            outcome_code = -7;
+        }
+
         // --- Shutdown Lua ---
         fceux11_lua_shutdown();
-        0
+        outcome_code
     }
 }
 

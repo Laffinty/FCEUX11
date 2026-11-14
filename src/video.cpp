@@ -250,6 +250,12 @@ void FCEU_PutImage(void)
 	else
 	{
 		//Save backbuffer before overlay stuff is written.
+		//A4-1 (v2.0.2 A4 decision, kept rejected): do NOT gate this 64 KiB/frame
+		//copy on a "consumer count". Rejected because the savestate chunk-8
+		//consumer runs asynchronously at an arbitrary frame, so a consumption
+		//gate would make the golden savestate drift -- and the predicate would
+		//be true anyway (there is always a consumer). See the v2.0.2 review
+		//report A4-1 and the v2.0.4 build plan item V3.
 		if(!fceu11::IsEmulationPaused())
 			memcpy(XBackBuf, XBuf, 256*256);
 

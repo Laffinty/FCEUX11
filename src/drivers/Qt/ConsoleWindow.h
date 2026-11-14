@@ -300,6 +300,13 @@ class  consoleWin_t : public QMainWindow
 		QAction *frameTimingAct = nullptr;
 		QAction *paletteEditorAct = nullptr;
 		QAction *aviRiffViewerAct = nullptr;
+#ifdef __FCEU_PROFILER_ENABLE__
+		// v2.0.4 V7 (B2(d)): Advanced -> Misc Tools -> Profiler Report.
+		// Registered in the consoleWin_t ctor (ConsoleWindow.cpp) under the
+		// same macro, so a non-profiler build has neither the menu item nor
+		// this member.
+		QAction *profilerReportAct = nullptr;
+#endif
 
 		//QAction *aviHudAct;
 		//QAction *aviMsgAct;
@@ -410,6 +417,11 @@ class  consoleWin_t : public QMainWindow
 		void openPaletteEditorWin(void);
 		void openAviRiffViewer(void);
 		void openTimingStatWin(void);
+#ifdef __FCEU_PROFILER_ENABLE__
+		// v2.0.4 V7 (B2(d)): profiler summary report dialog (profiler
+		// builds only; see openProfilerReport in ConsoleWindow.cpp).
+		void openProfilerReport(void);
+#endif
 		void openMovieOptWin(void);
 		void openCodeDataLogger(void);
 		void openTraceLogger(void);

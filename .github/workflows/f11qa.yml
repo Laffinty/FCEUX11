@@ -42,9 +42,9 @@ name: F11QA
 
 on:
   push:
-    branches: [main, wip1.8, wip2.0, wip203]
+    branches: [main, wip1.8, wip2.0, wip203, wip204]
   pull_request:
-    branches: [main, wip1.8, wip2.0, wip203]
+    branches: [main, wip1.8, wip2.0, wip203, wip204]
   workflow_dispatch:  # allow manual trigger
 
 jobs:
@@ -66,6 +66,20 @@ jobs:
       # literal `\vcpkg\archives` and vcpkg's binary cache was never preserved.
       # Point it at a deterministic in-workspace directory instead.
       VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg_bincache
+
+      # v2.0.4 r17 (2026-11-15): Rust 工具链**锁定**到具体版本。
+      #
+      # 之前这里是 `stable`（每次自动跟最新）。2026-11-14 stable 从 1.99.1
+      # 跳到 1.100.0，而 1.100 的 std 改用 WaitOnAddress / WakeByAddress*
+      # 做线程挂起 ⇒ fceux11_rust.lib 里多出三个 __imp_* 未定义符号 ⇒
+      # 本仓链接行缺 synchronization.lib ⇒ 5 个 F11QA runner 可执行文件
+      # 全部 LNK1120 ⇒ 构建中断、迁移矩阵没产出 ⇒ R4 gate 判红。
+      # **本仓代码零改动**，纯粹是工具链漂移打穿了链接契约。
+      #
+      # 锁定后，工具链升级变成「显式决定」而不是「被外部悄悄改掉」。
+      # 升级步骤（先看 native-static-libs 清单，再改版本号）：
+      #   见 src/rust/CMakeLists.txt 顶部的契约注释。
+      RUST_TOOLCHAIN: '1.100.0'
 
     steps:
       - name: Checkout
@@ -90,7 +104,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
           targets: x86_64-pc-windows-msvc
 
       - name: Setup Python
@@ -131,6 +145,10 @@ jobs:
           key: vcpkg-${{ hashFiles('vcpkg.json') }}
           restore-keys: vcpkg-
 
+      # Cache Rust
+      # v2.0.4 r17: the toolchain version is part of the key — cargo's target
+      # dir is not reusable across compilers, and sharing one cache between
+      # two toolchain versions only makes both of them rebuild.
       - name: Cache Rust
         uses: actions/cache@v4
         with:
@@ -138,8 +156,9 @@ jobs:
             src/rust/target
             ~/.cargo/registry
             ~/.cargo/git
-          key: rust-f11qa-${{ hashFiles('src/rust/Cargo.lock') }}
-          restore-keys: rust-f11qa-
+          key: rust-f11qa-${{ env.RUST_TOOLCHAIN }}-${{ hashFiles('src/rust/Cargo.lock') }}
+          restore-keys: |
+            rust-f11qa-${{ env.RUST_TOOLCHAIN }}-
 
       # -----------------------------------------------------------------------
       # Build C++ project (with tests)

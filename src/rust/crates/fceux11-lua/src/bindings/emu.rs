@@ -1,7 +1,8 @@
 //! `emu` library binding — core emulator functions
 //!
-//! Key design: `emu.frameadvance()` yields the main coroutine via
-//! `mlua::Thread::yield`. The C++ emulator resumes it each frame via
+//! Key design: `emu.frameadvance()` is a pure-Lua wrapper around
+//! `coroutine.yield` (see the V1 comment at its registration site); the C++
+//! emulator resumes the main coroutine each frame via
 //! `fceux11_lua_frame_boundary()` → `LuaEngine::frame_boundary()`.
 
 use mlua::{Function, Lua, Result, String, Table};
@@ -81,18 +82,20 @@ pub fn register(lua: &Lua) -> Result<Table> {
         })?,
     )?;
 
-    emu.set(
-        "frameadvance",
-        lua.create_function(|lua, ()| {
-            let engine = crate::get_engine_mut();
-            if let Some(eng) = engine {
-                eng.set_frame_advance_waiting(true);
-            }
-            let co: mlua::Table = lua.globals().get("coroutine")?;
-            let yield_fn: mlua::Function = co.get("yield")?;
-            yield_fn.call::<()>(())
-        })?,
-    )?;
+    // V1 (F-1, 2026-11-13): `emu.frameadvance` must yield at the Lua layer.
+    // The former native binding called `coroutine.yield` via a Rust-side
+    // `Function::call`, which raises Lua 5.1's C-call depth (nCcalls) and
+    // makes `lua_yield` fail with "attempt to yield across metamethod/C-call
+    // boundary" — graceful `Err` under the test profile, but a silent
+    // process abort (0xC0000409) under the workspace `panic = "abort"`
+    // release profile. A pure-Lua function yields from Lua itself, so the
+    // frame-boundary resume works; `frame_advance_waiting` is maintained by
+    // `LuaEngine::frame_boundary()` from the thread status, so no native
+    // flag-set is needed here.
+    let frameadvance_lua: Function = lua
+        .load("return function() return coroutine.yield() end")
+        .eval()?;
+    emu.set("frameadvance", frameadvance_lua)?;
 
     emu.set(
         "speedmode",

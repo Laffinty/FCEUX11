@@ -2,6 +2,7 @@
 #define _DEBUG_H_
 
 #include <array>
+#include <atomic>
 #include <string>
 
 #include "conddebug.h"
@@ -82,7 +83,10 @@ uint8 GetPPUMem(uint8 A);
 //---------CDLogger
 void LogCDVectors(int which);
 void LogCDData(uint8 *opcode, uint16 A, int size);
-extern volatile int codecount, datacount, undefinedcount;
+// V14 (2026-11-14): was `volatile int` — these cross the emu/GUI thread
+// boundary (written by LogCDData/LogCDVectors on the emu thread, read by the
+// CDL dialog on the Qt main thread), so they are std::atomic<int> now.
+extern std::atomic<int> codecount, datacount, undefinedcount;
 extern unsigned char *cdloggerdata;
 extern unsigned int cdloggerdataSize;
 

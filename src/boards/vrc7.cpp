@@ -197,6 +197,12 @@ static void VRC7IRQHook(int a) {
 
 static void StateRestore(int version) {
 	Sync();
+	// v2.0.4 V11: the FCEUSTATE_INDIRECT "VRC7" block restores the OPLL struct
+	// verbatim, so its sintbl pointers dangle after a cross-process load. Placed
+	// here, not in Sync() (fires on every PRG/CHR write); forceRefresh only
+	// rebuilds derived quantities, leaving the restored phase/patch untouched.
+	if (VRC7Sound)
+		OPLL_forceRefresh(VRC7Sound);
 }
 
 void Mapper85_Init(CartInfo *info) {

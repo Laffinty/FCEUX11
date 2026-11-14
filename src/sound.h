@@ -21,6 +21,8 @@
 #ifndef _SOUND_H_
 #define _SOUND_H_
 
+#include <atomic>
+
 #include "apu.h"           // v1.6 Resonance: Apu class + v1.0 reference aliases
 #include "expansion_audio.h" // v1.6 Resonance: EXPSOUND + ExpansionAudio
 
@@ -40,7 +42,7 @@ extern uint32_t& soundtsinc;
 extern uint32_t& soundtsi;
 
 #ifdef WIN32
-extern volatile int datacount, undefinedcount;
+extern std::atomic<int> datacount, undefinedcount;
 extern int debug_loggingCD;
 extern unsigned char *cdloggerdata;
 #endif
