@@ -156,7 +156,7 @@ static uint32 ChannelBC[5];
 int movieSyncHackOn=0,resetDMCacc=0,movieConvertOffset1,movieConvertOffset2;
 
 #ifdef WIN32
-extern volatile int datacount, undefinedcount;
+extern std::atomic<int> datacount, undefinedcount;
 extern int debug_loggingCD;
 extern unsigned char *cdloggerdata;
 #endif
@@ -191,9 +191,9 @@ void LogDPCM(int romaddress, int dpcmsize){
 			cdloggerdata[dpcmstart] |= (romaddress >> 11) & 0x0c;
 
 			if(!(cdloggerdata[dpcmstart] & 2)){
-				datacount++;
+				datacount.fetch_add(1, std::memory_order_relaxed);
 				cdloggerdata[dpcmstart] |= 2;
-				if(!(cdloggerdata[dpcmstart] & 1))undefinedcount--;
+				if(!(cdloggerdata[dpcmstart] & 1))undefinedcount.fetch_sub(1, std::memory_order_relaxed);
 			}
 		}
 	}

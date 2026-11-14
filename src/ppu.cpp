@@ -201,7 +201,10 @@ inline void FFCEUX_PPUWrite_Default(uint32 A, uint8 V) {
 	}
 }
 
-volatile int rendercount, vromreadcount, undefinedvromcount, LogAddress = -1;
+// V14 (2026-11-14): the three CDL counters were `volatile int` — see ppu.h.
+// LogAddress is PPU-internal (emu thread only) and stays `volatile int`.
+std::atomic<int> rendercount{0}, vromreadcount{0}, undefinedvromcount{0};
+volatile int LogAddress = -1;
 unsigned char *cdloggervdata = NULL;
 unsigned int cdloggerVideoDataSize = 0;
 
@@ -248,8 +251,8 @@ int GetCHROffset(uint8 *ptr) {
 				{ \
 					cdloggervdata[addr] |= 1; \
 					if(cdloggerVideoDataSize) { \
-						if (!(cdloggervdata[addr] & 2)) undefinedvromcount--; \
-						rendercount++; \
+						if (!(cdloggervdata[addr] & 2)) undefinedvromcount.fetch_sub(1, std::memory_order_relaxed); \
+						rendercount.fetch_add(1, std::memory_order_relaxed); \
 					} \
 				} \
 			} \
@@ -266,8 +269,8 @@ int GetCHROffset(uint8 *ptr) {
 				{ \
 					cdloggervdata[addr] |= 1; \
 					if(cdloggerVideoDataSize) { \
-						if (!(cdloggervdata[addr] & 2)) undefinedvromcount--; \
-						rendercount++; \
+						if (!(cdloggervdata[addr] & 2)) undefinedvromcount.fetch_sub(1, std::memory_order_relaxed); \
+						rendercount.fetch_add(1, std::memory_order_relaxed); \
 					} \
 				} \
 			} \
@@ -1150,8 +1153,8 @@ static DECLFR(A2007) {
 		if (!DummyRead && (LogAddress != -1)) {
 			if (!(cdloggervdata[LogAddress] & 2)) {
 				cdloggervdata[LogAddress] |= 2;
-				if ((!(cdloggervdata[LogAddress] & 1)) && cdloggerVideoDataSize) undefinedvromcount--;
-				vromreadcount++;
+				if ((!(cdloggervdata[LogAddress] & 1)) && cdloggerVideoDataSize) undefinedvromcount.fetch_sub(1, std::memory_order_relaxed);
+				vromreadcount.fetch_add(1, std::memory_order_relaxed);
 			}
 		} else
 			DummyRead = 0;

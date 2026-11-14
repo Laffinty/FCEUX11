@@ -126,12 +126,12 @@ int& ConfigView::frame_advance_delay() noexcept { return ::frameAdvance_Delay; }
 // ---------------------------------------------------------------------------
 int& DebugView::in_debug() noexcept { return ::fceuindbg; }
 
-volatile int& DebugView::code_count() noexcept { return ::codecount; }
-volatile int& DebugView::data_count() noexcept { return ::datacount; }
-volatile int& DebugView::undefined_count() noexcept { return ::undefinedcount; }
-volatile int& DebugView::render_count() noexcept { return ::rendercount; }
-volatile int& DebugView::vrom_read_count() noexcept { return ::vromreadcount; }
-volatile int& DebugView::undefined_vrom_count() noexcept { return ::undefinedvromcount; }
+std::atomic<int>& DebugView::code_count() noexcept { return ::codecount; }
+std::atomic<int>& DebugView::data_count() noexcept { return ::datacount; }
+std::atomic<int>& DebugView::undefined_count() noexcept { return ::undefinedcount; }
+std::atomic<int>& DebugView::render_count() noexcept { return ::rendercount; }
+std::atomic<int>& DebugView::vrom_read_count() noexcept { return ::vromreadcount; }
+std::atomic<int>& DebugView::undefined_vrom_count() noexcept { return ::undefinedvromcount; }
 
 int& DebugView::ia_pc() noexcept { return ::iaPC; }
 uint32_t& DebugView::ia_poffset() noexcept { return ::iapoffset; }

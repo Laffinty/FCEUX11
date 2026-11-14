@@ -466,7 +466,10 @@ int condition(watchpointinfo* wp)
 
 //---------------------
 
-volatile int codecount = 0, datacount = 0, undefinedcount = 0;
+// V14 (2026-11-14): was `volatile int` — see debug.h. The RMW below goes
+// through the Rust FFI (composite logic, not a fetch_add): load relaxed ->
+// hand the local int32_t copy to the FFI -> store relaxed.
+std::atomic<int> codecount{0}, datacount{0}, undefinedcount{0};
 unsigned char *cdloggerdata = NULL;
 unsigned int cdloggerdataSize = 0;
 static int indirectnext = 0;
@@ -478,14 +481,14 @@ void LogCDVectors(int which){
 	int j = GetPRGAddress(which);
 	if (j == -1) return;
 
-	int32_t cc = codecount;
-	int32_t dc = datacount;
-	int32_t uc = undefinedcount;
+	int32_t cc = codecount.load(std::memory_order_relaxed);
+	int32_t dc = datacount.load(std::memory_order_relaxed);
+	int32_t uc = undefinedcount.load(std::memory_order_relaxed);
 	fceux11_rust_debug_log_cd_vectors(
 		cdloggerdata, cdloggerdataSize, j, &cc, &dc, &uc);
-	codecount = cc;
-	datacount = dc;
-	undefinedcount = uc;
+	codecount.store(cc, std::memory_order_relaxed);
+	datacount.store(dc, std::memory_order_relaxed);
+	undefinedcount.store(uc, std::memory_order_relaxed);
 }
 
 bool break_on_unlogged_code = false;
@@ -496,9 +499,9 @@ void LogCDData(uint8 *opcode, uint16 A, int size)
 	int j_pc = GetPRGAddress(_PC);
 	int j_a  = GetPRGAddress(A);
 
-	int32_t cc = codecount;
-	int32_t dc = datacount;
-	int32_t uc = undefinedcount;
+	int32_t cc = codecount.load(std::memory_order_relaxed);
+	int32_t dc = datacount.load(std::memory_order_relaxed);
+	int32_t uc = undefinedcount.load(std::memory_order_relaxed);
 
 	FceuLogCdDataResult r = fceux11_rust_debug_log_cd_data(
 		cdloggerdata, cdloggerdataSize,
@@ -511,9 +514,9 @@ void LogCDData(uint8 *opcode, uint16 A, int size)
 		indirectnext != 0,
 		&cc, &dc, &uc);
 
-	codecount = cc;
-	datacount = dc;
-	undefinedcount = uc;
+	codecount.store(cc, std::memory_order_relaxed);
+	datacount.store(dc, std::memory_order_relaxed);
+	undefinedcount.store(uc, std::memory_order_relaxed);
 	indirectnext = r.indirect_out ? 1 : 0;
 
 	if (break_on_unlogged_code && r.new_code_hit)

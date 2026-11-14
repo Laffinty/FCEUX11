@@ -20,6 +20,7 @@
 #ifndef FCEU11_CORE_STATE_H
 #define FCEU11_CORE_STATE_H
 
+#include <atomic>
 #include <array>
 #include <cstdint>
 
@@ -171,16 +172,16 @@ struct ConfigView {
 struct DebugView {
     int& in_debug() noexcept;                 // ::fceuindbg
 
-    // The 6 below are declared `volatile int` in their owning headers
-    // (debug.h / ppu.h). The volatile qualifier must propagate through
-    // the facade so writes from another thread are not elided by the
-    // compiler.
-    volatile int& code_count() noexcept;
-    volatile int& data_count() noexcept;
-    volatile int& undefined_count() noexcept;
-    volatile int& render_count() noexcept;
-    volatile int& vrom_read_count() noexcept;
-    volatile int& undefined_vrom_count() noexcept;
+    // The 6 below are declared std::atomic<int> in their owning headers
+    // (debug.h / ppu.h) — V14 (2026-11-14): the counters cross the
+    // emu/GUI thread boundary, so the facade hands out the atomic
+    // reference and callers load/store explicitly.
+    std::atomic<int>& code_count() noexcept;
+    std::atomic<int>& data_count() noexcept;
+    std::atomic<int>& undefined_count() noexcept;
+    std::atomic<int>& render_count() noexcept;
+    std::atomic<int>& vrom_read_count() noexcept;
+    std::atomic<int>& undefined_vrom_count() noexcept;
 
     int&         ia_pc() noexcept;
     uint32_t&    ia_poffset() noexcept;

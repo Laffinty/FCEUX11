@@ -12,6 +12,7 @@
 #ifndef FCEU11_PPU_H
 #define FCEU11_PPU_H
 
+#include <atomic>
 #include <cstdint>
 
 #include "ppu_class.h"   // fceu11::Ppu, g_ppu, PPU/NTARAM/vnapage/PPUCHRRAM/PPUNTARAM aliases
@@ -146,6 +147,9 @@ extern PPUPHASE ppuphase;
 
 extern unsigned char *cdloggervdata;
 extern unsigned int cdloggerVideoDataSize;
-extern volatile int rendercount, vromreadcount, undefinedvromcount;
+// V14 (2026-11-14): was `volatile int` — these cross the emu/GUI thread
+// boundary (written by the PPU render path on the emu thread, read by the
+// CDL dialog on the Qt main thread), so they are std::atomic<int> now.
+extern std::atomic<int> rendercount, vromreadcount, undefinedvromcount;
 
 #endif // FCEU11_PPU_H
