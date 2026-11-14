@@ -1479,7 +1479,8 @@ input_famicom_mic_test 入门禁 37→38）；Rust 七条全绿——root 299/0/
 - [x] **V20**（2026-11-14，r12）：Rust 侧拒收负 `length` 归 -1（fail_to_fail：153/1 红 →
       **154/0** 绿）+ `truncateAt` 负值归零护栏（5 调用点全传非负 ⇒ 纯潜伏，**C++ 侧无机器红腿**
       ——静态核查登记）；#858 POC 不 abort = 非回归判据（abort 路径已被 Rust 重写消除）；
-- [ ] **NES 零回归**：`ctest -LE perf` **全绿**（r13 实跑：**39/39**；三金标零漂移子项
+- [ ] **NES 零回归**：`ctest -LE perf` **全绿**（r13 实跑：**39/39**；**r14 收尾复跑仍 39/39**
+      —— 主树全量重建 EXIT=0，套件 8.97 s；三金标零漂移子项
       rom_regression/savestate/ppu_frame_diff 随套件全绿实测）
       + F11QA 矩阵 `pass_to_fail = 0` + grade ≥ B（矩阵**本地无入口** ⇒ 以 CI 复核为准
       ⇒ 该子项**保持未勾**并待 CI；⚠️ 另注：`docs/tech/F11QA.md` 里 R4 gate 的 `total==120` 口径
