@@ -500,7 +500,7 @@ $env:PATH="D:\Project\FCEUX11\vcpkg_installed\x64-windows\bin;$env:PATH"
 & "D:\Program Files\CMake\bin\ctest.exe" --test-dir D:\Project\FCEUX11\build -j 4
 ```
 
-### 十二个坑
+### 十四个坑
 
 1. **不加载 MSVC 环境就连标准库头都找不到**（`cl.exe` 在，`INCLUDE` 不在）。先 `call vcvars64.bat`。
 2. **`cargo test -p fceux11-rust` 必须加 `--no-default-features --features gba`**。默认 feature
@@ -563,6 +563,26 @@ $env:PATH="D:\Project\FCEUX11\vcpkg_installed\x64-windows\bin;$env:PATH"
     `.lib` ⇒ 新构建连环 LNK1104、且 `.obj` 时间戳新于源码却编的是旧内容。判据补一条：
     连环 LNK1104 且错误点漂移时，先 `tasklist` 查 ninja.exe/link.exe 残留，`taskkill /F`
     后 `-j 1` 串行重跑即净——孤儿产物本就是要被正确树覆盖的，杀掉无损。
+13. **改 `fceux11_core` 之后要做整体重链时，可能撞上 MSVC 的 LTCG 病态。** 某些目标的链接
+    以 `link.exe exit -1` 失败且**没有一条 LNK 报错**，只留下一个 **2 MiB 的不可用 `.exe`**
+    （⇒ 跑起来报「文件或目录已损坏」）。2026-11-14 实测命中的是
+    `fceux11_input_famicom_mic_test`（v2.0.4 V6 加的麦克风锁测试），与 `src/bus.cpp` /
+    `src/ppu_sprite_lut.cpp` 早已规避的「c2.dll 从 IL 物化出 2 MB 假镜像」同族。
+    **判据**：链接失败无 LNK 消息 + 产物恰好 2 MiB + 运行报「文件损坏」⇒ 就是它。
+    **解法**：按仓库既有先例给该 TU 加 `/GL-`（不进全程序优化）——
+    `tests/CMakeLists.txt` 里 `set_source_files_properties(<该 TU> PROPERTIES COMPILE_FLAGS "/GL-")`
+    ⇒ 链接恢复正常（产物 4.9 MB 可执行，ctest 39/39 全绿）。
+    **⚠️ 附带成本认知**：本机 Release 开着 LTCG（`CMakeLists.txt:91-92`
+    `CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON`）⇒ **每个 exe 的链接都是一次全程序优化**
+    （实测单 exe 5–25 min；40+ exe 的整体重链 ≈ 30–60 min；本机**没有 ccache**）⇒
+    改核心库后要给足时间，**别中途取消**（取消会留孤儿 link.exe，见坑 12）。
+14. **Windows 上写含中文的 `.ps1` 必须带 BOM。** PS 5.1 按系统 ANSI（GBK）读**无 BOM** 的
+    `.ps1` ⇒ 中文注释/字符串变乱码，而且乱码里的某些字节会**直接破坏语法**
+    （实测报 `Unexpected token '}'` 这类与中文毫无关系的解析错，极难定位）。
+    **修法**：落盘后补 BOM（`[IO.File]::WriteAllText($p,$t,(New-Object Text.UTF8Encoding($true)))`），
+    或干脆把脚本注释写成纯 ASCII/英文（自写的一次性脚本建议后者，从根上避开）。
+    同族：**函数名别撞内置别名**（`Measure` 撞 `Measure-Object` ⇒ 报
+    "A positional parameter cannot be found"）。
 
 ## 纪律（这几条都是被违反过之后写下来的）
 
