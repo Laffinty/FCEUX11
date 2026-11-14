@@ -364,9 +364,23 @@ bool StringToBytes(const std::string& str, void* data, int len)
 	{
 		// hex
 		int amt = len;
-		int bytesAvailable = str.size()/2;
-		if(bytesAvailable < amt)
-			amt = bytesAvailable;
+		// v2.0.4 V16 (upstream issue #857, fixed by commit 683c3f0): the two
+		// "0X" prefix characters are not payload — only the digits after them
+		// are divided by 2. The old str.size()/2 over-counted by one for
+		// even-length values, so the last loop iteration read cstr[N] (the
+		// NUL, in bounds) AND cstr[N+1] — one byte past the string. Odd-length
+		// values only ever reached the NUL, and amt now floors to (N/2), so an
+		// unpaired trailing digit is simply ignored (same as upstream; no
+		// `return false` was added, to keep the best-effort clamp contract).
+		// The int-domain comparison preserves the old write-nothing behavior
+		// for negative len and agrees with HexStringToBytesLength below,
+		// which already returned size/2-1 == (size-2)/2. This branch is
+		// currently unreachable (all callers are dead code — see the guard
+		// comment at MovieData::installValue in movie_fm2.cpp); the targeted
+		// test is tests/f11qa/utils/xstring_test.cpp (ctest xstring_test).
+		const size_t bytesAvailable = (str.size() - 2) / 2;
+		if((int)bytesAvailable < amt)
+			amt = (int)bytesAvailable;
 		const char* cstr = str.c_str()+2;
 		for(int i=0;i<amt;i++) {
 			char a = toupper(cstr[i*2]);

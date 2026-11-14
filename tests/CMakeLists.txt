@@ -551,6 +551,24 @@ if(FCEUX11_BUILD_TESTS)
                 "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
     endif()
 
+    # v2.0.4 V16 — StringToBytes "0X"-prefix byte count (hex over-read,
+    # upstream issue #857 / commit 683c3f0). Pure utils calls (StringToBytes
+    # only); no core init, no fixtures. Registered with its own
+    # ENVIRONMENT_MODIFICATION, same pattern as guid_test above. Gate count
+    # grows 38 -> 39. Mutation legs are documented at the bottom of the
+    # test file.
+    fceux11_add_test_executable(fceux11_xstring_test
+        f11qa/utils/xstring_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME xstring_test
+             COMMAND fceux11_xstring_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    if(WIN32)
+        set_tests_properties(xstring_test PROPERTIES ENVIRONMENT_MODIFICATION
+                "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+    endif()
+
     # -------------------------------------------------------------------------
     # v0.3.0 — Performance baseline benchmarks (Google Benchmark preferred)
     # -------------------------------------------------------------------------
