@@ -55,6 +55,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Qt::MiddleButton → 0x04`（三种 viewport 实现已各自支持，补一处分发即可）+ 对齐上游补
   数值字段 `input.get().click`（行为增加：脚本遍历会多见一个 `click=0`）。
 
+### Added — 开发者工具（批 3）
+
+- **Function Profiler 报告菜单**（V7）：`Advanced → Misc Tools → Profiler Report`——
+  **仅 profiler 构建**（`FCEU_PROFILER_ENABLE`）注册，非 profiler 构建零痕迹；触发时
+  `FCEU_WRAPPER_LOCK` + 先暂停再读（mainMenuOpen/Close 同族先例）双保险后调
+  `FCEU_profiler_report` 写 CRT 临时文件读回（零残留），只读对话框（等宽字体）展示
+  sum/%total/avg/min/max/calls/func。此前报告只能在退出时看 stdout。
+
 ### Fixed — 输入协议（批 1）
 
 - **FC 麦克风协议**（V6）：`$4016` bit2（Famicom II 麦克风）原是 1996 年的**逐读翻转 hack**
@@ -65,6 +73,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   新增 QA 桥导出 `kagami_bridge_set_famicom_mic` + manifest `sut_input` 保留值 0x40
   （kgmqa-108 的 manifest 行与基线翻转留待同级评审）。锁测试 `input_famicom_mic_test`
   入门禁（ctest 37 → 38），变异 M-1..M-5 实测各归其位。
+
+### Fixed — 潜伏与纵深（批 6）
+
+- **StringToBytes 的 `0X` 前缀字节数误算**（V16）：`bytesAvailable = str.size()/2` 把两位
+  前缀算进负载 ⇒ 偶数长度末轮**越过 NUL 再读 1 字节**（上游 issue #857）。改上游写法
+  `(str.size()-2)/2`（奇数长度照上游 clamp）。⚠️ 两个可达点均为死代码（`installValue`
+  无调用方、`drivers/common/config.cpp` 整文件不参与编译）——已加「DO NOT REVIVE」护栏，
+  复活须同步 `HexStringToBytesLength` 语义。新锁 `xstring_test`（ctest 38 → 39）；
+  ASan 实测变异红（container-overflow）→ 还原绿。
+- **movie 负 length 纵深**（V20）：FM2 头的负 `length` 原被照收入库（`-1` 哨兵语义被绕过
+  ⇒ 只读判定失效）；Rust 解析层拒收归 `-1`；C++ `truncateAt` 加负值归零护栏
+  （上游 #858 同式；5 个调用点全传非负 ⇒ 纯潜伏护栏，静态核查登记）。
+  formats 锁测试 153 → 154。
 
 ### Fixed — 正确性与防御性修正（批 5）
 
@@ -86,8 +107,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **TraceLogger 环形缓冲跨线程数据竞争**（V14 上半）：`logBufHead/logBufTail` 为
   `volatile int` 被模拟线程（生产）与写盘线程（消费）共享。改 `std::atomic<unsigned int>`
   （照抄上游 `44d3e45d`/`0a1ef89e`：写端 relaxed/acquire/release、读端局部快照 + 出循环
-  一次 release store——与 V13 的 AviRecordDiskThread 同构）。CDL 六计数器半边另批。
+  一次 release store——与 V13 的 AviRecordDiskThread 同构）。
   数据竞争无机器红腿（TSAN 未落地），证明方式为上游 diff 逐段对照 + 全访问点静态审查。
+- **CDL 六计数器跨线程数据竞争**（V14 下半）：`codecount/datacount/undefinedcount/
+  rendercount/vromreadcount/undefinedvromcount` 为 `volatile int` 被模拟线程（写）与
+  GUI 线程（读）共享。改 `std::atomic<int>`（emu 侧 RMW = load(relaxed)→FFI 局部副本→
+  store(relaxed)；渲染宏 fetch_* relaxed；GUI 读点一次快照——顺带消除百分比与 %x 取自
+  不同读的既有瑕疵）；`core_state` 六访问器改 `atomic<int>&`（零调用者）；
+  `trace_common.cpp` 四处隐式 seq_cst 读补 `.load(relaxed)`。零行为变化。
 
 ### Changed — 护栏与文本登记（批 2）
 
