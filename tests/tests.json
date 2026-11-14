@@ -1420,6 +1420,8 @@
         "working_dir": ".",
         "args": [
           "tests/lua_scripts/test_frameadvance.lua",
+          "--rom",
+          "tests/fixtures/nestest.nes",
           "--frames",
           "60"
         ]
@@ -1434,7 +1436,7 @@
         "frameadvance"
       ],
       "failure_means": "blocking",
-      "provenance": "V1/F-1 lock (2026-11-13): emu.frameadvance must yield at the Lua layer; pre-fix this script aborted the runner with 0xC0000409 (panic=abort). Shape mirrors kgmqa-045"
+      "provenance": "V1/F-1 lock (2026-11-13): emu.frameadvance must yield at the Lua layer; pre-fix this script aborted the runner with 0xC0000409 (panic=abort). Shape mirrors kgmqa-045; corrected 2026-11-14 (v2.0.4 r15): the case now runs with --rom (kgmqa-046 shape) — without a ROM the runner's emulation step failed on the first iteration, so the script was never resumed and the case passed vacuously (the exit-code-only assertion could not tell that apart from a real pass); the runner now fails the case when the script does not complete"
     },
     {
       "kgmqa_id": "kgmqa-046-lua-memory",

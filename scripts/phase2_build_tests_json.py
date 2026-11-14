@@ -308,7 +308,8 @@ KG_LUA = [
     ('kgmqa-046-lua-memory', 'lua_memory_test',
      'memory 库 9 函数',
      ['lua-api', 'harness-rust'], 'lua', 'internal',
-     'f11qa_lua_runner', ['tests/lua_scripts/test_memory.lua', '--frames', '60'], '.', 30,
+     'f11qa_lua_runner', ['tests/lua_scripts/test_memory.lua', '--rom',
+                          'tests/fixtures/nestest.nes', '--frames', '60'], '.', 30,
      ['lua', 'integration', 'memory'], 'blocking', 'fceux11-lua memory library binding tests'),
     ('kgmqa-047-lua-joypad', 'lua_joypad_test',
      'joypad 库 get/set + mask1/mask2',
@@ -325,7 +326,8 @@ KG_LUA = [
 
 def make_case(kgmqa_id, legacy_id, title, kind, layer, spec_source,
               binary, args, working_dir, timeout, tags, failure_means, provenance_or_input_extra,
-              is_rom_suite=False, mirror_path=None, vendor_state=None, license='GPL-2.0'):
+              is_rom_suite=False, mirror_path=None, vendor_state=None, license='GPL-2.0',
+              exact_provenance=None, extra_fields=None):
     """通用 case 构造函数"""
     # input
     if isinstance(provenance_or_input_extra, dict):
@@ -336,6 +338,13 @@ def make_case(kgmqa_id, legacy_id, title, kind, layer, spec_source,
         input_extra = None
         provenance = (provenance_or_input_extra or '') + '; F11QA-recast-2026-09-21; mirror-ref-2026-09-24'
         provenance = provenance.lstrip('; ').rstrip()
+
+    # v2.0.4 r15: a few cases were hand-written into the artifact with a
+    # provenance that must be reproduced VERBATIM (no recast suffix).  Without
+    # this escape hatch a regeneration would rewrite their provenance and the
+    # artifact would no longer match the generator.
+    if exact_provenance is not None:
+        provenance = exact_provenance
 
     input_obj = {'binary': binary, 'working_dir': working_dir}
     if args:
@@ -367,6 +376,9 @@ def make_case(kgmqa_id, legacy_id, title, kind, layer, spec_source,
         if vendor_state in ('advisory', 'pending-vendor'):
             case['failure_means'] = 'advisory'
 
+    if extra_fields:
+        case.update(extra_fields)
+
     return case
 
 def build_cases_a_e():
@@ -392,7 +404,70 @@ def build_cases_a_e():
     for row in KG_LUA:
         (kgid, legacy, title, kind, layer, src, binary, args, wdir, to, tags, fm, prov) = row
         cases.append(make_case(kgid, legacy, title, kind, layer, src, binary, args, wdir, to, tags, fm, prov))
-    return cases
+    # v2.0.4 r15: 两条用例此前只存在于产物 tests/tests.json 里（手工插入），
+    # 生成器不覆盖 ⇒ 重跑生成器会**静默丢掉**它们。现在按产物里的插入位置
+    # （122 在 kgmqa-040 之后、123 在 kgmqa-045 之后）纳入生成器。
+    out = []
+    for c in cases:
+        out.append(c)
+        if c['kgmqa_id'].startswith('kgmqa-040-'):
+            out.append(build_case_122())
+        if c['kgmqa_id'].startswith('kgmqa-045-'):
+            out.append(build_case_123())
+    return out
+
+
+def build_case_122():
+    """kgmqa-122 —— vbl_05_nmi_timing 真 ROM canary（产物里手工插入，r20）。"""
+    return make_case(
+        'kgmqa-122-vbl-05-nmi-timing-canary-blargg', 'blargg_vbl_05_nmi_timing_canary',
+        'vbl_05_nmi_timing real ROM (NMIDELAY canary, PASS monitor)',
+        ['rom-suite', 'harness-rust'], 'core', 'nesdev.org/wiki/Emulator_tests#vbl_nmi_timing',
+        'f11qa-rom-runner',
+        ['--kgmqa-id', 'kgmqa-122-vbl-05-nmi-timing-canary-blargg',
+         '--tests-json', 'tests/tests.json', '--frames', '600'],
+        '.', 60,
+        ['blargg', 'vbl', 'nmi', 'timing', 'canary'], 'blocking', None,
+        is_rom_suite=True, mirror_path='blargg/ppu/05-nmi_timing.nes', vendor_state='vendored',
+        exact_provenance='S2.5 gate G-2 (r20): mounts the ROM that kgmqa-040 legacy name claims; '
+                         'survey cpu_interrupt_hijack 12.7',
+        extra_fields={'protocol': '$6000'})
+
+
+def build_case_123():
+    """kgmqa-123 —— emu.frameadvance 的 yield 回归锁（V1/F-1，r5）。
+
+    v2.0.4 r15：args 增加 `--rom`（kgmqa-046 同款）。此前不带 ROM 时，runner 的
+    模拟步在第一轮就失败 ⇒ 脚本从未被恢复 ⇒ 只断言 exit_code 的门禁**空洞成立**。
+    """
+    return make_case(
+        'kgmqa-123-lua-frameadvance', 'lua_frameadvance_test',
+        'emu.frameadvance yield（F-1 回归锁）',
+        ['lua-api', 'harness-rust'], 'lua', 'internal',
+        'f11qa_lua_runner',
+        ['tests/lua_scripts/test_frameadvance.lua',
+         '--rom', 'tests/fixtures/nestest.nes',
+         '--frames', '60'],
+        '.', 30,
+        ['lua', 'integration', 'frameadvance'], 'blocking', None,
+        exact_provenance='V1/F-1 lock (2026-11-13): emu.frameadvance must yield at the Lua layer; '
+                         'pre-fix this script aborted the runner with 0xC0000409 (panic=abort). '
+                         'Shape mirrors kgmqa-045; corrected 2026-11-14 (v2.0.4 r15): the case now '
+                         'runs with --rom (kgmqa-046 shape) — without a ROM the runner\'s emulation '
+                         'step failed on the first iteration, so the script was never resumed and the '
+                         'case passed vacuously (the exit-code-only assertion could not tell that apart '
+                         'from a real pass); the runner now fails the case when the script does not complete')
+
+
+def build_case_121():
+    """kgmqa-121 —— APU 帧计数器逐周期时序锁（产物末尾手工追加，2026-11-06）。"""
+    return make_case(
+        'kgmqa-121-apu-frame-timing', None,
+        'APU 帧计数器逐周期时序锁测试 (A2 特性化基线)',
+        ['unit-cpp'], 'core', 'internal',
+        'fceux11_apu_frame_timing_test', None, 'tests', 120,
+        ['unit', 'apu', 'timing'], 'blocking', None,
+        exact_provenance='A2 (APU 帧计数器批量步进) 步骤1 特性化基线; 2026-11-06')
 
 # ============================================================================
 # F. 第三方 ROM 套件 (kgmqa-048 ~ 112) — 65 项
@@ -999,16 +1074,26 @@ def build_cases_g_j():
 
 def main():
     cases = []
-    cases.extend(build_cases_a_e())        # 001-047 (47 项)
+    cases.extend(build_cases_a_e())        # 001-047 (47 项) + 插在中间的 122/123
     cases.extend(build_cases_f_batch1())   # 048-080 (33 项)
     cases.extend(build_cases_f_rest())      # 081-112 (32 项)
     cases.extend(build_cases_g_j())         # 113-120 (8 项)
-    # 验证 kgmqa_id 编号 1..120 连续
-    for i, c in enumerate(cases, 1):
-        expected_prefix = f'kgmqa-{i:03d}-'
-        actual = c['kgmqa_id']
-        if not actual.startswith(expected_prefix):
-            print(f'WARN: position {i} has kgmqa_id {actual} (expected {expected_prefix}*)')
+    cases.append(build_case_121())          # 121（产物末尾，2026-11-06 追加）
+    # v2.0.4 r15: 编号检查从「位置 == 编号」改为「集合完整」。
+    # 122/123 是插在中间的（产物里就是那个顺序），位置法会刷一屏假 WARN；
+    # 真正要防的是**编号缺失或重复**（那会让某条用例在重跑生成器后消失）。
+    import re
+    nums = []
+    for c in cases:
+        m = re.match(r'kgmqa-(\d+)-', c['kgmqa_id'])
+        if m:
+            nums.append(int(m.group(1)))
+    missing = sorted(set(range(1, (max(nums) if nums else 0) + 1)) - set(nums))
+    dupes = sorted({n for n in nums if nums.count(n) > 1})
+    if missing:
+        print(f'WARN: missing kgmqa numbers: {missing}')
+    if dupes:
+        print(f'WARN: duplicated kgmqa numbers: {dupes}')
     output = {
         'schema_version': '1.8',
         'suite_id': 'f11qa-v1.8',

@@ -93,6 +93,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   按仓库既有先例，对该测试的 TU 加 `/GL-`（不进全程序优化）⇒ 链接恢复正常。
   ⚠️ 触发条件：任何改动 `fceux11_core` 之后需要整体重链时都会命中。
 
+### Fixed — 门禁诚实性（r15）
+
+- **Lua runner 把「脚本根本没跑」判成 PASS**（V1 的 kgmqa-123 门禁因此全盲）：
+  `src/rust/crates/f11qa/src/runner/lua.rs` 旧代码在模拟步失败时**静默 `break`**
+  ⇒ `fceux11_lua_frame_boundary()` 一次都不会被调用 ⇒ 脚本永远停在第一次 yield；
+  而该 runner 的 PASS 判定只看「退出码 + 捕获输出里的失败标记」⇒ **脚本带着任何
+  Lua 错误、或压根没跑，都会判 PASS**（`kgmqa-123` 当时又恰好不带 ROM ⇒ 模拟首轮
+  即失败 ⇒ 双重掩盖）。现在：**模拟失败 / 脚本未跑完 / Lua 报错** 一律判失败
+  （静默 break → 负退出码；并把引擎自身的报错前缀 `Lua frame_boundary error` /
+  `Lua script load error` 加入失败标记表——此前 mlua 的报错措辞与标记表不匹配）。
+  `kgmqa-123` 同时补 `--rom tests/fixtures/nestest.nes`（kgmqa-046 同款）⇒ 该用例
+  **真的走恢复路径**了（三条判定腿实测：带 ROM 绿 / 不带 ROM 红 / Lua 报错 红）。
+  **新增两把 WILL_FAIL 回归锁**（`ctest -LE perf` 39 → **41**）：
+  `lua_runner_rejects_failed_script`（脚本带 Lua 错误 ⇒ runner 必须非零退出）与
+  `lua_runner_rejects_incomplete_script`（yield 永不结束 + 无 ROM ⇒ 模拟首轮失败 ⇒
+  runner 必须非零退出）——后者即 kgmqa-123 那个洞的**变异腿**：把 runner 还原成修复前
+  版本即转红（实测），还原修复后复跑转绿。
+  ⚠️ 同时更正一条旧结论：**V1 的纯 Lua 包装修复是有效的**（带 ROM 后同一脚本自证走完
+  A→B→C→D）⇒ GUI 下的崩溃是 **GUI 路径特有**（线程拓扑 + Qt 帧路径），不在 Lua yield 机制。
+- **F11QA 清单生成器不再丢用例**：`scripts/phase2_build_tests_json.py` 此前不覆盖
+  `kgmqa-121/122/123`（只存在于产物 `tests/tests.json`）⇒ **重跑生成器会静默丢掉它们**
+  （含 V1 的回归锁）。现在三条都纳入生成器且**逐字一致**，编号检查由「位置==编号」
+  改为**集合完整**（插入式编号不再刷假 WARN），`kgmqa-046` 的 `--rom` 也已对齐
+  ⇒ **用例清单（123 条、顺序+集合）与产物完全一致**。⚠️ 仍有 **133 个「用例×字段」对
+  漂移**（含 10 条 `failure_means`，参与 grade 判定）——**独立工作项，待裁决**，
+  详见计划 §二末 ⑭。
+
 ### Fixed — 输入协议（批 1）
 
 - **FC 麦克风协议**（V6）：`$4016` bit2（Famicom II 麦克风）原是 1996 年的**逐读翻转 hack**

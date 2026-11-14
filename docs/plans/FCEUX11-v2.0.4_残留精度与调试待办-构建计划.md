@@ -93,7 +93,7 @@
 
 | 项 | 状态 | 依据 |
 |---|---|---|
-| V1 F-1 | ✅ **完成**（出口判据达成） | 修复落地（纯 Lua 包装）+ runner exit 0 + kgmqa-123（blocking）+ 四门禁 299/249/93/52 + ctest 36/36（r5①②③）。附：GUI 侧暴露新缺陷（r5⑤），LUA-1/2 的 GUI 转绿归新缺陷工作项 |
+| V1 F-1 | ✅ **完成**（r5 落地；**r15 门禁已变诚实、出口判据真正验证**） | 修复落地（纯 Lua 包装）+ runner exit 0 + kgmqa-123（blocking）+ 四门禁 299/249/93/52 + ctest 36/36（r5①②③）。**r15**：实测钉死 r5 的「exit 0」当时是**空洞成立**的（kgmqa-123 不带 ROM ⇒ 模拟首轮失败 ⇒ runner 静默 break ⇒ 脚本从未被恢复 ⇒ 判 PASS）⇒ 已修 runner 诚实性 + 给 kgmqa-123 补 `--rom` ⇒ 该用例**真的走恢复路径**（自证脚本走完 A→B→C→D）⇒ **V1 的纯 Lua 包装修复确认有效**。附：GUI 侧暴露新缺陷（r5⑤），LUA-1/2 的 GUI 转绿归新缺陷工作项 |
 | V2 A1 手工验收 | ✅ **完成**（出口判据达成） | 21 行全部有「结果+日期+测试人」+ 走查单 18 项逐项结论（16 绿 / 1 红 S-2 / 2 红=F-1 取证 / 2 未验证）（r4） |
 | V3 护栏登记 | ✅ **完成**（r8） | A4-1 否决护栏进 `src/video.cpp`（64 KiB/帧拷贝处，写明「勿再做消费计数门控」+ chunk-8 任意帧异步消费 ⇒ 金标漂移/谓词恒真的否决理由）；`FCEU_SoundCPUHook` 的「有意省略探点」登记进 `src/sound.cpp`（并把探点口径修正为 **6 个**，实测坐标见 §二 V3）。**纯注释、零行为变更** |
 | V4 文本修订批 | ✅ **完成**（r8） | 5 条 `known_limit` 改写（037/038/056/078/107，逐条回源码复核）；`docs/tech/{cpu,F11QA,f11qa-accuracy-backlog}.md` 过期措辞订正；死文件 `src/tests/CMakeLists.txt` **整份删除**（零构建引用 + 覆盖未丢失已核）；v1.8 计划的 3 处活引用改指 `docs/history/plans/`（**生成器与产物逐字一致已验**）。⚠️ `expected` / `failure_means` / `pass_to_fail` **零改动** |
@@ -102,7 +102,7 @@
 | V7 profiler 菜单 | ✅ **完成**（r12） | Advanced → Misc Tools → Profiler Report，**仅 `__FCEUX11_PROFILER_ENABLE__` 构建注册**（非 profiler 构建连 QAction 成员/MOC 槽都不存在）；wrapper 锁 + 先暂停再读双保险后调 `FCEU_profiler_report` 写 tmpfile 读回（零残留）→ 只读对话框。⚠️ 人工项待做：profiler 构建下真实点击 |
 | V8 A7 实验 | ✅ **完成**（r14；结论=**不值得，收益上限 ≈ 0**） | 工具侧已落地（生成器 `--variant a7` + `src/ops_table_a7.inc` + `src/ops_table_variant.h` + CMake 开关，**`src/x6502.cpp` 行数中性**）；A/B 读数：S1 nestest −0.67%、S2 `instr_v5_all` +1.32%（**方向相反、±1.3% 属噪声**）⇒ **收益上限 ≈ 0**，而代价是 256 个 handler 的「单 Cpu 实例」语义前提 ⇒ **建议永久封口**（A7 本体维持不进范围） |
 | **计划外 A** | ✅ **完成** | 断点关键字死代码回归（v0.3.5 `704078f` 引入）修复 + 5 断言锁测试（r5④）——走查 NSF-1 带出 |
-| **计划外 B** | 🔴 **未定位根因**（r14 完成一轮只读 RE） | GUI 下任何 yielding Lua 脚本运行中崩溃（0xC00000FD/0xC000041D，时长随机 2s～68s+，堆 ~4MB/s 增长，突发深递归）。**r14 新事实**：① `__chkstk@Qt6Gui+0x4754C7` 是 **Qt6Gui 自带的 CRT 栈探针**，**不能**用来定位递归点（r5 的这条线索作废）；② 崩溃在 **GUI 线程**（唯一会进 Qt6Gui 的线程）；③ **不是 Rust panic**（`panic="abort"` 的签名是 `0xC0000409`，与观察到的两个码不符）；④ 「创建线程 ≠ 续跑线程」是结构性的（mlua `Lua` 是 `!Send`，本仓用 `AtomicPtr` 绕过类型系统）。**r14 产出**：可脚本化的自动复现（`.zcode/repro/`，gitignored）；**下一步**：先拿 GUI 线程完整回溯（**本机无 Windows SDK / cdb / WinDbg**，需业主批准安装），再动续跑逻辑。详见 §二「计划外 B」小节 |
+| **计划外 B** | 🔴 **未定位根因**（r14 只读 RE + **r15 机制钉死**） | GUI 下任何 yielding Lua 脚本运行中崩溃（0xC00000FD/0xC000041D，时长随机 2s～68s+，堆 ~4MB/s 增长，突发深递归）。**r14 新事实**：① `__chkstk@Qt6Gui+0x4754C7` 是 **Qt6Gui 自带的 CRT 栈探针**，**不能**用来定位递归点（r5 这条线索作废）；② 崩溃在 **GUI 线程**（唯一会进 Qt6Gui 的线程）；③ **不是 Rust panic**（`panic="abort"` 的签名是 `0xC0000409`，与观察到的两个码不符）；④ 「创建线程 ≠ 续跑线程」是结构性的（mlua `Lua` 是 `!Send`，本仓用 `AtomicPtr` 绕过类型系统）。**r15 更正**：**V1 的修复是有效的**（给脚本加 ROM 后，自证探针显示同一脚本走完 A→B→C→D）⇒ 崩溃是 **GUI 路径特有**（线程拓扑 + Qt 帧路径），**不在 Lua yield 机制**；此前「无头下脚本停在第一次 yield」的真因是 **kgmqa-123 不带 ROM ⇒ 模拟首轮失败 ⇒ runner 静默 break ⇒ 门禁判 PASS**（本批已修）。**r14 产出**：可脚本化的自动复现（`scripts/repro/`，已入仓）；**下一步**：先拿 GUI 线程完整回溯（**本机无 Windows SDK / cdb / WinDbg**，需业主批准安装），再动续跑逻辑。详见 §二「计划外 B」小节 |
 | **计划外 C** | 🔴 **回归候选挂起** | S-2：Step Over 的 watchpoint[64] 长程不消费（r4③）；静态调查榨干（r5⑧），§6.3 门回退变异测试排队（GUI 崩溃缺陷关闭后做） |
 | **追加批 V9–V25** | 🔧 **13/14 完成**（r13；明细见 §1.2） | **V9 ✅**（r10 双尾巴全清）、**V24 ✅**、**V11 ✅**（人工验证待做）、**V13 ✅**（压测待人工）、**V15 ✅**（压测待人工）、**V25 ✅**（r11；真机 Lua 读值待做）、**V22 ✅**（r11；真机待做）、**V19 ✅**（双腿变异实测）、**V23 ✅**（r11，**.cdl 输出变化**；端到端上游对比登记不做）、**V14 ✅**（r12 全清）、**V16 ✅**（r12，ASan 红腿实测）、**V20 ✅**（r12）、**V10 ✅**（r13：垫层 8192 逐字照抄 `8510fb8` + 四行钳制回补 + bus_test 锁（1K/8K/size0 三组）；M1 变异实测红 90/3 → 还原绿；三金标零漂移实测全绿；⚠️ <8K 卡画面会变口径进提交说明；M2/M3 备选腿与 ASan+oam3.nes 验收登记待后续）；其余 **V12 ⬜**（需业主 3GO.nes 实际文件，做法已备好） |
 
@@ -1254,12 +1254,32 @@ iNES 路径**根本不做板级名匹配**（`src/ines_init.cpp:38-39` 只比 `n
    `pcall` 是 C 函数，Lua 5.1 `ldo.c:447` 的判据 `L->nCcalls > L->baseCcalls`
    会因此成立，而 `baseCcalls` 只在 `lua_resume`（`ldo.c:427`）里重置一次。
    ⇒ **判定 yield 是否成功不能用 pcall 包住 frameadvance**，只能靠「脚本是否还活着」间接判定。
-5. **⇒ 当前可陈述的因果链（不越界下结论）**：
+5. **⇒ 当前可陈述的因果链（r14 口径，r15 已更正，见下）**：
    **无头门禁的脚本从未恢复到「第二次」**（恢复路径在无头配置下根本没被执行）
    ⇒ 门禁对该路径**全盲**；而**同一脚本在 GUI 下确实在跑**（r4/r5 的人工证据）并崩溃
    ⇒ 崩溃位于**无头门禁从未覆盖的那条路径**上。
    ⚠️ **根因仍未钉死**：为什么无头下脚本在第一次 yield 就终止、而 GUI 下能跑起来并最终崩，
    需要一轮「让无头路径真的恢复」的实验（先修门禁盲区，再看崩溃是否可在无头复现）。
+
+**r15 更正与收口（2026-11-14，第 2 批第 1 项）**：上面第 3～5 条里有一处**必须更正**——
+「V1 的纯 Lua 包装在二进制里、但行为仍坏」是**错的**；**V1 的修复本身是有效的**。
+实测（带探针重建 + 自证脚本）：
+
+- **盲区的精确机制**（不是「yield 机制坏了」）：
+  `kgmqa-123` 跑脚本时**不带 ROM** ⇒ runner 的 `kagami_bridge_emulate_frame()` 在**第一轮就失败**
+  ⇒ 旧代码在这里**静默 `break`** ⇒ `fceux11_lua_frame_boundary()` **一次都没被调用**
+  ⇒ 脚本永远停在第一次 yield ⇒ runner 只看「退出码 + 捕获输出里有没有失败标记」
+  ⇒ **判 PASS**。探针实证：`load_script` 后 `status=Resumable running=true`，
+  而 `frame_boundary` 的进入记录**一条都没有**。
+- **V1 修复有效**：给同一脚本加 ROM 后，自证探针显示脚本**走完 A→B→C→D**
+  （每次 `emu.frameadvance()` 返回即说明被恢复），引擎侧 `frame_boundary` 连续进入且
+  `status=Resumable` ⇒ **无头单线程路径下 yield/resume 正常**。
+- **⇒ 因此计划外 B 是 GUI 路径特有**：无头（单线程）不崩，GUI（脚本在 GUI 线程创建、
+  模拟线程每帧续跑 + Qt 事件循环 + 视频缓冲路径）崩 ⇒ 崩溃点在**线程拓扑/GUI 帧路径**，
+  不在 Lua 的 yield 机制。
+- **本批已把门禁变诚实**（见 §五 V1 与 §七 r15）：runner 现在对「脚本没跑完 / 模拟失败 /
+  Lua 报错」一律**判失败**，kgmqa-123 补 `--rom`（kgmqa-046 同款）⇒ 该用例**真的走恢复路径**了。
+
 6. **本轮新增的可执行资产**（**已入仓 `scripts/`**，可复现）：
    `scripts/repro/yield_only.lua`（自证型 yielding 脚本，计数器路径走
    `FCEUX11_YIELD_COUNTER` 环境变量）、`scripts/repro/lua_yield_diag.lua`
@@ -1292,6 +1312,7 @@ iNES 路径**根本不做板级名匹配**（`src/ines_init.cpp:38-39` 只比 `n
 | ⑪ | `src/tests/` 整目录 | `src/tests/CMakeLists.txt` 已于 r8 删除（从不参与构建），但该目录**仍有 5 个 `.cpp` + 旧金标 `fixtures/golden_hashes.json`（5 条，活的在 `tests/fixtures/`，13 条）+ `AGENTS.md` + `Testing/Temporary/CTestCostData.txt`** ⇒ 整目录仍是死资产。r8 只按授权范围删了 CMakeLists 并修了 `src/tests/AGENTS.md:122` 的悬空引用；**整目录清理由业主另行裁决** | V4（待裁决） |
 | ⑫ | `docs/tech/precision.md:31` | 同一句过期中断描述仍在（「中断只在指令边界轮询（无 hijack/branch-delay…）」）—— V4 改了 `docs/tech/cpu.md` 的三处，但 precision.md 这一处不在当批所有权内 | V4（**r14 已落地**：改写为「两段式已建模（指令内轮询点采样 + 下一指令边界派发 + BRK 向量级劫持），未建模 branch-delay 与周期精确断言时刻，残留差距是 VBL NMI 断言时刻量化 G5」，并附 2026-11-14 更正说明） |
 | ⑬ | `tests/CMakeLists.txt` 的 `fceux11_input_famicom_mic_test` 目标 | **LTCG 链接崩溃（构建基础设施缺陷，r14 查出并已修）**：MSVC 14.51 上该目标的链接以 `exit -1` 失败且**无 LNK 报错**，只留下一个 **2 MiB 的不可用 `.exe`**（⇒ 运行时报「文件损坏」）。与 `src/bus.cpp` / `src/ppu_sprite_lut.cpp` 早已规避的「c2.dll 从 IL 物化出 2 MB 假镜像」同族。**触发条件**：任何改动 `fceux11_core` 之后需要整体重链时都会命中（本轮两次 `cmake --build build` 各命中一次） | **r14 已修**：按仓库既有先例对该 TU 加 `/GL-`（`set_source_files_properties(... COMPILE_FLAGS "/GL-")`）⇒ 链接恢复正常，产物 4.9 MB 可执行，ctest 39/39 全绿 |
+| ⑭ | `scripts/phase2_build_tests_json.py` ↔ `tests/tests.json` | **生成器与产物仍有 133 个「用例×字段」对不一致（r15 实测）**：其中 **15 条用例的 `known_limit` / `provenance`** 是手工维护层（生成器不持有），另有 **~10 条 `failure_means`** 与大量 `input`（`working_dir` / `args`）差异。⚠️ **危险**：`failure_means` 参与 `compute_grade`（advisory vs blocking）⇒ **重跑生成器会静默改写这些字段**（含 grade 语义），而 `known_limit` 虽不参与判定却是带日期的溯源记录。**r15 已把危害面从「丢 3 条用例」收到「字段漂移」**：121/122/123 三条（含 V1 的 kgmqa-123）已纳入生成器且**逐字一致**，`kgmqa-046` 的 `--rom` 也已对齐 ⇒ 用例**清单**（123 条、顺序）现在完全一致 | **待业主裁决**：把 133 对漂移全部对齐生成器是**独立工作项**（需逐条确认每处漂移「以哪边为准」），本轮只登记不擅自改（否则会顺手改掉 r8/r14 的文本登记与 grade 语义）。复现命令：`python scripts/phase2_build_tests_json.py /tmp/gen.json` 后与 `tests/tests.json` 逐条比对 |
 
 ---
 
@@ -1349,8 +1370,17 @@ input_famicom_mic_test 入门禁 37→38）；Rust 七条全绿——root 299/0/
 
 ## 五、v2.0.4 出口判据
 
-- [x] **V1**（2026-11-13，r5）：`tests/lua_scripts/test_frameadvance.lua` 实跑 exit 0（不再 `0xC0000409`），
+- [x] **V1**（2026-11-13，r5；**r15 门禁已变诚实**）：`tests/lua_scripts/test_frameadvance.lua` 实跑 exit 0（不再 `0xC0000409`），
       **且该脚本进入门禁路径**（tests.json kgmqa-123、`failure_means: blocking`）；
+      ⚠️ **r15 实测更正**：r5 的「exit 0」当时是**空洞成立**的——kgmqa-123 跑脚本时**不带 ROM**
+      ⇒ runner 的模拟步首轮失败 ⇒ 旧代码**静默 break** ⇒ `fceux11_lua_frame_boundary()` 一次没被调用
+      ⇒ 脚本停在第一次 yield ⇒ runner 只看退出码与失败标记 ⇒ **判 PASS**。
+      **r15 已修**：① runner 对「模拟失败 / 脚本没跑完 / Lua 报错」一律**判失败**
+      （`src/rust/crates/f11qa/src/runner/lua.rs`：静默 break → 负退出码；并把引擎自身的
+      报错前缀加入失败标记表）；② kgmqa-123 补 `--rom tests/fixtures/nestest.nes`（kgmqa-046 同款）。
+      ⇒ **该用例现在真的走恢复路径**：自证脚本实测走完 A→B→C→D（每次 `emu.frameadvance()` 后即被恢复），
+      **V1 的纯 Lua 包装修复确认有效**；三条判定腿实测：带 ROM 绿 / 不带 ROM 红 / Lua 报错 红；
+      其余四条 lua 用例（044/045/046/047）仍绿；`cargo test -p f11qa --lib` **181/0**。
 - [x] **V2**（2026-11-13，r4）：A1 的 21 行勾选表**全部**有「绿/红 + 日期 + 测试人」；
       走查单 18 项逐项结论；F-1 阻断项按 V1 的结论标注（后因新缺陷改挂，见 r5⑤）；
 - [x] **V3**（2026-11-13，r8）：`src/video.cpp` 的 A4-1 否决护栏注释在位（写明否决理由 +「勿再做消费计数门控」）；
@@ -1479,9 +1509,10 @@ input_famicom_mic_test 入门禁 37→38）；Rust 七条全绿——root 299/0/
 - [x] **V20**（2026-11-14，r12）：Rust 侧拒收负 `length` 归 -1（fail_to_fail：153/1 红 →
       **154/0** 绿）+ `truncateAt` 负值归零护栏（5 调用点全传非负 ⇒ 纯潜伏，**C++ 侧无机器红腿**
       ——静态核查登记）；#858 POC 不 abort = 非回归判据（abort 路径已被 Rust 重写消除）；
-- [ ] **NES 零回归**：`ctest -LE perf` **全绿**（r13 实跑：**39/39**；**r14 收尾复跑仍 39/39**
-      —— 主树全量重建 EXIT=0，套件 8.97 s；三金标零漂移子项
-      rom_regression/savestate/ppu_frame_diff 随套件全绿实测）
+- [ ] **NES 零回归**：`ctest -LE perf` **全绿**（r13 实跑：**39/39**；r14 收尾复跑 **39/39**；
+      **r15 复跑 41/41** —— 门禁 39 → 41（新增两把 WILL_FAIL 回归锁
+      `lua_runner_rejects_failed_script` / `lua_runner_rejects_incomplete_script`）；
+      三金标零漂移子项 rom_regression/savestate/ppu_frame_diff 随套件全绿实测）
       + F11QA 矩阵 `pass_to_fail = 0` + grade ≥ B（矩阵**本地无入口** ⇒ 以 CI 复核为准
       ⇒ 该子项**保持未勾**并待 CI；⚠️ 另注：`docs/tech/F11QA.md` 里 R4 gate 的 `total==120` 口径
       已随 kgmqa-123 落地变为 123 ⇒ 属期望值口径变更，**须同级评审**，本轮只登记未改）；
@@ -1571,3 +1602,4 @@ curl.exe -s -x http://127.0.0.1:7897 "https://api.github.com/repos/TASEmulators/
 | r12 | 2026-11-14 | **波次 3/4：V14 全清（CDL 下半）+ V10 前置就绪 + 批 3 首项（V7）+ 批 6 全清（V16/V20）——总进度 18/22。** **门禁终读数**：`ctest -LE perf` **39/39**（38→39 = xstring_test 入门禁）；Rust 七条全绿（**formats 154/0**，V20 +1）；两态 `cargo check` EXIT=0。① **V14 下半**：CDL 六计数器 `std::atomic<int>`（load→FFI 局部副本→store，`-std=c++20` 实测选 Option A 非 atomic_ref——类型系统强制防漏点）；文件域偏差两处编译强制并入（sound.cpp / ppu_rendering.cpp 局部 extern 重声明冲突）；`LogAddress` 拆出保留 volatile；主会话补 `trace_common.cpp` 四处隐式 seq_cst 读 `.load(relaxed)`（agent 移交裁决项）。② **V10 前置**：**13 张金标 ROM（勘误：非 12）全部在 V10 影响面外**（全 iNES 1.0 + 8K CHR-RAM/CHR-ROM）⇒ 现有 rom_regression/savestate/ppu_frame_diff 三个金标 = 「≥8K 零漂移」可执行基线；仓内**无 movie 资产**（真 movie 基线需业主落地前录制，登记待提供）；**ASan 构建打通**（`build-asan` 230/230，`-j 1`，冒烟 2/2，`/fsanitize=address` 1134 处实证）；`oam3.nes`（影响面内样本）本机无——验收①需业主外部提供。③ **V7**：`__FCEU_PROFILER_ENABLE__` 全包裹五处（include/注册/retranslate/成员/槽）；`FCEU_PROFILER_ENABLE` CMake 选项注入宏；tmpfile 零残留方案；wrapper 锁 + 暂停双保险；⚠️ 菜单结构在 `ConsoleMenu.cpp`，QAction 于构造函数注册保单一 #ifdef 域（偏差登记）；人工验收 = profiler 构建真实点击。④ **V16**：上游公式落地；⚠️ **计划自带 POC 不开窗**（`"0XABAB",2` 被 clamp）——红腿修正为 len≥L/2（len=20 主腿 / len=3 副腿），**ASan 变异红（container-overflow at xstring.cpp:387）→ 还原绿**；护栏两处死代码登记；ASan 运行时 DLL（`clang_rt.asan_dynamic-x86_64.dll`，MSVC 14.44 HostX64）需手工前置 PATH——ctest 的 ENVIRONMENT_MODIFICATION 自带、直跑 exe 需要。⑤ **V20**：formats fail_to_fail（153/1 红 → 154/0 绿）；truncateAt 护栏为纯潜伏无机器红腿（静态核查登记）。⑥ **f11qa-rom-runner 全名 kgmqa-108-mict-rainwarrior**；⑦ 剩余：V10 主体（前置就绪，单提交簇）+ V12（需业主 3GO.nes）；⑧ 未推送（push 需业主逐次明确指示）。 |
 | r13 | 2026-11-14 | **波次 5 + 本日收口：V10 主体落地（批 4 = 7/7 全清），总进度 19/22 ≈ 86%——业主指令「完成手头工作，完成/未完成全部修订进文档，剩余下次开展」。** **门禁终读数**：`ctest -LE perf` **39/39**（含三金标零漂移子项 rom_regression/savestate/ppu_frame_diff 全绿实测）；Rust 七条全绿（r12 读数不变）；两态 `cargo check` EXIT=0。① **V10 主体**：垫层 1024→8192（上游 `8510fb8` 逐字；`memset` 只盖垫层、`FCEU_MemoryRand` 真实尺寸保留——`FCEU_malloc` 本身清零 ⇒ memset 属双保险）；四行钳制回补 `src/bus.cpp`（与本仓 `ad2914d` 删除前形态逐字同构、与上游 master/2.7.0 逐字节 identical 实证）；错误注释改正；单测 `test_setup_chr_mapping_clamp` 三组（1K：mask1=0 天然 / mask2-4-8 下溢钳 0；8K：7/3/1/0 全天然防过度修复；size==0：早退互不覆盖）。② **M1 变异实测**：删四行 ⇒ 恰 3 条钳制断言红（90/3）⇒ 还原绿。③ **⚠️ 工具链新坑（坑 12 变体，已录 AGENTS.md）**：**被取消的后台构建任务会留孤儿 ninja/link 进程**，与新构建争写同一 `.lib` ⇒ LNK1104 连环失败；判据补一条——`tasklist` 查 ninja.exe/link.exe 残留，`taskkill` 后串行 `-j 1` 重跑即净。④ **未完成（下次开展）**：**V12**（做法已备好——需业主提供 3GO.nes 实际文件，按 padded 口径重算 CRC）；V10 的 M2/M3 备选变异腿与 ASan+`oam3.nes` 验收①（ROM 需业主外部提供）；**人工验收清单**：V11 跨进程读档（Lagrange Point）/ V13 录 AVI ≥10 分钟 / V15 按 A/B 录 movie 回放 / V25+V22 真机 Lua 读值与鼠标 / V6 真机吹气 / V7 profiler 构建真实点击 / V14 CDL 一致性读数 / 真 movie 基线录制（V10 口径，可选）；**计划外 B**（GUI yielding Lua 崩溃）与**计划外 C**（S-2）仍挂起；**V1 的 LUA-1/2 GUI 复走**待计划外 B 关闭。⑤ **push**：`9f91024` 起共 **10 个提交未推送**（r10 文档 + 8 个 fix/feat + r13 文档），待业主逐次明确指示。 |
 | r14 | 2026-11-14 | **第 1 批（四项一批）落地：V8 收益上限实验完成 + 计划外 B 只读 RE + V4 下一批小项 ⑩⑫ + 文档一致性更正；另查出两项新缺陷（LTCG 链接崩溃已修、V1 门禁空洞待裁决）。** **门禁终读数**：`ctest -LE perf` **39/39**（8.98 s）；Rust **七条全绿**——root 299/0/20、gba-core 249/0/2、debug 94/0、media 52/0、formats 154/0、utils 51/0、lua 54/0；两态 `cargo check` EXIT=0。① **V8 完成（结论：不值得，收益上限 ≈ 0）**：工具侧落地（生成器 `--variant {base,a7}`，base 输出 SHA256 与已提交文件**逐字相同** `9CCB508C…`；`src/ops_table_a7.inc`；`src/ops_table_variant.h` 选择器；CMake 开关 `FCEUX11_X6502_ALIAS_VARIANT` 默认 OFF）——**`src/x6502.cpp` 只改 1 行且行数中性（1134 → 1134 行）**，避免全仓 `x6502.cpp:<行号>` 坐标漂移；**独立变体树 `build-a7`**（`-G Ninja`，`DEFINES` 逐字可比，仅差一个宏）⇒ A/B 读数 7 轮交替：S1 `nestest` 37.891 → 37.637 ms（**−0.67%**，逐轮正负乱跳）、S2 `instr_v5_all` 44.445 → 45.033 ms（**+1.32%**，逐轮全为正）⇒ **两场景方向相反、±1.3% 属噪声** ⇒ **不值得做**；附带结论：A7 还隐含「单 Cpu 实例」语义前提（`Cpu` 构造私有、全仓单例、`src/x6502.cpp:1088` 传 `&cpu.native_layout()`）⇒ **建议永久封口**（A7 本体维持不进范围）。② **计划外 B：只读 RE（不跑 GUI、不改代码）**——三条新事实：① `__chkstk@Qt6Gui+0x4754C7` 是 **Qt6Gui 自带的静态 CRT 栈探针**（反汇编 Qt6Gui.dll：RVA `0x475490` 为独立函数、故障指令 `0x4754C7` 正是逐页 touch），**不能**用于定位递归点（r5 的这条线索作废），且**只有 GUI 线程会进 Qt6Gui** ⇒ 溢出线程 = GUI 线程；② **不是 Rust panic**（`panic="abort"` 的签名是 `0xC0000409`，与观察到的 `0xC00000FD`/`0xC000041D` 不符）；③ 「创建线程 ≠ 续跑线程」是结构性的（mlua 0.10.5 的 `Lua` 未开 `send` ⇒ `!Send`，本仓用 `AtomicPtr` 绕过类型系统）。**排除五条假设**（Qt 事件链 / Rust panic / mlua 跨线程 panic / GUI 与 emu 并发进引擎 / 断点重入）。**新线索**：4 MB/s 堆增长与 GUI 视频路径 64 KiB/帧拷贝量级吻合（`src/video.cpp:259-260`）⇒ 堆增长与栈溢出**可能是两个独立现象**。③ **🔴 门禁空洞（本批最重要的发现）**：`tests/lua_scripts/test_frameadvance.lua` 在无头 runner 下**零输出**、自证计数器停在 `frames=0`、runner 的帧循环**一次都没跑** ⇒ **kgmqa-123（blocking）从未走过「恢复」路径** ⇒ **V1 的出口判据「exit 0 且有脚本输出」空洞成立**（脚本只要不崩退出码就是 0）；同时 `string.dump(emu.frameadvance)` **成功**（dump 内含 `emu.rs:96:10` 与 `coroutine`/`yield` 操作码）⇒ **V1 的纯 Lua 包装确实在二进制里**（「V1 没落地 / 二进制陈旧」两种假设被排除）；而同一脚本在 GUI 下确实在跑并崩溃 ⇒ **崩溃位于无头门禁从未覆盖的那条路径上**。⚠️ **根因仍未钉死**；诊断坑已登记：**不能用 `pcall(function() emu.frameadvance() end)` 判定 yield**——`pcall` 是 C 函数，Lua 5.1 `ldo.c:447` 的 `nCcalls > baseCcalls` 判据会因此成立而**人为造出** `attempt to yield across metamethod/C-call boundary`（我自己踩了）。④ **V4 下一批小项 ⑩⑫ 落地**：5 条 `provenance` 末尾按 `kgmqa-081` 惯例追加带日期更正指针（原句逐字保留；`provenance` 的克隆句属**手工维护层**——生成器只持有 `'cpu interrupt (bucket B)'` 这类基础串 ⇒ 与 V4 同法只改产物）；`docs/tech/precision.md:31` 的过期中断描述改写为「两段式已建模」口径。⑤ **三处文档不一致更正**（本批自查发现）：§三/§一「批 1 = 全清」与 V5 未开始互斥（改为 5/6）、§五 Rust 门禁标题「六条」实为七条、§五 formats 读数 153 → **154/0**。⑥ **🔴 新缺陷（已修）**：`fceux11_input_famicom_mic_test` 的 **LTCG 链接崩溃**（MSVC 14.51：link.exe `exit -1` 无 LNK 报错、只留 2 MiB 损坏 exe；与 `bus.cpp`/`ppu_sprite_lut.cpp` 已规避的 c2.dll 病态同族；两次全量重链各命中一次）⇒ 按仓库先例对该 TU 加 `/GL-` ⇒ 产物 4.9 MB 可执行、39/39 全绿（登记为 §二末 ⑬）。⑦ **本批工具链坑三则**：① **CMake 重配置会触发全树重编**（764 步）⇒ 「同树开关切换」成本远高于独立树；② **孤儿 link.exe**：构建被中止后会留下挂死的 LTCG 链接进程（本次挂死 25 min、CPU 100%、内存 6 GB），必须 `taskkill` 后再跑；③ **Windows 上含中文的 `.ps1` 必须带 BOM**（PS 5.1 按 ANSI 读无 BOM 文件 ⇒ 中文注释变乱码并**破坏语法**），`.zcode` 下的脚本已全部改为纯英文注释。⑧ **V10 的 M2/M3 备选变异腿已补做（在本批的变体树 `build-a7` 里做，主树全程未被变异污染）**：**M2 = 钳制改无条件清零** ⇒ 92 通过 / **1 红**（`8K chip: mask1/2/4/8 = 7/3/1/0 all natural`）；**M3 = 钳制挪到 mask 计算之前** ⇒ 90 通过 / **3 红**（1K 组 mask2/4/8 下溢未钳）；**两条腿的红点与 `bus_test.cpp:655-658` 的预登记预期逐字一致**，还原后绿。⑨ **未完成**：**V5 PGO**（需业主训练 ROM）、**V12**（需业主 3GO.nes）、**ASan + `oam3.nes` 验收①**（ROM 本机无，业主外部提供）、**ASan + `oam3.nes` 验收①**（ROM 需业主外部提供）、**人工验收清单 8 项**、**计划外 B 的根因**（下一步：先修门禁盲区 ⇒ 让无头路径真的恢复，再看崩溃能否无头复现；以及按业主批准安装 Windows SDK 调试工具以取 GUI 线程回溯）。⑨ **未推送**：本批 2 个提交（e9ec6aa r14 文档批 + M2/M3 变异腿的文档追记）待业主逐次明确指示。 |
+| r15 | 2026-11-14 | **第 2 批第 1 项：让 kgmqa-123 真正验证恢复路径 ⇒ 门禁空洞已闭，并更正 r14 的一处结论。** ① **盲区机制钉死**（带探针重建 + 自证脚本，非静态推导）：`kgmqa-123` 跑脚本时**不带 ROM** ⇒ runner 的 `kagami_bridge_emulate_frame()` 在**第一轮就失败** ⇒ 旧代码在此**静默 `break`** ⇒ `fceux11_lua_frame_boundary()` **一次都没被调用** ⇒ 脚本永远停在第一次 yield ⇒ 而 runner 的 PASS 判定只看「退出码 + 捕获输出里的失败标记」⇒ **判 PASS**（探针实证：`load_script` 后 `status=Resumable running=true`，而 `frame_boundary` 的进入记录**一条都没有**）。② **⚠️ 更正 r14 的一处结论**：**V1 的纯 Lua 包装修复是有效的**——给同一脚本加 ROM 后，自证探针显示脚本**走完 A→B→C→D**（每次 `emu.frameadvance()` 返回即说明被恢复），引擎侧 `frame_boundary` 连续进入且 `status=Resumable` ⇒ **无头单线程路径下 yield/resume 正常** ⇒ **计划外 B 是 GUI 路径特有**（脚本在 GUI 线程创建、模拟线程续跑 + Qt 事件循环 + 视频缓冲路径），**不在 Lua 的 yield 机制**；「V1 出口判据空洞成立」这个结论**仍成立**，但机制比 r14 描述的更精确。③ **改动三处**：**(a) runner 诚实性**（`src/rust/crates/f11qa/src/runner/lua.rs`）——静默 `break` → 负退出码（-5 模拟失败且脚本仍活着 / -6 超时未跑完 / -7 循环结束时脚本仍在跑），并把引擎自身报错前缀（`Lua frame_boundary error` / `Lua script load error`）加入失败标记表（此前 mlua 的报错措辞与标记表不匹配 ⇒ **脚本带任何 Lua 错误都判 PASS**）；**(b) `kgmqa-123` 补 `--rom tests/fixtures/nestest.nes`**（kgmqa-046 同款）+ provenance 追加带日期更正指针；**(c) 生成器补齐**——`scripts/phase2_build_tests_json.py` 此前**不覆盖 121/122/123**（三条只存在于产物里 ⇒ **重跑生成器会静默丢掉它们**，含 V1 的回归锁）⇒ 现三条均纳入生成器且**逐字一致**、`kgmqa-046` 的 `--rom` 已对齐、编号检查由「位置==编号」改为**集合完整**（插入式编号不再刷假 WARN）⇒ **用例清单（123 条、顺序+集合）与产物完全一致**。④ **读数**：三条判定腿实测 **带 ROM 绿 / 不带 ROM 红 / Lua 报错 红**；其余四条 lua 用例（044/045/046/047）仍绿；`cargo test -p f11qa --lib` **181/0**；Rust 七条全绿（root 299/0/20、gba-core 249/0/2、debug 94/0、media 52/0、formats 154/0、utils 51/0、lua 54/0）+ 两态 `cargo check` EXIT=0；`ctest -LE perf` **41/41**（门禁 39 → **41**，新增两把 WILL_FAIL 回归锁，见下）。⑤ **两条 WILL_FAIL 回归锁**（`tests/CMakeLists.txt`）：`lua_runner_rejects_failed_script`（脚本带 Lua 错误 ⇒ runner 必须非零退出）+ `lua_runner_rejects_incomplete_script`（**yield 永不结束 + 不带 ROM** ⇒ 模拟首轮失败 ⇒ runner 必须非零退出）。**变异腿闭合**：把 runner 还原成修复前版本（`git checkout --`）⇒ **`lua_runner_rejects_incomplete_script` 转红**（另一把锁因旧版在 load 阶段即非零退出 ⇒ 不具区分力，如预期）⇒ 还原修复（**必须刷新 mtime**：`Copy-Item` 保留源文件时间戳 ⇒ 否则 cargo 跳过重建、还原腿假红——本轮实踩一次）⇒ 复跑转绿。⑥ **新登记 §二末 ⑭**：生成器↔产物仍有 **133 个「用例×字段」对漂移**（含 **10 条 `failure_means`** ⇒ 参与 `compute_grade`）⇒ **重跑生成器会静默改写 grade 语义** —— **独立工作项，待业主裁决**（本轮只登记，不擅自改）。⑦ **本批工具坑一则**：**rust 侧 `eprintln!` 的输出会被 runner 吞掉**——它用 `freopen` 重定向 C 的 stdout/stderr FILE*（Windows 上连带改绑 fd 1/2），并在跑完**删除**临时文件 ⇒ **诊断探针必须写文件**，不能写 stderr。跑完**删除**临时文件 ⇒ **诊断探针必须写文件**，不能写 stderr。 |

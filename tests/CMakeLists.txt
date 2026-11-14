@@ -709,6 +709,45 @@ if(FCEUX11_BUILD_TESTS)
                 "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
     endif()
 
+    # v2.0.4 r15 — regression lock for the lua runner's HONESTY.
+    # A script that dies with a Lua error (or never completes) must make the
+    # runner exit non-zero.  Before this lock the runner silently `break`ed on
+    # a failed emulation step and reported "script completed (all assertions
+    # passed)" -- which is exactly why the kgmqa-123 frameadvance gate was blind
+    # to the whole yield/resume path (it was also invoked without a ROM, so the
+    # emulation step failed on the very first iteration).
+    # WILL_FAIL inverts ctest's exit-code check: the OLD behaviour (exit 0)
+    # makes this case FAIL, the NEW behaviour (non-zero) makes it pass.
+    add_test(NAME lua_runner_rejects_failed_script
+             COMMAND f11qa_lua_runner
+             ${CMAKE_SOURCE_DIR}/scripts/repro/lua_error_probe.lua
+             --rom ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/nestest.nes
+             --frames 10
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    set_tests_properties(lua_runner_rejects_failed_script PROPERTIES WILL_FAIL TRUE TIMEOUT 60)
+    if(WIN32)
+        set_tests_properties(lua_runner_rejects_failed_script PROPERTIES ENVIRONMENT_MODIFICATION
+                "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+    endif()
+
+    # v2.0.4 r15 — second regression lock, targeting the *other* half of the
+    # same defect: a script that never completes (here: yields forever) and is
+    # run WITHOUT a ROM.  The runner's emulation step then fails on the first
+    # iteration.  The OLD runner broke out of its frame loop silently there and
+    # exited 0 -- i.e. "all assertions passed" for a script that never ran a
+    # single frame.  That is precisely the hole kgmqa-123 fell into, so this
+    # case is the mutation leg: revert the runner change and it goes RED.
+    add_test(NAME lua_runner_rejects_incomplete_script
+             COMMAND f11qa_lua_runner
+             ${CMAKE_SOURCE_DIR}/scripts/repro/lua_never_completes.lua
+             --frames 60
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    set_tests_properties(lua_runner_rejects_incomplete_script PROPERTIES WILL_FAIL TRUE TIMEOUT 60)
+    if(WIN32)
+        set_tests_properties(lua_runner_rejects_incomplete_script PROPERTIES ENVIRONMENT_MODIFICATION
+                "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+    endif()
+
     # =========================================================================
     # F11QA P5 — In-process direct runner (Stage-2 §七 C-3 + C-5).
     #
