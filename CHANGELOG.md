@@ -5,11 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — v2.0.4（在途）
+## [2.0.4] - 2026-11-15
 
-> **在途段**：随 v2.0.4 的工作累加，**发版时并入正式版本段**。
-> 对应计划：`docs/plans/FCEUX11-v2.0.4_残留精度与调试待办-构建计划.md`（批 1 = V1/V6、
-> 批 2 = V3/V4、批 4 = V9/V11/V13/V15/V24/V25、批 5 = V19/V22/V23（V14 半）等）。
+> **v2.0.4 正式发布**：残留精度与调试待办收口（构建计划 r13–r16：**20/22 项落地**；
+> V12/V5 业主裁决 defer 转长尾，V8 A7 实验完成——结论「不值得，收益上限 ≈ 0」）。
+> 对应计划：
+> `docs/history/plans/FCEUX11-v2.0.4_残留精度与调试待办-构建计划.md`（内容冻结）。
+> ⚠️ **四处行为变更**（各条目已标注，此处汇总）：V23 非 FDS 卡带的 `.cdl` 输出改变
+> （与上游一致化）、V6 按住麦克风时每次读 bit2=1（旧为逐读交替）、V10 <8K CHR-RAM 卡
+> 画面会变（movie 会漂移）、V22 `input.get()` 恒含数值 `click` 字段。
+> ⚠️ 版本数值 20003 → 20004（FCSX 存档头 / FM2 录像头的**信息性字段**，两侧读取器
+> 不拒绝比对 ⇒ v2.0.2/2.0.3 的存档与录像在本版仍可正常读取）。
 
 ### Fixed — 崩溃与内存安全（批 4）
 
@@ -186,6 +192,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   的过期措辞订正；v1.8 计划的失效引用改指 `docs/history/plans/`（**生成器与产物一起改**）；
   删除从不参与构建的死文件 `src/tests/CMakeLists.txt`。
   ⚠️ **未改任何期望值 / 基线 / 判定**（`expected` / `failure_means` / `pass_to_fail` 零改动）。
+
+### Known limitations（随包登记）
+
+- **计划外 B 未修**：GUI 下 yielding Lua 脚本运行中可能崩溃（`0xC00000FD`/`0xC000041D`，
+  V1 修复所暴露）⇒ 无头 runner 不受影响；LUA-1/2 的 GUI 复走挂起。计划外 C（S-2）同挂起。
+- **人工验收未闭合**（机器判据已过、实测待业主）：V11 跨进程读档 / V13 录 AVI ≥10 分钟 /
+  V15 movie 回放比对 / V25+V22 真机 Lua 与鼠标 / V6 真机吹气 / V7 profiler 点击 /
+  V14 CDL 一致性读数。
+- **defer 转长尾两项**（业主裁决 r16；V12 已于 r15 登记长尾）：V12 3GO.nes 矫正条目
+  （需实际文件，做法已备好）、V5 PGO 读数（开关现成、训练 ROM 未采；V8 的 A7 实验
+  已完成并封口——结论「不值得，收益上限 ≈ 0」）。
+- **V4 遗留**：049/050/051 基线翻转与 `F11QA.md` R4 gate 计数口径，需同级评审。
+- F11QA 矩阵以 CI 复核为准（`pass_to_fail = 0`、grade ≥ B）。
+- GBA 仍是 Alpha（SWI 声音家族 12 号 + `0x2A` 兜底、GPIO/RTC 未做；长期不阻塞本体发版，
+  沿用 v2.0.3 已知限制）。
 
 ## [2.0.2_hotfix1] - 2026-11-10
 
