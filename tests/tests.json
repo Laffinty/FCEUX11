@@ -1061,7 +1061,7 @@
         "interrupt"
       ],
       "failure_means": "advisory",
-      "provenance": "cpu interrupt (bucket B); F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: CPU interrupt polling only at instruction boundary (x6502.cpp:515-579); hijack/branch-delay not modeled",
+      "provenance": "cpu interrupt (bucket B); F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: CPU interrupt polling only at instruction boundary (x6502.cpp:515-579); hijack/branch-delay not modeled; corrected 2026-11-14 (v2.0.4 V4): two-stage polling and vector-level hijack ARE modeled (the known_limit field was rewritten on 2026-11-13) - the residual gap is the VBL NMI assertion-instant quantization (G5), not the polling/hijack model; supersedes the known-limit note above",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/cpu/cpu_interrupts_v2_2-nmi_and_brk.nes",
       "vendor_state": "vendored",
@@ -1101,7 +1101,7 @@
         "misc"
       ],
       "failure_means": "advisory",
-      "provenance": "instr_misc (bucket B); F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: instr_misc combined opcode group; singles pass, combo fails (accuracy gap)",
+      "provenance": "instr_misc (bucket B); F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: instr_misc combined opcode group; singles pass, combo fails (accuracy gap); corrected 2026-11-14 (v2.0.4 V4): the open-bus path is dead because Cpu::set_db() has zero call sites (the known_limit field was rewritten on 2026-11-13); supersedes the known-limit note above",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/cpu/instr_misc.nes",
       "vendor_state": "vendored",
@@ -1844,7 +1844,7 @@
         "instr-timing"
       ],
       "failure_means": "advisory",
-      "provenance": "instr_timing; F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: instruction cycle table combined test; singles pass",
+      "provenance": "instr_timing; F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: instruction cycle table combined test; singles pass; corrected 2026-11-14 (v2.0.4 V4): RESOLVED (v1.18.1) - this case now PASSes, no residual known limit (the known_limit field was rewritten on 2026-11-13); supersedes the known-limit note above",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "blargg/cpu/instr_timing_instr_timing.nes",
       "vendor_state": "vendored",
@@ -2689,7 +2689,7 @@
         "shrom"
       ],
       "failure_means": "advisory",
-      "provenance": "lidnariq serom; F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: MMC1 SEROM/SHROM bank-size constraint not modeled",
+      "provenance": "lidnariq serom; F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: MMC1 SEROM/SHROM bank-size constraint not modeled; corrected 2026-11-14 (v2.0.4 V4): RESOLVED (v1.18.2) - this case now PASSes, no residual known limit (the known_limit field was rewritten on 2026-11-13); supersedes the known-limit note above",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "lidnariq/serom/serom.nes",
       "vendor_state": "vendored",
@@ -3815,7 +3815,7 @@
         "mouse"
       ],
       "failure_means": "advisory",
-      "provenance": "mset; F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: SNES mouse input scan protocol",
+      "provenance": "mset; F11QA-recast-2026-09-21; mirror-ref-2026-09-24; known-limit: SNES mouse input scan protocol; corrected 2026-11-14 (v2.0.4 V4): the SNES mouse protocol itself is IMPLEMENTED (commit 05bfc1f, locked by input_snesmouse_test T1-T6) - the residual limit is the end-to-end 0xFC result requiring real mouse interaction (the known_limit field was rewritten on 2026-11-13); supersedes the known-limit note above",
       "mirror_ref": "v1.8.0-mirror",
       "mirror_path": "rainwarrior/mset/mset.nes",
       "vendor_state": "vendored",

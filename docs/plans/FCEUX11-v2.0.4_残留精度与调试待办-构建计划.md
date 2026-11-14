@@ -100,14 +100,15 @@
 | V5 PGO | ⬜ 未开始 | |
 | V6 麦克风 | ⬜ 未开始 | |
 | V7 profiler 菜单 | ⬜ 未开始 | |
-| V8 A7 实验 | ⬜ 未开始 | |
+| V8 A7 实验 | ✅ **完成**（r14；结论=**不值得，收益上限 ≈ 0**） | 工具侧已落地（生成器 `--variant a7` + `src/ops_table_a7.inc` + `src/ops_table_variant.h` + CMake 开关，**`src/x6502.cpp` 行数中性**）；A/B 读数：S1 nestest −0.67%、S2 `instr_v5_all` +1.32%（**方向相反、±1.3% 属噪声**）⇒ **收益上限 ≈ 0**，而代价是 256 个 handler 的「单 Cpu 实例」语义前提 ⇒ **建议永久封口**（A7 本体维持不进范围） |
 | **计划外 A** | ✅ **完成** | 断点关键字死代码回归（v0.3.5 `704078f` 引入）修复 + 5 断言锁测试（r5④）——走查 NSF-1 带出 |
-| **计划外 B** | 🔴 **新缺陷立项** | GUI 下任何 yielding Lua 脚本运行中崩溃（0xC00000FD/0xC000041D，时长随机 2s～68s+，堆 ~4MB/s 增长，突发深递归）；V1 修复所暴露，阻断 LUA-1/2 GUI 转绿（r5⑤）；需 cdb/WinDbg 或 mlua 内部分析 |
+| **计划外 B** | 🔴 **未定位根因**（r14 完成一轮只读 RE） | GUI 下任何 yielding Lua 脚本运行中崩溃（0xC00000FD/0xC000041D，时长随机 2s～68s+，堆 ~4MB/s 增长，突发深递归）。**r14 新事实**：① `__chkstk@Qt6Gui+0x4754C7` 是 **Qt6Gui 自带的 CRT 栈探针**，**不能**用来定位递归点（r5 的这条线索作废）；② 崩溃在 **GUI 线程**（唯一会进 Qt6Gui 的线程）；③ **不是 Rust panic**（`panic="abort"` 的签名是 `0xC0000409`，与观察到的两个码不符）；④ 「创建线程 ≠ 续跑线程」是结构性的（mlua `Lua` 是 `!Send`，本仓用 `AtomicPtr` 绕过类型系统）。**r14 产出**：可脚本化的自动复现（`.zcode/repro/`，gitignored）；**下一步**：先拿 GUI 线程完整回溯（**本机无 Windows SDK / cdb / WinDbg**，需业主批准安装），再动续跑逻辑。详见 §二「计划外 B」小节 |
 | **计划外 C** | 🔴 **回归候选挂起** | S-2：Step Over 的 watchpoint[64] 长程不消费（r4③）；静态调查榨干（r5⑧），§6.3 门回退变异测试排队（GUI 崩溃缺陷关闭后做） |
 | **追加批 V9–V25** | 🔧 **13/14 完成**（r13；明细见 §1.2） | **V9 ✅**（r10 双尾巴全清）、**V24 ✅**、**V11 ✅**（人工验证待做）、**V13 ✅**（压测待人工）、**V15 ✅**（压测待人工）、**V25 ✅**（r11；真机 Lua 读值待做）、**V22 ✅**（r11；真机待做）、**V19 ✅**（双腿变异实测）、**V23 ✅**（r11，**.cdl 输出变化**；端到端上游对比登记不做）、**V14 ✅**（r12 全清）、**V16 ✅**（r12，ASan 红腿实测）、**V20 ✅**（r12）、**V10 ✅**（r13：垫层 8192 逐字照抄 `8510fb8` + 四行钳制回补 + bus_test 锁（1K/8K/size0 三组）；M1 变异实测红 90/3 → 还原绿；三金标零漂移实测全绿；⚠️ <8K 卡画面会变口径进提交说明；M2/M3 备选腿与 ASan+oam3.nes 验收登记待后续）；其余 **V12 ⬜**（需业主 3GO.nes 实际文件，做法已备好） |
 
-**交付批次视角（r13 同步）**：批 1（V1→V6）= ✅✅；批 2（V3→V4）= ✅✅；批 3（V5/V7/V8）= **1/3**（V7 ✅，余 V5 PGO 需训练 ROM / V8）；插入 V2 = ✅；
-追加批 4 = **7/7 ✅ 全清**；批 5 = **4/5**（余 V12）；批 6 = **2/2 ✅**。**总进度 19/22 ≈ 86%**。
+**交付批次视角（r14 更正）**：批 1（V1→V6）= **5/6**（V1/V2/V3/V4/V6 ✅，余 **V5 PGO** 需业主训练 ROM）；批 2（V3→V4）= **2/2 ✅**；批 3（V5/V7/V8）= **2/3**（V7 ✅、**V8 ✅（r14：收益上限 ≈ 0 ⇒ 不采用）**，余 V5 PGO 需训练 ROM）；插入 V2 = ✅；
+追加批 4 = **7/7 ✅ 全清**；批 5 = **4/5**（余 V12）；批 6 = **2/2 ✅**。**总进度 20/22 ≈ 91%**（r13 为 19/22）。
+> ⚠️ **更正（r14）**：r11/r12/r13 的批次进度行曾写「批 1 = ✅✅ 全清」——**与 V5 未开始矛盾**（批 1 的定义域 V1→V6 含 V5）。r-rows 是历史记录不改写，正确口径以本行为准。
 
 ### 1.2 追加批任务总表（V9–V25，2026-11-13 核验后并入，r7）
 
@@ -415,6 +416,64 @@ if (replaceP2StartWithMicrophone) {
 **风险与非目标**：宏路由改动波及所有含 handler 的编译单元（只在隔离构建里做）；
 `x6502.h` 的全局 `X` inline 别名保留（兼容未迁移文件）；**savestate 布局不得动**；
 ⚠️ **A7 本体（256 handler 全面别名化）不在 v2.0.4 范围**（2026-11-12 业主指令已从本计划删除）。
+
+**r14 实施（工具侧，r14 落地）**：
+
+1. **生成器加开关**：`scripts/generate_x6502_dispatch.py` 新增 `--variant {base,a7}`。
+   - `base`（默认）→ `src/ops_table.inc`，输出与已提交文件**哈希逐字相同**
+     （实测 SHA256 `9CCB508CF1BB0A6241D6CFFA6F6B08B5D369A46AA08AFE8D069664A48A26DB90`，
+     重生成后 `git diff` 为空）⇒ 工具改造**未扰动主线生成物**。
+   - `a7` → `src/ops_table_a7.inc`：在 256 个 handler 之前把 `_PC/_A/_X/_Y/_S/_P/_PI/_DB/
+     _count/_tcount/_IRQlow/_jammed` 重定义为 `(xp)-><成员>`，**文件末尾按
+     `src/x6502abbrev.h` 逐字恢复规范定义**（恢复文本由生成器从该头文件解析得到 ⇒
+     头文件仍是唯一事实源）。256 个 handler **一个都没手改**。
+2. **选择器独立成头**：`src/ops_table_variant.h`（新文件）做 `#ifdef` 选择；
+   `src/x6502.cpp:514` 的 `#include "ops_table.inc"` 改为 `#include "ops_table_variant.h"`
+   —— **行数中性**（HEAD 1134 行 → 工作区 1134 行，仅 1 行内容变化）。
+   ⚠️ **为什么必须行数中性**：全仓文档与 `tests/tests.json` 大量引用 `x6502.cpp:<行号>`
+   （如 kgmqa-037 的 `x6502.cpp:1094-1116` / `:848` / `x6502.cpp:969` / `:1004-1040`），
+   若条件 include 直接写进 `x6502.cpp`（+9 行），**所有这些坐标整体漂移** ⇒ 故选择器放进独立头。
+3. **CMake 开关**：`option(FCEUX11_X6502_ALIAS_VARIANT … OFF)`（默认 OFF ⇒ 规范构建逐字不变）；
+   `src/CMakeLists.txt` 在 `FCEUX11_X6502_ALIAS_VARIANT=ON` 时给 `fceux11_core` 加同名宏。
+4. **语义前提（实测）**：别名化要求 `xp` 恒等于 `g_cpu.native_layout()`。
+   `Cpu` 的构造函数私有且全仓仅 `cpu_instance()` 一个实例（`src/cpu.cpp:107-110` Meyers 单例），
+   而 dispatch 的调用点 `src/x6502.cpp:1088` 传的就是 `&cpu.native_layout()`（`cpu` 即该单例）
+   ⇒ **两变体语义等价**，A/B 只差「寄存器访问是否经由全局引用」。
+   ⇒ 由此得到一条**独立于性能的结论**：A7 全面别名化还隐含「单 Cpu 实例」前提。
+5. **构建方法学（r14 实测后修订，与原计划的偏离已登记）**：原计划写「隔离分支/隔离构建」；
+   r14 实测本仓**无 ccache**（`CCACHE_PROGRAM-NOTFOUND`）且 Release 开启 LTCG
+   （`CMakeLists.txt:91-92` `CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON`）
+   ⇒ 每个 exe 都要一次**全程序 LTCG 链接**（实测单 exe 链接 5–25 min；曾两次把
+   `fceux11_input_famicom_mic_test.exe` 链接拖死，见 §二末「其他真实缺陷」⑬）。
+   **最终做法 = 独立构建树 `build-a7`**（`-G Ninja -DCMAKE_BUILD_TYPE=Release
+   -DFCEUX11_X6502_ALIAS_VARIANT=ON`）⇒ 变体树与基线树**除一个编译宏外编译选项逐字相同**
+   （`build.ninja` 的 `DEFINES` 行逐字可比），两个基准二进制外置后再 A/B，
+   **主树全程保持规范构建**（未做过任何开关切换）。
+6. **r14 读数（2026-11-14，7 轮交替、同机同场景、口径见 §0.2 的 advisory 纪律）**：
+
+   | 场景 | base 中位数 | variant 中位数 | delta | 逐轮 delta 分布 |
+   |---|---|---|---|---|
+   | S1 `tests/fixtures/nestest.nes` | **37.891 ms** | **37.637 ms** | **−0.67%** | −1.56% … +0.52%（**正负乱跳**） |
+   | S2 `instr_test_v5_all.nes`（blargg 全指令，ALU 密集） | **44.445 ms** | **45.033 ms** | **+1.32%** | +0.80% … +1.88%（**全为正**） |
+
+   - 复现命令：`powershell -ExecutionPolicy Bypass -File .zcode/bench/run_ab.ps1 -Rounds 7`
+     （脚本与两个二进制在 `.zcode/bench/`，gitignored；场景 S2 通过把
+     `instr_test_v5_all.nes` 复制成 `<cwd>/fixtures/nestest.nes` 复用 bench 的固定 ROM 路径）。
+   - **结论（V8 的出口判据「值得 / 不值得 / 只做哪子集」）**：
+     **收益上限 ≈ 0 —— 不值得做。** 两个场景的 delta **方向相反**（S1 变体快 0.67%，
+     S2 变体慢 1.32%），量级 ±1.3%，落在 advisory 口径的噪声内
+     （历史真回归量级 ≈ +100%）。
+   - **机制解释（读码推导，与读数一致）**：`g_cpu` 是 `inline auto&`（`src/cpu.h:179`
+     指向 `cpu_instance()` 的 Meyers 单例），所以 `g_cpu.native_layout().A` 与 `xp->A`
+     **指向同一块内存**，差别只是「多一次经全局引用的取址」；编译器本就能把
+     `g_cpu` 的地址折叠成常量 ⇒ 别名化省不下实质工作量。
+   - **附带结论（与性能无关、但更重要）**：A7 全面别名化还隐含**「单 Cpu 实例」前提**
+     （`Cpu` 构造私有、全仓仅 `cpu_instance()` 一个实例；dispatch 调用点
+     `src/x6502.cpp:1088` 传的就是 `&cpu.native_layout()`）——收益 ≈ 0，却要背上这条语义前提，
+     **收益/代价比为负** ⇒ 建议**永久封口**（A7 本体维持「不进范围」，V8 到此收口）。
+   - ⚠️ **未做**：变体树只用于取读数，**未跑变体树的 39 项门禁**（语义等价的论证见第 4 条：
+     单实例前提成立 ⇒ 两变体行为等价）；M2/M3 变异腿与 ASan 验收仍登记待后续。
+
 
 ---
 
@@ -1123,6 +1182,93 @@ iNES 路径**根本不做板级名匹配**（`src/ines_init.cpp:38-39` 只比 `n
 
 ---
 
+### 计划外 B · GUI 下 yielding Lua 脚本崩溃（r14 只读 RE 结果）
+
+> **状态**：🔴 仍未定位根因；r14 完成**一轮只读 RE**（不跑 GUI、不改代码），钉死三条新事实、排除五条假设，
+> 并把「人工 GUI 会话才能复现」变成**可脚本化的自动复现**（`.zcode/repro/`，gitignored）。
+
+**r14 新事实（三条，均带 file:line 证据）**：
+
+1. **崩溃发生在 GUI 线程**——`__chkstk@Qt6Gui+0x4754C7` 是 **Qt6Gui 自带的静态 CRT 栈探针**
+   （反汇编 `vcpkg_installed/x64-windows/tools/Qt6/bin/Qt6Gui.dll`：RVA `0x475490` 是独立函数，
+   体为 MSVC 栈探针循环 `movq %gs:0x10,%r11` → 逐页 touch；故障指令 `0x4754C7` 正是那条 touch）。
+   ⇒ 该偏移**只说明「溢出函数在 Qt6Gui 内」，不能用来定位递归点**——r5 把它当「Qt 事件处理器链」
+   的线索是无效的。进程里只有 GUI 线程会进 Qt6Gui（emu 线程每帧路径是 core + SDL）⇒ 溢出线程 = GUI 线程。
+2. **不是 Rust panic**——`src/rust/Cargo.toml` 的 `[profile.release] panic = "abort"` 下 Rust panic 的
+   签名是 `0xC0000409`；本次观察到的 `0xC00000FD`（栈溢出）/ `0xC000041D`（用户回调致命异常）与之不符。
+3. **「创建线程 ≠ 续跑线程」是结构性的**——协程在 GUI 线程创建并首次 resume
+   （`src/rust/crates/fceux11-lua/src/lib.rs:332` `create_thread`、`:343` 首次 `resume`，
+   调用链 `ConsoleWindow.cpp:578` / `LuaControl.cpp:428` → `FCEU_LoadLuaCode` → `lua-engine.cpp:132-137`），
+   之后由**模拟线程**每帧续跑（`lib.rs:377` `frame_boundary` ← `fceu.cpp:869` `FCEU_LuaFrameBoundary`
+   ← 模拟线程 `fceuWrapper.cpp:1369` 整帧持 wrapper 锁）。`mlua 0.10.5` 的 `Lua` 未开 `send` feature
+   ⇒ `!Send`（`mlua-0.10.5/src/state.rs:2062-2065`），本仓用 `AtomicPtr` 绕过类型系统
+   （`lib.rs:65/76-79`）⇒ **跨线程续跑在类型层是未被检查的违背**（虽被 wrapper 锁串行化，无并发别名）。
+
+**已排除的五条假设**：① 「崩溃点在 Qt 事件处理器链」（栈探针偏移不指示递归点）；
+② 「Rust panic → abort」（签名不符）；③ 「mlua 跨线程 resume 会 panic」（mlua 无线程亲和检查，
+内部 `ReentrantMutex` 串行化，Lua 错误走 `Err` 而非 panic）；④ 「GUI 线程与模拟线程并发进入 `LuaEngine`」
+（GUI 侧仅 load/stop 两个入口，都在 wrapper 锁内；`FCEU_LuaReadJoypad` 只在模拟线程）；
+⑤ 「断点/hitbreakpoint 或弹窗重入」（`yield_only.lua` 无 hitbreakpoint；杀脚本弹窗链路是**死代码**）。
+
+**另一条新线索（未实测）**：**4 MB/s 的堆增长与 GUI 视频路径的 64 KiB/帧拷贝量级吻合**
+（`src/video.cpp:259-260` `memcpy(XBackBuf, XBuf, 256*256)` × 60 fps ≈ 3.9 MB/s，
+经 `ConsoleWindow.cpp:654-667` `transferVideoBuffer` → `ConsoleViewerSDL::transfer2LocalBuffer`）——
+**无头 runner 无 Qt 驱动、无此路径**，与「无头不崩」不矛盾。⇒ 「堆增长」与「栈溢出」可能是**两个独立现象**，
+需要 VMMap 归因，不能默认同因。
+
+**r14 的可执行产出**：`.zcode/repro/yield_only.lua` + `.zcode/repro/run_gui_lua_repro.ps1`
+（利用 GUI 启动时读配置项 `SDL.LuaScript` 自动装载脚本的机制，
+`src/drivers/Qt/fceuWrapper.cpp:1091-1108`）⇒ **无需人工 GUI 会话**即可脚本化复现与验证，
+并自动读 Windows 事件日志核对 `0xC00000FD` / `0xC000041D`。
+
+**下一步（按优先级）**：
+① 用上述脚本跑一次自动复现（拿到可重复的崩溃入口 + 事件日志）；
+② 依 r14 建议**先拿 GUI 线程的完整回溯**再动续跑逻辑——**本机未安装 Windows SDK / cdb / WinDbg**
+（实测 `C:\Program Files (x86)\Windows Kits\10` 不存在）⇒ 需业主批准安装「Windows SDK 调试工具」
+（系统软件，按纪律须明确批准）；
+③ 建**双线程无头门禁**（复刻 GUI 的「创建/续跑分属两线程」+ **每帧一次** resume；现有 runner 是
+每帧**两次** resume ⇒ 结构上覆盖不到 GUI 节奏），进 `ctest`；
+④ 待回溯到手后再评估「把脚本创建与首次 resume 搬回模拟线程」与「把 `frame_advance_waiting`
+接回 C++（当前全仓零读取方，是死状态）」这两处结构缺口。
+
+**r14 第二轮（自证探针 → 两条硬事实 + 一处门禁空洞）**：
+
+1. **复现脚本自证机制落地**（`.zcode/repro/yield_only.lua` 用 `io.open` 写计数器）：
+   * **「脚本是否真的在跑」必须自证**——GUI 是 GUI 子系统程序，stdout/stderr 无处可看，
+     「没崩」不能当作「没复现」的证据（首轮两次尝试即栽在这：计数器从未生成）。
+   * 探针坑：**GUI 的配置文件名是相对路径**（`src/drivers/common/configSys.cpp:13`
+     `"fceux.cfg"`）⇒ 必须把工作目录设成 exe 所在目录，否则配置项根本读不到。
+2. **🔴 门禁空洞（比崩溃本身更重要）**：`tests/lua_scripts/test_frameadvance.lua`
+   在无头 runner 下**没有任何输出**（连脚本自己的 `PASSED` 都没打印），且自证计数器停在
+   `frames=0` ⇒ **脚本在第一次 `emu.frameadvance()` 就终止，从未恢复过**；
+   而 runner 的帧循环**一次都没跑**（`fceux11_lua_running()` 在 load 之后即为假，
+   注册的 `registerbefore` 回调从未触发）。
+   ⇒ **kgmqa-123（blocking）从未走过「恢复」路径** ⇒ **V1 的出口判据「实跑 exit 0 且有脚本输出」
+   是空洞成立的**：只要脚本不崩，退出码就是 0（§五 V1 那一行的「有脚本输出」从未被门禁验证过）。
+3. **V1 的代码改动确实在位**：`string.dump(emu.frameadvance)` **成功**（dump 内容含
+   `crates\fceux11-lua\src\bindings\emu.rs:96:10` 与 `coroutine`/`yield` 操作码）
+   ⇒ 二进制里的 `emu.frameadvance` **就是纯 Lua 包装**，不是原生 Rust 绑定
+   ⇒ 「V1 没落地 / 二进制陈旧」两种假设都被排除。
+4. **诊断方法学坑（我自己踩了）**：用 `pcall(function() emu.frameadvance() end)` 抓错误
+   ⇒ **报出来的 `attempt to yield across metamethod/C-call boundary` 是探针自己造的**：
+   `pcall` 是 C 函数，Lua 5.1 `ldo.c:447` 的判据 `L->nCcalls > L->baseCcalls`
+   会因此成立，而 `baseCcalls` 只在 `lua_resume`（`ldo.c:427`）里重置一次。
+   ⇒ **判定 yield 是否成功不能用 pcall 包住 frameadvance**，只能靠「脚本是否还活着」间接判定。
+5. **⇒ 当前可陈述的因果链（不越界下结论）**：
+   **无头门禁的脚本从未恢复到「第二次」**（恢复路径在无头配置下根本没被执行）
+   ⇒ 门禁对该路径**全盲**；而**同一脚本在 GUI 下确实在跑**（r4/r5 的人工证据）并崩溃
+   ⇒ 崩溃位于**无头门禁从未覆盖的那条路径**上。
+   ⚠️ **根因仍未钉死**：为什么无头下脚本在第一次 yield 就终止、而 GUI 下能跑起来并最终崩，
+   需要一轮「让无头路径真的恢复」的实验（先修门禁盲区，再看崩溃是否可在无头复现）。
+6. **本轮新增的可执行资产**（`.zcode/`，gitignored）：
+   `repro/yield_only.lua`（自证型 yielding 脚本）、`repro/diag.lua` / `diag2.lua` / `diag3.lua`
+   （三种判定：脚本是否死、`frameadvance` 运行时类型、最小 yield 存活探针）、
+   `repro/run_gui_lua_repro.ps1`（自动复现 + 事件日志 + 自证校验）、
+   `bench/run_ab.ps1`（V8 的 A/B 基准驱动）。
+
+
+---
+
 ### 追加批 · 核验中发现的其余真实缺陷（**登记，不立任务**）
 
 > 以下均为本轮核验顺带查出、**不在本批任务面**内的缺陷。登记在此防丢失；
@@ -1139,9 +1285,10 @@ iNES 路径**根本不做板级名匹配**（`src/ines_init.cpp:38-39` 只比 `n
 | ⑦ | `src/drivers/Qt/TraceLogger.cpp:1006-1016` | 生产者在环形缓冲满时于**模拟线程内** `SDL_Delay(1)` 自旋最多约 10 秒 ⇒ 阻塞模拟线程（掉帧/长时间卡死） | 与 ⑥ 同域 |
 | ⑧ | `src/drivers/Qt/CodeDataLogger.cpp:872-918` | `LoadCDLog()` 在 **GUI 线程且不取 `FCEU_WRAPPER_LOCK`** 地逐字节写 `cdloggerdata`，而模拟线程可能正对同一缓冲做 CDL 标记 ⇒ **缓冲级**数据竞争（比计数器竞态严重） | 与 V14 的 CDL 半边同域，但独立 |
 | ⑨ | `src/ines-correct.h` | 死表（全仓无 include）；上游同款表仍在用 ⇒ 移植时不要两边都改 | V12 |
-| ⑩ | `tests/tests.json` 的 `provenance` 字段（`:1064` / `:1104` / `:1847` / `:2692` / `:3818`） | **5 条旧的 `known-limit:` 克隆句仍留在 `provenance`**（V4 只改 `known_limit`，未动 `provenance`）⇒ 后人 grep 旧句仍会命中。**建议**：按仓库既有惯例（`kgmqa-081` 的「追加式带日期更正」）在 `provenance` **末尾追加**更正指针，**不改原句**（它是带日期的溯源记录） | V4（**下一批小项**） |
+| ⑩ | `tests/tests.json` 的 `provenance` 字段（`:1064` / `:1104` / `:1847` / `:2692` / `:3818`） | **5 条旧的 `known-limit:` 克隆句仍留在 `provenance`**（V4 只改 `known_limit`，未动 `provenance`）⇒ 后人 grep 旧句仍会命中。**建议**：按仓库既有惯例（`kgmqa-081` 的「追加式带日期更正」）在 `provenance` **末尾追加**更正指针，**不改原句**（它是带日期的溯源记录） | V4（**r14 已落地**：5 条 provenance 末尾各追加一条 `corrected 2026-11-14 (v2.0.4 V4): … ; supersedes the known-limit note above`；原句逐字保留。⚠️ 附注：`provenance` 的 `known-limit:` 克隆句属**手工维护层**——生成器 `scripts/phase2_build_tests_json.py` 只持有 `'cpu interrupt (bucket B)'` 这类基础串，故本次与 V4 同法**只改产物**） |
 | ⑪ | `src/tests/` 整目录 | `src/tests/CMakeLists.txt` 已于 r8 删除（从不参与构建），但该目录**仍有 5 个 `.cpp` + 旧金标 `fixtures/golden_hashes.json`（5 条，活的在 `tests/fixtures/`，13 条）+ `AGENTS.md` + `Testing/Temporary/CTestCostData.txt`** ⇒ 整目录仍是死资产。r8 只按授权范围删了 CMakeLists 并修了 `src/tests/AGENTS.md:122` 的悬空引用；**整目录清理由业主另行裁决** | V4（待裁决） |
-| ⑫ | `docs/tech/precision.md:31` | 同一句过期中断描述仍在（「中断只在指令边界轮询（无 hijack/branch-delay…）」）—— V4 改了 `docs/tech/cpu.md` 的三处，但 precision.md 这一处不在当批所有权内 | V4（下一批小项） |
+| ⑫ | `docs/tech/precision.md:31` | 同一句过期中断描述仍在（「中断只在指令边界轮询（无 hijack/branch-delay…）」）—— V4 改了 `docs/tech/cpu.md` 的三处，但 precision.md 这一处不在当批所有权内 | V4（**r14 已落地**：改写为「两段式已建模（指令内轮询点采样 + 下一指令边界派发 + BRK 向量级劫持），未建模 branch-delay 与周期精确断言时刻，残留差距是 VBL NMI 断言时刻量化 G5」，并附 2026-11-14 更正说明） |
+| ⑬ | `tests/CMakeLists.txt` 的 `fceux11_input_famicom_mic_test` 目标 | **LTCG 链接崩溃（构建基础设施缺陷，r14 查出并已修）**：MSVC 14.51 上该目标的链接以 `exit -1` 失败且**无 LNK 报错**，只留下一个 **2 MiB 的不可用 `.exe`**（⇒ 运行时报「文件损坏」）。与 `src/bus.cpp` / `src/ppu_sprite_lut.cpp` 早已规避的「c2.dll 从 IL 物化出 2 MB 假镜像」同族。**触发条件**：任何改动 `fceux11_core` 之后需要整体重链时都会命中（本轮两次 `cmake --build build` 各命中一次） | **r14 已修**：按仓库既有先例对该 TU 加 `/GL-`（`set_source_files_properties(... COMPILE_FLAGS "/GL-")`）⇒ 链接恢复正常，产物 4.9 MB 可执行，ctest 39/39 全绿 |
 
 ---
 
@@ -1226,7 +1373,15 @@ input_famicom_mic_test 入门禁 37→38）；Rust 七条全绿——root 299/0/
       `FCEU_profiler_report` 写 CRT `tmpfile` 读回（零残留）→ 只读对话框展示；
       探点布局零改动；⚠️ 菜单结构实测在 `ConsoleMenu.cpp`，QAction 改在构造函数注册
       （单一 #ifdef 域，偏差已登记）；⚠️ 人工项待做：profiler 构建下真实点击出报告；
-- [ ] **V8**：A7 收益上限实验给出**读数结论**（值得/不值得/只做哪子集）；
+- [x] **V8**（2026-11-14，r14）：**A7 收益上限实验完成 ⇒ 结论「不值得，收益上限 ≈ 0」**。
+      工具侧：生成器 `--variant {base,a7}`（base 输出与已提交文件**哈希逐字相同**）、
+      `src/ops_table_a7.inc`、`src/ops_table_variant.h` 选择器（**`src/x6502.cpp` 只改 1 行、
+      行数中性**，避免全仓 `x6502.cpp:<行号>` 坐标漂移）、CMake 开关 `FCEUX11_X6502_ALIAS_VARIANT`
+      （默认 OFF ⇒ 规范构建逐字不变）。
+      读数（7 轮交替、同机同场景、advisory 口径）：S1 `nestest` **−0.67%**（37.891 → 37.637 ms）、
+      S2 `instr_v5_all`（ALU 密集）**+1.32%**（44.445 → 45.033 ms）⇒ **两场景方向相反、量级 ±1.3%
+      属噪声** ⇒ **不值得做**；且 A7 还隐含「单 Cpu 实例」语义前提（`Cpu` 构造私有、全仓单例）
+      ⇒ **建议永久封口**。详见 §二 V8「r14 读数与结论」。
 - [x] **V9**（2026-11-13，r8）：mapper 218 的 `VPageR` 改上游写法（`src/boards/datalatch.cpp`，逐字照抄 commit `6738471`）
       + 新夹具 `tests/fixtures/mapper_mapper218.nes`（生成器登记，单文件生成）
       + 常驻锁测试（**断言「有效地址落在 NTARAM 内」**，不复述指针公式 ⇒ 不会与实现同错）
@@ -1321,8 +1476,8 @@ input_famicom_mic_test 入门禁 37→38）；Rust 七条全绿——root 299/0/
       + F11QA 矩阵 `pass_to_fail = 0` + grade ≥ B（矩阵**本地无入口** ⇒ 以 CI 复核为准
       ⇒ 该子项**保持未勾**并待 CI；⚠️ 另注：`docs/tech/F11QA.md` 里 R4 gate 的 `total==120` 口径
       已随 kgmqa-123 落地变为 123 ⇒ 属期望值口径变更，**须同级评审**，本轮只登记未改）；
-- [x] **六条 Rust 锁测试门禁全绿**（r8 实测；**r11 扩为七条并逐字复核**）：root **299 passed / 0 failed / 20 ignored**、
-      vendor（gba-core）**249 / 0 / 2**、debug **94 / 0**（r11：V23 +1，基线 93）、media **52 / 0**、formats **153 / 0**、
+- [x] **七条 Rust 锁测试门禁全绿**（r8 实测；**r11 扩为七条并逐字复核；r14 标题与正文对齐**）：root **299 passed / 0 failed / 20 ignored**、
+      vendor（gba-core）**249 / 0 / 2**、debug **94 / 0**（r11：V23 +1，基线 93）、media **52 / 0**、formats **154 / 0**（r12：V20 +1，基线 153）、
       utils **51 / 0**（基线 46 ⇒ V24 +5）、**lua 54 / 0**（r11：V25/V22，**crate 首次入门禁**，基线 49）；
       两态 `cargo check --workspace --no-default-features` 与 `cargo check --workspace` 均 **EXIT=0**。
 
@@ -1406,3 +1561,4 @@ curl.exe -s -x http://127.0.0.1:7897 "https://api.github.com/repos/TASEmulators/
 | r11 | 2026-11-14 | **波次实施：批 1 全清（V6）+ 批 4/5 再落四项（V25/V22/V23/V14 上半）——业主拍板「执行下一步，每次两个 agent 并行」。** **门禁终读数**：`ctest -LE perf` **38/38**（37→38 = V6 锁入门禁）；Rust **七条**全绿（root 299/0/20、gba-core 249/0/2、**debug 94/0**（V23 +1）、media 52/0、formats 153/0、utils 51/0、**lua 54/0**（crate 首次入门禁，基线 49））；两态 `cargo check` EXIT=0。① **实施方式**：两波 × 两路 agent（按文件域切分，V25+V22 强制同 agent——同一绑定面）；主会话逐条审 diff + 串行门禁 + **变异腿由主会话合并施加**（每条目标锁均见红，归因逐测登记）。② **V25**：KEY_TO_NAME 改 SDL scancode 基准（99 项逐行注明 SDL 常量名，值取自本机 vcpkg SDL_scancode.h）；**Lua 字段名零改名**——变化的是 96 键的读取下标（对照表进提交说明）；掩码改「值 ≠ 0」（双形态 sweep：归一化 0x80 与原始 0/1）。**计划偏差改正**：「&0x80 恒不相交」不成立——`fceWrapper_GetKeyboardState`（`fceu_callbacks.cpp:293-302`）把非零键态归一化 0x80 ⇒ 生产上多数键能读到位；主缺陷 = 96 键名整体错位 + 三个 0x01 例外键恒 false。⚠️ 已知缺口：scancode ≥ 256（MODE/媒体键）在 FFI 256 字节窗口外不可表示。③ **V22**：click 位测试 + 数值字段；**三 viewport 已各自支持中键**（GL/SDL/QWidget 的 `getMouseButtonState` 均含 `Qt::MiddleButton`）⇒ 只补 `GetMouseData` 一处；`GetMouseData` 行号 1233→1272（V15 落地后漂移）。④ **V23**：FFI 增 `is_fds`；FDS 判据 = **`GameInfo->type == GIT_FDS`**（⚠️ 计划的 grepFDS 惯例名不成立）；agent 独立复核上游 2.7.0/master 快照逐行号证实 `:557`/`:577`/`:588`；**.cdl 输出行为变更**（非 FDS 写指令不再误抹 PRG 槽）已声明；文档落 `debug-regression-checklist.md` §七.7（含 #771 原话）；验收③端到端对比**登记不做**（需构建上游）。⑤ **V14 上半**：TraceLogger 环形缓冲 10 访问点全 `.load/.store`，上游 `44d3e45d`/`0a1ef89e` diff 逐段对照；读端取 **V13 形**（局部快照 + 出循环一次 release store）——与 master 消费端的逐次 store 不同，但该形同为上游所出（同批 commit、AviRecordDiskThread 先例），按任务口径取本仓最小结构；复位逻辑竞态（§二末⑥）保持现状为非目标；**无机器红腿**（TSAN 未落地）——证明 = 上游对照 + 静态审查。⑥ **V6**：wiki + Mesen2 双信源落地（bit2 电平直读、仅 $4016、仅 P2；1996 翻转 hack 退役）；新桥导出 `kagami_bridge_set_famicom_mic` + sut_input 保留值 0x40；锁测试 T1–T6（nestest + 真 strobe + ARead 直读）；kgmqa-108 修复前后读数逐字相同（0x02 稳定，只登记不判）；**manifest 行与基线翻转留待同级评审**；变异 M-1..M-5 两轮合并实测（轮 1 = M-1 如实归因为 M-1+M-4 合并施加，T1/T3/T4/T6 红；轮 2 = M-2..M-5 合并，T3×10/T4×2/T5×4/T6×4 红）。⑦ **工具链新事实（坑 10 变体，已录 AGENTS.md）**：FFI 签名变更后的首次构建可与 cbindgen 头重生成**竞态**（ninja 并行下 debug.cpp.obj 读到旧头 ⇒ C2660）⇒ 直接重跑即可，头已重生成。⑧ **管道退出码陷阱（自踩）**：`cmd //c … | tail` 会把构建失败码吃成 0 ⇒ 此后门禁一律「重定向到文件 + echo BUILD_EXIT」；首跑 ctest 曾在陈旧二进制上 37/37（无效），已重跑。⑨ **f11qa-rom-runner 实际路径** = `build\tests\`（非 src/rust/target）；kgmqa id 须全名。⑩ 人工项待做：V25/V22 真机 Lua 读值与鼠标、V6 真机吹气、V13/V15 压测、V11 跨进程读档。⑪ 未推送（push 需业主逐次明确指示）。 |
 | r12 | 2026-11-14 | **波次 3/4：V14 全清（CDL 下半）+ V10 前置就绪 + 批 3 首项（V7）+ 批 6 全清（V16/V20）——总进度 18/22。** **门禁终读数**：`ctest -LE perf` **39/39**（38→39 = xstring_test 入门禁）；Rust 七条全绿（**formats 154/0**，V20 +1）；两态 `cargo check` EXIT=0。① **V14 下半**：CDL 六计数器 `std::atomic<int>`（load→FFI 局部副本→store，`-std=c++20` 实测选 Option A 非 atomic_ref——类型系统强制防漏点）；文件域偏差两处编译强制并入（sound.cpp / ppu_rendering.cpp 局部 extern 重声明冲突）；`LogAddress` 拆出保留 volatile；主会话补 `trace_common.cpp` 四处隐式 seq_cst 读 `.load(relaxed)`（agent 移交裁决项）。② **V10 前置**：**13 张金标 ROM（勘误：非 12）全部在 V10 影响面外**（全 iNES 1.0 + 8K CHR-RAM/CHR-ROM）⇒ 现有 rom_regression/savestate/ppu_frame_diff 三个金标 = 「≥8K 零漂移」可执行基线；仓内**无 movie 资产**（真 movie 基线需业主落地前录制，登记待提供）；**ASan 构建打通**（`build-asan` 230/230，`-j 1`，冒烟 2/2，`/fsanitize=address` 1134 处实证）；`oam3.nes`（影响面内样本）本机无——验收①需业主外部提供。③ **V7**：`__FCEU_PROFILER_ENABLE__` 全包裹五处（include/注册/retranslate/成员/槽）；`FCEU_PROFILER_ENABLE` CMake 选项注入宏；tmpfile 零残留方案；wrapper 锁 + 暂停双保险；⚠️ 菜单结构在 `ConsoleMenu.cpp`，QAction 于构造函数注册保单一 #ifdef 域（偏差登记）；人工验收 = profiler 构建真实点击。④ **V16**：上游公式落地；⚠️ **计划自带 POC 不开窗**（`"0XABAB",2` 被 clamp）——红腿修正为 len≥L/2（len=20 主腿 / len=3 副腿），**ASan 变异红（container-overflow at xstring.cpp:387）→ 还原绿**；护栏两处死代码登记；ASan 运行时 DLL（`clang_rt.asan_dynamic-x86_64.dll`，MSVC 14.44 HostX64）需手工前置 PATH——ctest 的 ENVIRONMENT_MODIFICATION 自带、直跑 exe 需要。⑤ **V20**：formats fail_to_fail（153/1 红 → 154/0 绿）；truncateAt 护栏为纯潜伏无机器红腿（静态核查登记）。⑥ **f11qa-rom-runner 全名 kgmqa-108-mict-rainwarrior**；⑦ 剩余：V10 主体（前置就绪，单提交簇）+ V12（需业主 3GO.nes）；⑧ 未推送（push 需业主逐次明确指示）。 |
 | r13 | 2026-11-14 | **波次 5 + 本日收口：V10 主体落地（批 4 = 7/7 全清），总进度 19/22 ≈ 86%——业主指令「完成手头工作，完成/未完成全部修订进文档，剩余下次开展」。** **门禁终读数**：`ctest -LE perf` **39/39**（含三金标零漂移子项 rom_regression/savestate/ppu_frame_diff 全绿实测）；Rust 七条全绿（r12 读数不变）；两态 `cargo check` EXIT=0。① **V10 主体**：垫层 1024→8192（上游 `8510fb8` 逐字；`memset` 只盖垫层、`FCEU_MemoryRand` 真实尺寸保留——`FCEU_malloc` 本身清零 ⇒ memset 属双保险）；四行钳制回补 `src/bus.cpp`（与本仓 `ad2914d` 删除前形态逐字同构、与上游 master/2.7.0 逐字节 identical 实证）；错误注释改正；单测 `test_setup_chr_mapping_clamp` 三组（1K：mask1=0 天然 / mask2-4-8 下溢钳 0；8K：7/3/1/0 全天然防过度修复；size==0：早退互不覆盖）。② **M1 变异实测**：删四行 ⇒ 恰 3 条钳制断言红（90/3）⇒ 还原绿。③ **⚠️ 工具链新坑（坑 12 变体，已录 AGENTS.md）**：**被取消的后台构建任务会留孤儿 ninja/link 进程**，与新构建争写同一 `.lib` ⇒ LNK1104 连环失败；判据补一条——`tasklist` 查 ninja.exe/link.exe 残留，`taskkill` 后串行 `-j 1` 重跑即净。④ **未完成（下次开展）**：**V12**（做法已备好——需业主提供 3GO.nes 实际文件，按 padded 口径重算 CRC）；V10 的 M2/M3 备选变异腿与 ASan+`oam3.nes` 验收①（ROM 需业主外部提供）；**人工验收清单**：V11 跨进程读档（Lagrange Point）/ V13 录 AVI ≥10 分钟 / V15 按 A/B 录 movie 回放 / V25+V22 真机 Lua 读值与鼠标 / V6 真机吹气 / V7 profiler 构建真实点击 / V14 CDL 一致性读数 / 真 movie 基线录制（V10 口径，可选）；**计划外 B**（GUI yielding Lua 崩溃）与**计划外 C**（S-2）仍挂起；**V1 的 LUA-1/2 GUI 复走**待计划外 B 关闭。⑤ **push**：`9f91024` 起共 **10 个提交未推送**（r10 文档 + 8 个 fix/feat + r13 文档），待业主逐次明确指示。 |
+| r14 | 2026-11-14 | **第 1 批（四项一批）落地：V8 收益上限实验完成 + 计划外 B 只读 RE + V4 下一批小项 ⑩⑫ + 文档一致性更正；另查出两项新缺陷（LTCG 链接崩溃已修、V1 门禁空洞待裁决）。** **门禁终读数**：`ctest -LE perf` **39/39**（8.98 s）；Rust **七条全绿**——root 299/0/20、gba-core 249/0/2、debug 94/0、media 52/0、formats 154/0、utils 51/0、lua 54/0；两态 `cargo check` EXIT=0。① **V8 完成（结论：不值得，收益上限 ≈ 0）**：工具侧落地（生成器 `--variant {base,a7}`，base 输出 SHA256 与已提交文件**逐字相同** `9CCB508C…`；`src/ops_table_a7.inc`；`src/ops_table_variant.h` 选择器；CMake 开关 `FCEUX11_X6502_ALIAS_VARIANT` 默认 OFF）——**`src/x6502.cpp` 只改 1 行且行数中性（1134 → 1134 行）**，避免全仓 `x6502.cpp:<行号>` 坐标漂移；**独立变体树 `build-a7`**（`-G Ninja`，`DEFINES` 逐字可比，仅差一个宏）⇒ A/B 读数 7 轮交替：S1 `nestest` 37.891 → 37.637 ms（**−0.67%**，逐轮正负乱跳）、S2 `instr_v5_all` 44.445 → 45.033 ms（**+1.32%**，逐轮全为正）⇒ **两场景方向相反、±1.3% 属噪声** ⇒ **不值得做**；附带结论：A7 还隐含「单 Cpu 实例」语义前提（`Cpu` 构造私有、全仓单例、`src/x6502.cpp:1088` 传 `&cpu.native_layout()`）⇒ **建议永久封口**（A7 本体维持不进范围）。② **计划外 B：只读 RE（不跑 GUI、不改代码）**——三条新事实：① `__chkstk@Qt6Gui+0x4754C7` 是 **Qt6Gui 自带的静态 CRT 栈探针**（反汇编 Qt6Gui.dll：RVA `0x475490` 为独立函数、故障指令 `0x4754C7` 正是逐页 touch），**不能**用于定位递归点（r5 的这条线索作废），且**只有 GUI 线程会进 Qt6Gui** ⇒ 溢出线程 = GUI 线程；② **不是 Rust panic**（`panic="abort"` 的签名是 `0xC0000409`，与观察到的 `0xC00000FD`/`0xC000041D` 不符）；③ 「创建线程 ≠ 续跑线程」是结构性的（mlua 0.10.5 的 `Lua` 未开 `send` ⇒ `!Send`，本仓用 `AtomicPtr` 绕过类型系统）。**排除五条假设**（Qt 事件链 / Rust panic / mlua 跨线程 panic / GUI 与 emu 并发进引擎 / 断点重入）。**新线索**：4 MB/s 堆增长与 GUI 视频路径 64 KiB/帧拷贝量级吻合（`src/video.cpp:259-260`）⇒ 堆增长与栈溢出**可能是两个独立现象**。③ **🔴 门禁空洞（本批最重要的发现）**：`tests/lua_scripts/test_frameadvance.lua` 在无头 runner 下**零输出**、自证计数器停在 `frames=0`、runner 的帧循环**一次都没跑** ⇒ **kgmqa-123（blocking）从未走过「恢复」路径** ⇒ **V1 的出口判据「exit 0 且有脚本输出」空洞成立**（脚本只要不崩退出码就是 0）；同时 `string.dump(emu.frameadvance)` **成功**（dump 内含 `emu.rs:96:10` 与 `coroutine`/`yield` 操作码）⇒ **V1 的纯 Lua 包装确实在二进制里**（「V1 没落地 / 二进制陈旧」两种假设被排除）；而同一脚本在 GUI 下确实在跑并崩溃 ⇒ **崩溃位于无头门禁从未覆盖的那条路径上**。⚠️ **根因仍未钉死**；诊断坑已登记：**不能用 `pcall(function() emu.frameadvance() end)` 判定 yield**——`pcall` 是 C 函数，Lua 5.1 `ldo.c:447` 的 `nCcalls > baseCcalls` 判据会因此成立而**人为造出** `attempt to yield across metamethod/C-call boundary`（我自己踩了）。④ **V4 下一批小项 ⑩⑫ 落地**：5 条 `provenance` 末尾按 `kgmqa-081` 惯例追加带日期更正指针（原句逐字保留；`provenance` 的克隆句属**手工维护层**——生成器只持有 `'cpu interrupt (bucket B)'` 这类基础串 ⇒ 与 V4 同法只改产物）；`docs/tech/precision.md:31` 的过期中断描述改写为「两段式已建模」口径。⑤ **三处文档不一致更正**（本批自查发现）：§三/§一「批 1 = 全清」与 V5 未开始互斥（改为 5/6）、§五 Rust 门禁标题「六条」实为七条、§五 formats 读数 153 → **154/0**。⑥ **🔴 新缺陷（已修）**：`fceux11_input_famicom_mic_test` 的 **LTCG 链接崩溃**（MSVC 14.51：link.exe `exit -1` 无 LNK 报错、只留 2 MiB 损坏 exe；与 `bus.cpp`/`ppu_sprite_lut.cpp` 已规避的 c2.dll 病态同族；两次全量重链各命中一次）⇒ 按仓库先例对该 TU 加 `/GL-` ⇒ 产物 4.9 MB 可执行、39/39 全绿（登记为 §二末 ⑬）。⑦ **本批工具链坑三则**：① **CMake 重配置会触发全树重编**（764 步）⇒ 「同树开关切换」成本远高于独立树；② **孤儿 link.exe**：构建被中止后会留下挂死的 LTCG 链接进程（本次挂死 25 min、CPU 100%、内存 6 GB），必须 `taskkill` 后再跑；③ **Windows 上含中文的 `.ps1` 必须带 BOM**（PS 5.1 按 ANSI 读无 BOM 文件 ⇒ 中文注释变乱码并**破坏语法**），`.zcode` 下的脚本已全部改为纯英文注释。⑧ **未完成**：**V5 PGO**（需业主训练 ROM）、**V12**（需业主 3GO.nes）、**V10 的 M2/M3 备选变异腿**（定义已在 `tests/f11qa/core/bus_test.cpp:655-658` 写好：M2 = 钳制改无条件清零 ⇒ 8K 组红、M3 = 钳制挪到 mask 计算之前 ⇒ 1K 组红；本批未跑，因变异会改 `src/bus.cpp` 而变体树正在构建）、**ASan + `oam3.nes` 验收①**（ROM 需业主外部提供）、**人工验收清单 8 项**、**计划外 B 的根因**（下一步：先修门禁盲区 ⇒ 让无头路径真的恢复，再看崩溃能否无头复现；以及按业主批准安装 Windows SDK 调试工具以取 GUI 线程回溯）。⑨ **未推送**：本批提交待业主逐次明确指示。 |

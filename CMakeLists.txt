@@ -119,6 +119,17 @@ if(FCEUX11_PGO_USE)
     message(STATUS "FCEUX11: PGO profile-use build enabled (/USEPROFILE)")
 endif()
 
+# v2.0.4 V8 — A7 alias experiment ("收益上限实验").  OFF (default) = canonical
+# build: the x6502 opcode handlers keep routing the `_PC`/`_A`/... macros
+# through the global `g_cpu` accessor (src/x6502abbrev.h), exactly as before.
+# ON = experiment only: src/x6502.cpp includes src/ops_table_a7.inc, where the
+# same macros are re-routed through the handler parameter.  The variant table
+# is produced by
+#   python scripts/generate_x6502_dispatch.py --variant a7
+# and needs its own build dir (the benchmark readings of the two variants are
+# only comparable when they are not built in the same tree).
+option(FCEUX11_X6502_ALIAS_VARIANT "A7 alias experiment: route x6502 register macros through the handler parameter (V8)" OFF)
+
 # v0.3.1: ccache probe. v1.0: scan PATH first (CMake default) so ccache
 # in any user-writable location (scoop, winget, custom) is picked up.
 # The PATHS list below is a fallback hint for choco-installed ccache.

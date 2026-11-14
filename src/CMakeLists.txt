@@ -589,6 +589,14 @@ target_include_directories(fceux11_boards PUBLIC ${CMAKE_SOURCE_DIR}/src)
 add_library(fceux11_core STATIC ${SRC_CORE})
 target_link_libraries(fceux11_core PUBLIC fceux11_boards fceux11_utils ${ZLIB_LIBRARIES} SDL2::SDL2)
 target_include_directories(fceux11_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
+# v2.0.4 V8 (A7 alias experiment): when enabled, x6502.cpp includes the
+# experiment table src/ops_table_a7.inc (register macros routed through the
+# handler parameter) instead of the canonical src/ops_table.inc.  OFF (default)
+# keeps the canonical build byte-identical.
+if(FCEUX11_X6502_ALIAS_VARIANT)
+    target_compile_definitions(fceux11_core PRIVATE FCEUX11_X6502_ALIAS_VARIANT)
+    message(STATUS "FCEUX11: A7 alias experiment variant enabled (ops_table_a7.inc)")
+endif()
 # M3-fix: MSVC LTCG linker (c2.dll) crashes when materialising the 512 KiB
 # kSpriteIdxLUT from IL during link-time code gen — produces a 2 MB zero file
 # for fceux11_ppu_rendering_lut_test (the only consumer). Compile this source

@@ -72,6 +72,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `FCEU_WRAPPER_LOCK` + 先暂停再读（mainMenuOpen/Close 同族先例）双保险后调
   `FCEU_profiler_report` 写 CRT 临时文件读回（零残留），只读对话框（等宽字体）展示
   sum/%total/avg/min/max/calls/func。此前报告只能在退出时看 stdout。
+- **A7 别名化实验开关**（V8 工具侧）：`scripts/generate_x6502_dispatch.py` 新增
+  `--variant {base,a7}`——`base` 的输出与已提交文件**哈希逐字相同**（主线零扰动），
+  `a7` 产出 `src/ops_table_a7.inc`（256 个 handler 的寄存器宏改走 handler 参数 `xp`，
+  文件末尾按 `src/x6502abbrev.h` 逐字恢复规范定义）。配套 CMake 开关
+  `FCEUX11_X6502_ALIAS_VARIANT`（默认 OFF）与选择器头 `src/ops_table_variant.h`
+  ——**`src/x6502.cpp` 只改 1 行且行数中性**，避免全仓 `x6502.cpp:<行号>` 坐标漂移。
+  本开关只服务于「A7 值不值得」的收益上限实验，**A7 本体仍不在 v2.0.4 范围**。
+  **实验结论（2026-11-14）**：独立变体树与基线树 A/B（7 轮交替、同机同场景）——
+  S1 `nestest` **−0.67%**、S2 `instr_v5_all`（ALU 密集）**+1.32%**，
+  **两场景方向相反、±1.3% 属噪声 ⇒ 收益上限 ≈ 0** ⇒ **不值得做**；
+  且别名化还隐含「单 `Cpu` 实例」语义前提 ⇒ **建议永久封口**（A7 本体维持不进范围）。
+
+### Fixed — 构建基础设施（r14）
+
+- **`fceux11_input_famicom_mic_test` 的 LTCG 链接崩溃**：MSVC 14.51 上该目标的
+  链接以 `exit -1` 失败且**无 LNK 报错**，只留下一个 2 MiB 的不可用 `.exe`
+  （与 `src/bus.cpp` / `src/ppu_sprite_lut.cpp` 早已规避的「c2.dll 从 IL 物化出
+  2 MB 假镜像」同族）。复现于两次独立的 `cmake --build build`。
+  按仓库既有先例，对该测试的 TU 加 `/GL-`（不进全程序优化）⇒ 链接恢复正常。
+  ⚠️ 触发条件：任何改动 `fceux11_core` 之后需要整体重链时都会命中。
 
 ### Fixed — 输入协议（批 1）
 

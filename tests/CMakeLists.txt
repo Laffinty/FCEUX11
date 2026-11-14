@@ -238,6 +238,17 @@ if(FCEUX11_BUILD_TESTS)
         f11qa/input_famicom_mic_test.cpp
         git_info_stub.cpp
     )
+    # v2.0.4 r14: this target's LTCG link CRASHES on MSVC 14.51 (link.exe
+    # exits -1 with no LNK message, leaving a 2 MiB unusable .exe -- the same
+    # "c2.dll materialises a bogus 2 MB image" family that src/bus.cpp and
+    # src/ppu_sprite_lut.cpp already dodge with /GL-).  Reproduced twice on
+    # this machine (ninja step 47/48 of a plain `cmake --build build`).
+    # Remedy = the repo's existing precedent: compile the offending
+    # translation unit without whole-program optimisation.  The libraries it
+    # links stay /GL, so the linker still runs LTCG for them -- the crash is
+    # in this TU's own IL, and the test target is the only consumer.
+    set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/f11qa/input_famicom_mic_test.cpp
+        PROPERTIES COMPILE_FLAGS "/GL-")
     add_test(NAME input_famicom_mic_test
              COMMAND fceux11_input_famicom_mic_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})

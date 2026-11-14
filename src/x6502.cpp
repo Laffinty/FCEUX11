@@ -511,7 +511,7 @@ static inline uint32 intl_live_irq_mask(void) {
 // evidence; the override form fixes the scoping.)
 static uint64 g_intl_poll_override = 0;
 
-#include "ops_table.inc"
+#include "ops_table_variant.h"
 
 FCEUX11_CACHE_ALIGN static uint8 CycTable[256] =
 {
