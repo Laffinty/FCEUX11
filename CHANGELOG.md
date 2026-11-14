@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **偏移基址**。新增回归夹具 `tests/fixtures/mapper_mapper218.nes` + 锁测试
   （断言「每个 CHR 地址的有效落点都在 NTARAM 内」——**不复述指针公式** ⇒ 不会与实现同错；
   还原旧写法 ⇒ 8192 个地址中 6145 个越界、最深 0x1800 字节 ⇒ 必红）。
+  上游 issue #851 的复现 ROM（`mapper218bad.nes`，出自 nesdev 论坛 mapper 218 game-jam 帖）
+  已取得并在修复版上验证：装载 + 600 帧全程无崩溃（⚠️ 旧写法在本仓内存布局下表现为静默
+  损坏而非段错误——越界落点在相邻活动数组内，段错误是上游布局特有；布局无关的越界证明
+  由上述锁测试承担）。
 - **畸形 `.fm2` 的 GUID 字段可令进程中止**（V24）：`fceux11_rust_guid_scan` 按**字节**切片
   `String`，长度恰为 32 字节但含多字节 UTF-8 时切点落在字符中间 ⇒ panic；
   该函数是 `extern "C"` ⇒ panic 不可 unwind ⇒ **进程 abort**（`0xC0000409`）。
