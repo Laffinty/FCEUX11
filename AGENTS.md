@@ -633,6 +633,10 @@ $env:PATH="D:\Project\FCEUX11\vcpkg_installed\x64-windows\bin;$env:PATH"
       加 `synchronization.lib` 过，三腿把机制钉死。
     - ⚠️ **判据陷阱**：本机 rustc（1.99.0）与 CI 不同 ⇒ **本机构建绿 ≠ CI 绿**。
       本次本机构建一直是绿的，直到把 1.100 产物换进 `build/` 树才复现出来。
+    - ✅ **修复后 CI 读数**：提交 `8ade0fd`（wip204）触发的 F11QA 运行 **#99 全绿**
+      （21:03:01→21:37:38Z，34m37s）：Build C++ / CTest / Blargg 套件 / 迁移矩阵 /
+      **R4 gate** 全部 success —— 这是 v2.0.4 线**第一次**拿到 F11QA 矩阵读数
+      （此前 #97、#98 都死在同一个链接错误上）。
 
 ## 纪律（这几条都是被违反过之后写下来的）
 
