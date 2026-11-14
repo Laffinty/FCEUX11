@@ -1260,11 +1260,14 @@ iNES 路径**根本不做板级名匹配**（`src/ines_init.cpp:38-39` 只比 `n
    ⇒ 崩溃位于**无头门禁从未覆盖的那条路径**上。
    ⚠️ **根因仍未钉死**：为什么无头下脚本在第一次 yield 就终止、而 GUI 下能跑起来并最终崩，
    需要一轮「让无头路径真的恢复」的实验（先修门禁盲区，再看崩溃是否可在无头复现）。
-6. **本轮新增的可执行资产**（`.zcode/`，gitignored）：
-   `repro/yield_only.lua`（自证型 yielding 脚本）、`repro/diag.lua` / `diag2.lua` / `diag3.lua`
-   （三种判定：脚本是否死、`frameadvance` 运行时类型、最小 yield 存活探针）、
-   `repro/run_gui_lua_repro.ps1`（自动复现 + 事件日志 + 自证校验）、
-   `bench/run_ab.ps1`（V8 的 A/B 基准驱动）。
+6. **本轮新增的可执行资产**（**已入仓 `scripts/`**，可复现）：
+   `scripts/repro/yield_only.lua`（自证型 yielding 脚本，计数器路径走
+   `FCEUX11_YIELD_COUNTER` 环境变量）、`scripts/repro/lua_yield_diag.lua`
+   （最小 yield 存活探针：只写 A/B/C/D 四行，**能判定「脚本是否死」**）、
+   `scripts/repro/lua_gui_yield_repro.ps1`（GUI 自动复现：读 `SDL.LuaScript` 配置项 ⇒
+   免人工 GUI 会话；含工作目录修正 + 事件日志 + 自证校验）、
+   `scripts/bench/alias_ab_bench.ps1`（V8 的 A/B 基准驱动：交替轮次 + 中位数口径）。
+   ⚠️ 三个 Lua 脚本都**不得**用 `pcall` 包住 `emu.frameadvance()`（见上文第 4 条）。
 
 
 ---
