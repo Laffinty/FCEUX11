@@ -104,10 +104,10 @@
 | **计划外 A** | ✅ **完成** | 断点关键字死代码回归（v0.3.5 `704078f` 引入）修复 + 5 断言锁测试（r5④）——走查 NSF-1 带出 |
 | **计划外 B** | 🔴 **新缺陷立项** | GUI 下任何 yielding Lua 脚本运行中崩溃（0xC00000FD/0xC000041D，时长随机 2s～68s+，堆 ~4MB/s 增长，突发深递归）；V1 修复所暴露，阻断 LUA-1/2 GUI 转绿（r5⑤）；需 cdb/WinDbg 或 mlua 内部分析 |
 | **计划外 C** | 🔴 **回归候选挂起** | S-2：Step Over 的 watchpoint[64] 长程不消费（r4③）；静态调查榨干（r5⑧），§6.3 门回退变异测试排队（GUI 崩溃缺陷关闭后做） |
-| **追加批 V9–V25** | 🔧 **6/14 完成**（r9；明细见 §1.2） | **V9 ✅**（mapper 218 的 `VPageR` 改上游写法 + 夹具 + 不变式锁测试；**r9 变异腿已实跑**：6145/8192 越界、first 0x07FF、worst 6144 字节，与 r8 数值推导逐字一致）、**V24 ✅**（GUID 字节切片改按字节 + 失败置零 + 5 条锁测试）、**V11 ✅**（`StateRestore` 补 `OPLL_forceRefresh`；跨进程人工验证待做）、**V13 ✅**（AVI 四索引 atomic 化 + 27 访问点全 `.load/.store`；≥10 分钟压测待人工）、**V15 ✅**（JSreturn 原子转移 1:1 移植上游 + 线程模型探针；人工压测待做）、**V19 ✅**（C++ `ret{}` 兜底 + 删 `hexToByte` + `guid_test` 入门禁 36→37；**双腿变异实测双向可红**——单腿互相掩盖）；其余 8 项 ⬜ 未开始 |
+| **追加批 V9–V25** | 🔧 **9/14 完成 + V14 半**（r11；明细见 §1.2） | **V9 ✅**（变异腿实跑 + #851 真 ROM 验证，r10 双尾巴全清）、**V24 ✅**、**V11 ✅**（跨进程人工验证待做）、**V13 ✅**（压测待人工）、**V15 ✅**（压测待人工）、**V25 ✅**（r11：KEY_TO_NAME 改 SDL scancode 基准——96 键名错位修复 + 掩码改非零判定；真机 Lua 读值待做）、**V22 ✅**（r11：click 位测试 + 驱动中键 0x04 + 数值字段；真机待做）、**V19 ✅**（双腿变异实测）、**V23 ✅**（r11：CDL FDS-only 对齐上游，**.cdl 输出变化**；端到端上游对比登记不做）；**V14 🔧 半**（r11：TraceLogger 环形缓冲已 atomic 化 10 访问点，CDL 计数器半边待做）；其余 V10 / V12 ⬜ 未开始 |
 
-**交付批次视角（r9 同步）**：批 1（V1→V6）= V1 ✅ / V6 ⬜；批 2（V3→V4）= ✅✅；批 3（V5/V7/V8）= ⬜⬜⬜；插入 V2 = ✅；
-追加批 4/5/6（V9–V25）= **6/14 完成**（r9：V9 / V11 / V13 / V15 / V19 / V24 ✅）。
+**交付批次视角（r11 同步）**：批 1（V1→V6）= ✅✅（r11：V6 落地）；批 2（V3→V4）= ✅✅；批 3（V5/V7/V8）= ⬜⬜⬜；插入 V2 = ✅；
+追加批 4 = **6/7**（余 V10）；批 5 = **3/5**（✅ V19/V22/V23，🔧 V14 半，⬜ V12）；批 6 = ⬜。
 
 ### 1.2 追加批任务总表（V9–V25，2026-11-13 核验后并入，r7）
 
@@ -1171,6 +1171,13 @@ iNES 路径**根本不做板级名匹配**（`src/ines_init.cpp:38-39` 只比 `n
 V9 的变异腿已于 r9 实跑（红→绿，读数与 r8 数值推导逐字一致）；实施模式复用 r8 先例
 （多 agent 按文件域并行 + 主会话逐条审 diff + 统一串行门禁）。
 
+**批次进度（r11 追记，2026-11-14）**：**批 1 = ✅✅ 全清（V6 落地）**；批 4 = **6/7**（新增 V25 ✅，余 V10）；
+批 5 = **3/5 + V14 半**（新增 V22 ✅ V23 ✅，V14 环形缓冲半落地、CDL 半待做，余 V12）；
+批 3 = ⬜⬜⬜；批 6 = ⬜。实施模式：两路 agent/波（本机并发上限 ≈2），波间主会话统一串行门禁
++ 变异腿主会话代跑（合并变异归因：每条目标锁均见红）。门禁终读数：`ctest -LE perf` **38/38**（V6 锁
+input_famicom_mic_test 入门禁 37→38）；Rust 七条全绿——root 299/0/20、gba-core 249/0/2、
+**debug 94/0**（V23 +1）、media 52/0、formats 153/0、utils 51/0、**lua 54/0**（V25/V22，**crate 首次入门禁**）。
+
 每批独立可验收；**每批末跑全量门禁**（`ctest -LE perf` + 四条 Rust 锁测试）。
 
 ---
@@ -1205,8 +1212,13 @@ V9 的变异腿已于 r9 实跑（红→绿，读数与 r8 数值推导逐字一
       **049/050/051 的基线翻转未被顺手做掉**（只登记于 `docs/tech/f11qa-accuracy-backlog.md` §4）；
       ⚠️ `expected` / `failure_means` / `pass_to_fail` **零改动**；
 - [ ] **V5**：PGO 产出**一组可复现读数**（训练场景 + 构建命令 + 基准表 + 结论）；
-- [ ] **V6**：FC 麦克风协议按参照语义实现 + 锁测试 + 桥注入面接进 manifest；
-      `kgmqa-108` 行为读数记录在案（基线翻转留待同级评审）；
+- [x] **V6**（2026-11-14，r11）：FC 麦克风协议按参照语义实现（wiki `Standard controller` Famicom 节 +
+      Mesen2 双信源：**bit2 电平直读、仅 $4016、仅 P2**，1996 逐读翻转 hack 退役、键映射保留）
+      + 锁测试 `input_famicom_mic_test` 入门禁（**37 → 38**，T1–T6；变异 M-1..M-5 两轮合并实测各归其位）
+      + 桥注入面 `kagami_bridge_set_famicom_mic` + sut_input 保留值 0x40；
+      `kgmqa-108` 行为读数记录在案（修复前后逐字相同：0x02 稳定——判定逻辑未取证，只登记不判；
+      基线翻转与 manifest `sut_input:[1,64]` 留待同级评审）；
+      ⚠️ 人工项待做：真机吹气（游戏兼容面实测长尾）；
 - [ ] **V7**：Qt 侧 profiler 菜单动作在位，且能产出报告；
 - [ ] **V8**：A7 收益上限实验给出**读数结论**（值得/不值得/只做哪子集）；
 - [x] **V9**（2026-11-13，r8）：mapper 218 的 `VPageR` 改上游写法（`src/boards/datalatch.cpp`，逐字照抄 commit `6738471`）
@@ -1239,7 +1251,12 @@ V9 的变异腿已于 r9 实跑（红→绿，读数与 r8 数值推导逐字一
       `OPLL_forceRefresh` 的 NULL 早退 / 无分配无 I/O 已核实 `emu2413.c:613-626`）；
       `FCEUSTATE_INDIRECT` 数据条目修复后恰余 `state.cpp:131`（RAM）与本处两处；
       ⚠️ 人工项待做：Lagrange Point 跨进程读档不崩 + 音色连续（构建门禁已全绿）；
-- [ ] **V25**：Lua 键名表改 SDL scancode 基准 + 逐项映射锁测试 + 改名对照表进提交说明；
+- [x] **V25**（2026-11-14，r11）：Lua 键名表改 **SDL scancode 基准**（96 个字段名全部不变、读取下标
+      全换——改名对照表 = 索引对照表，逐项进提交说明）+ 掩码改「值 ≠ 0」+ 逐项映射锁测试
+      （capslock/backspace/方向键/F1–F12 + 双侧修饰键 + 旧 VK 位反锁，49 → 54 项，**crate 首次入门禁**）；
+      ⚠️ **计划偏差（r11 实测改正）**：「`&0x80` 恒不相交」半句不成立——FFI 桥把按下键归一化 0x80，
+      生产上多数键其实能读到位；主要缺陷是 96 键名整体错位 + 三个 0x01 例外键恒 false；
+      ⚠️ 人工项待做：真机 Lua 读 `input.get()` 与实际按键一致；
 - [x] **V15**（2026-11-14，r9）：`JSreturnGui/JSreturnEmu` 1:1 移植上游（与 master 快照逐点一致，
       计划五坐标**零漂移**）+ `emuThreadPollInputs` 接进 `fceuWrapper.cpp` 帧首
       + 线程模型断言以**常驻轻量探针**落地（同线程命中 ⇒ 去重 `FCEU_printf` 告警一次，预期静默）；
@@ -1252,9 +1269,14 @@ V9 的变异腿已于 r9 实跑（红→绿，读数与 r8 数值推导逐字一
 - [ ] **V12**：3GO.nes 的矫正条目按**本仓 CRC 口径（padded PRG+CHR，不含头）**重建
       + 加载日志出现 `Mapper corrected by CRC table: 252`
       + **反向锚点：`0xF3C85DC3` 必须查不中**；
-- [ ] **V22**：Lua 鼠标改位测试 + 驱动补中键 `0x04` + `click==3/4` 锁测试；
+- [x] **V22**（2026-11-14，r11）：Lua 鼠标改位测试（`click & 0x01/0x02/0x04`，click==3/4 锁测试）
+      + 驱动补中键 `0x04`（⚠️ 计划预期逐 viewport 补，实测三种实现已各自支持，只需 `GetMouseData`
+      一处）+ 数值字段 `table.set("click", click)`（对齐上游，行为增加已声明）；
 - [ ] **V14**：TraceLogger 环形缓冲改 atomic（照抄上游 master 的 release/acquire）
-      + CDL 六计数器原子化 + `core_state` 访问器改类型 + CDL 计数一致性读数；
+      + CDL 六计数器原子化 + `core_state` 访问器改类型 + CDL 计数一致性读数
+      （🔧 **r11：上半已落地**——环形缓冲 10 访问点全 `.load/.store`，上游 `44d3e45d`/`0a1ef89e`
+      diff 逐段对照，读端取 V13 形（局部快照 + 出循环一次 release store）；**下半（CDL 六计数器 +
+      core_state + GUI 读点）待做**——与 V23 同文件（debug.cpp），错峰执行）；
 - [x] **V19**（2026-11-14，r9）：GUID 失败置零双保险达成（Rust 半边已随 V24 落地，本轮核实三条失败路径
       均置零；C++ 半边 = `fromString` 的 `FCEU_Guid ret{};` 值初始化）+ `hexToByte` 死代码删除
       （删前零调用已核、删后 `grep` 归零）+ 新测试 `tests/f11qa/utils/guid_test.cpp` 注册进
@@ -1263,18 +1285,22 @@ V9 的变异腿已于 r9 实跑（红→绿，读数与 r8 数值推导逐字一
       **双腿变异实测**（`ret{}`→`ret` + 摘 `guid.rs` len≠32 分支置零）：Rust 锁
       `test_guid_scan_invalid_length_zeroes_guid` 红（0xA5 预填残留）+ `guid_test` 两条垃圾断言红
       （栈垃圾 + repeated mismatch；非 UTF-8 腿仍绿 = 只拆一腿的精确对照）⇒ 还原后全绿；
-- [ ] **V23**：CDL 写路径对齐上游（FDS-only）或明确声明差异 + CDL 对比用例 +
-      差异声明进文档（含 #771 与上游拒绝 revert 的原话）；
+- [x] **V23**（2026-11-14，r11）：CDL 写路径对齐上游 FDS-only（FFI 增 `is_fds`，C++ 判据
+      `GameInfo->type == GIT_FDS`——⚠️ 计划写的 grepFDS 惯例名不成立，本仓惯例是 GIT_FDS 比较）
+      + 差异声明进 `docs/tech/debug-regression-checklist.md` §七.7（含 #771 与上游拒绝 revert 原话逐字）
+      + 锁测试 93 → 94（判别腿变异已实测红）；**⚠️ 行为变更：非 FDS 卡带的 .cdl 输出自本版改变**
+      （写指令不再误抹 PRG 槽）；验收③「同一 ROM 与上游 2.7.0 端到端 .cdl 对比」**登记不做**
+      （需构建上游，留待后续立项）；
 - [ ] **V16**：`xstring.cpp` 的 `bytesAvailable` 改 `(str.size()-2)/2` + 死路径护栏注释；
 - [ ] **V20**：Rust 侧拒收负 `length` + `truncateAt` 负值归零 + `#858` POC 不 abort；
-- [ ] **NES 零回归**：`ctest -LE perf` **全绿**（r9 实跑：**37/37**，总耗时 23.75 s；36 → 37 为
-      guid_test 入门禁）
+- [ ] **NES 零回归**：`ctest -LE perf` **全绿**（r11 实跑：**38/38**；37 → 38 为
+      input_famicom_mic_test 入门禁）
       + F11QA 矩阵 `pass_to_fail = 0` + grade ≥ B（矩阵**本地无入口** ⇒ 以 CI 复核为准
       ⇒ 该子项**保持未勾**并待 CI；⚠️ 另注：`docs/tech/F11QA.md` 里 R4 gate 的 `total==120` 口径
       已随 kgmqa-123 落地变为 123 ⇒ 属期望值口径变更，**须同级评审**，本轮只登记未改）；
-- [x] **六条 Rust 锁测试门禁全绿**（r8 实测；**r9 复核逐字一致**）：root **299 passed / 0 failed / 20 ignored**、
-      vendor（gba-core）**249 / 0 / 2**、debug **93 / 0**、media **52 / 0**、formats **153 / 0**、
-      utils **51 / 0**（基线 46 ⇒ V24 +5）；
+- [x] **六条 Rust 锁测试门禁全绿**（r8 实测；**r11 扩为七条并逐字复核**）：root **299 passed / 0 failed / 20 ignored**、
+      vendor（gba-core）**249 / 0 / 2**、debug **94 / 0**（r11：V23 +1，基线 93）、media **52 / 0**、formats **153 / 0**、
+      utils **51 / 0**（基线 46 ⇒ V24 +5）、**lua 54 / 0**（r11：V25/V22，**crate 首次入门禁**，基线 49）；
       两态 `cargo check --workspace --no-default-features` 与 `cargo check --workspace` 均 **EXIT=0**。
 
 ---
@@ -1354,3 +1380,4 @@ curl.exe -s -x http://127.0.0.1:7897 "https://api.github.com/repos/TASEmulators/
 | r8 | 2026-11-13 | **批 2（V3 + V4）与批 4 的 V24、V9 落地**（业主采纳「先做批 2，再进批 4 的 V24 + V9」的建议）。**门禁终读数**：`ctest -LE perf` **36/36**（9.84 s）；六条 Rust 锁测试 **全绿**（root 299/0/20、gba-core 249/0/2、debug 93/0、media 52/0、formats 153/0、**utils 51/0**（基线 46 ⇒ V24 +5））；两态 `cargo check --workspace [--no-default-features]` 均 EXIT=0。① **实施方式**：四路并行（三个 agent 按文件域切分 + **V3 那路 agent 在落笔前结束回合，由主会话接手落地**）；**主会话逐条审 diff**（含核实 `tests/tests.json` 只动 `known_limit`/`spec_source`、`expected`/`failure_means`/`pass_to_fail` 零改动；抽查 056/078 的基线 `passed=true`、037/038/107 的基线 `false` 与新措辞一致）。② **V3**：A4-1 否决护栏进 `src/video.cpp`（写明 chunk-8 任意帧异步消费 ⇒ 金标漂移/谓词恒真，**勿再做消费计数门控**）+ `FCEU_SoundCPUHook` 的「有意省略探点」登记进 `src/sound.cpp`（探点口径订正为 **6 个**，实测坐标 `fceu.cpp:804` / `ppu_rendering.cpp:301,686` / `sdl-sound.cpp:376` / `ConsoleWindow.cpp:629,666`）；**纯注释、零行为变更**。⚠️ **计划的前提被证伪并已按实测改正**：r7 写的「照 `src/profiler.h` 的 A4 护栏宏体」——**该宏体不存在**（`profiler.h` 与 `fceu.cpp` 均无）⇒ 改用本仓真实惯例（`// 项号: 结论` 式注释，仿 `sound.cpp:1457` 的 A4-2、`input/snesmouse.cpp:82` 的 D9 A4）。③ **V4**：5 条 `known_limit` 逐条回源码复核后改写（037 向量级 hijack **已建模**、038 真根因是 `Cpu::set_db()` 零调用点、056/078 **已 RESOLVED**、107 SNES 鼠标协议**已实现**）；`docs/tech/{cpu,F11QA,f11qa-accuracy-backlog}.md` 过期措辞订正（新增「42 pass / 1 fail」实测口径 + 条数漂移注）；**死文件 `src/tests/CMakeLists.txt` 整份删除**（零构建引用 + 覆盖未丢失已核；其指向该文件的 `src/tests/AGENTS.md:122` 一并修正）；v1.8 计划的 3 处活引用改指 `docs/history/plans/`（**生成器与产物逐字一致已验**）；**049/050/051 只登记不改**（`docs/tech/f11qa-accuracy-backlog.md` §4）。④ **V24**：`guid.rs` 改全程按字节处理（`clean` 改 `Vec<u8>` + 按字节取组，**函数内再无 `&str` 区间切片**）+ 三条失败路径统一置零 + **+5 条锁测试**；**变异腿已实测双向可红**（还原 `&clean[..]` ⇒ `not a char boundary` ⇒ `extern "C"` 帧内 panic ⇒ 进程 abort `0xC0000409`；还原后 SHA256 一致、复跑全绿）；**一处裁决已定**（含非 ASCII 字节的 GUID 输入 ⇒ **整串置零**，非旧实现的「部分解析」）。⑤ **V9**：`src/boards/datalatch.cpp` **逐字照抄上游 commit `6738471`**；新建夹具 `tests/fixtures/mapper_mapper218.nes`（生成器登记 + 单文件生成，header `4e 45 73 1a 01 00 a0 d0 …` ⇒ mapper `0xDA`=218，16400 字节）；新增锁测试 ⇒ 实跑读数 `all 8192 CHR addresses land inside NTARAM`（`mapper_load_test` 10/10 PASSED）。⚠️ **r7 的锁测试写法被本轮更正**：r7 写的「`VPageR[i]` 落在 NTARAM 区间内」**不成立**（上游的偏移基址写法下 `i>0` 的指针本体就在 `NTARAM` 之前）⇒ 改为断言「**有效地址** `VPageR[v>>10] + v` 落在 NTARAM 内」（不复述指针公式 ⇒ 不会与实现同错）；⚠️ **V9 的变异腿未实跑**（旧写法 ⇒ 8192 中 6145 个越界、最深 0x1800 字节 —— 数值推导）；⚠️ **上游 #851 复现 ROM 仍未取**（本机无，**未验**）。⑥ **本计划自身的修正**：§二 V9 小节按上述更正重写；§二末「其他真实缺陷」表增 3 条登记（`provenance` 里 5 条旧 `known-limit:` 克隆句、`src/tests/` 整目录仍是死资产、`docs/tech/precision.md:31` 同一句过期描述）。⑦ `CHANGELOG.md` 新增 **`[Unreleased] — v2.0.4（在途）`** 段（v2.0.4 此前**没有**在途段，发版时并入正式版本段）。⑧ **未做**：V9 变异腿未实跑；上游 #851 ROM 未取；`src/tests/` 整目录清理、`provenance` 5 处旧句、`precision.md:31` 三处**只登记待裁决**；**未推送**（push 需业主逐次明确指示）。 |
 | r9 | 2026-11-14 | **第一梯队（批 4 收尾）四项落地 + V9 收尾（业主拍板「第一梯队 5 项并行」）**：V11 / V13 / V15 / V19 代码落地，V9 变异腿实跑闭合。**门禁终读数**：`ctest -LE perf` **37/37**（23.75 s；**36 → 37** = `guid_test` 入门禁）；六条 Rust 锁测试**全绿且与 r8 基线逐字一致**（root 299/0/20、gba-core 249/0/2、debug 93/0、media 52/0、formats 153/0、utils 51/0）；两态 `cargo check` 均 EXIT=0。① **实施方式复用 r8 先例**：五路 agent（四路实施按文件域切分 + 一路 V9 只读取证）+ 主会话逐条审 diff + 统一串行门禁；⚠️ 本机 agent 并发上限实测 ≈2（超出即 `user concurrency limit exceeded`）⇒ 分批续跑。② **V11**：`src/boards/vrc7.cpp` 的 `StateRestore` 补 `if (VRC7Sound) OPLL_forceRefresh(VRC7Sound);`（+6 行，落 StateRestore 非 Sync；上游 `vrc7.cpp` 至 master 未修 ⇒ 修完即领先）；`OPLL_forceRefresh` NULL 早退 / 无分配无 I/O 已核（`emu2413.c:613-626`）；`FCEUSTATE_INDIRECT` 数据条目恰余 `state.cpp:131` + `vrc7.cpp:51` 两处。③ **V13**：四索引改 `std::atomic<int>`，**27 个可变访问点全部 `.load/.store`**；内存序照上游 master（对端 acquire / 自有 relaxed / 写端 release / 重置 relaxed）；消费端 `AviRecordDiskThread.cpp` 一并原子化——⚠️ 计划 §二现状 `:742` 本就列三路径，agent 初判「扩围」系误读，实际零扩围；`AviVideoCodec.h` 是本仓拆 TU 自建头（上游 404，无需参照）；hotfix1 P1-8 overrun 护栏结构保留；`aviRecordClose` 的链式重置拆两条独立 `.store`（atomic store 返回 void）。④ **V15**：1:1 移植上游（`JSreturnGui` atomic + `JSreturnEmu` 快照 + `emuThreadPollInputs` 帧首移交），计划五坐标**零漂移**；验收①线程模型断言以**常驻轻量探针**落地（同线程命中 ⇒ 去重 `FCEU_printf` 告警一次；预期静默）；回放路径证据链核对（回放期核心整体跳过 driver Update，`input.cpp:416-425`）⇒ movie 行为零变化。⑤ **V19**：Rust 半边已随 V24 完成（三条失败路径置零已核实）⇒ 本轮只做 C++ 半边（`ret{}` 值初始化）+ 删 `hexToByte` 死代码（grep 归零）+ 新测试 `tests/f11qa/utils/guid_test.cpp`（`tests/CMakeLists.txt:525` 注册，照 pixbuf_pool_test 模式，无 LABELS ⇒ 自动进 `-LE perf` 门禁）。⚠️ **关键发现：单腿变异测不出 C++ 半边**——两层零化（Rust 失败分支 / C++ `ret{}`）在 C++ 可达输入上完全重叠、互相掩盖 ⇒ **双腿变异实测**（`ret{}`→`ret` + 摘 `guid.rs` len≠32 分支置零）：Rust 锁 `test_guid_scan_invalid_length_zeroes_guid` 红（0xA5 预填残留）+ `guid_test` 两条垃圾断言红（栈垃圾指针残渣 / repeated mismatch；**非 UTF-8 腿仍绿** = 只拆一腿的精确对照）⇒ 还原后全绿。⑥ **V9 收尾**：变异腿实跑达成——`FAIL: … 6145 of 8192 CHR addresses fall outside NTARAM (first at 0x07FF, worst is 6144 bytes out)`，与 r8 数值推导**逐字一致**，还原后回绿；**#851 复现 ROM 全通道取证不可得**（nesdev.org 对 curl / 内置浏览器 / 翻译代理 / Wayback / archive.today 全封锁；issue 本体无附件 0 评论；唯一线索 = 论坛帖 `viewtopic.php?p=310352` 的 zip）⇒ **待业主人工浏览器下载**。⑦ **文档自洽性修正**：§五 **V10 的 `[x]` 系 r7 并入时误预勾**（V10 实际未开始）⇒ 改回 `[ ]`；§一「交付批次视角」行的 r7 旧文与看板矛盾 ⇒ r9 同步；看板追加批 2/14 → **6/14**。⑧ **人工项待做**（不影响判据勾选，逐项已标注）：V11 跨进程读档（Lagrange Point）、V13 录 AVI ≥10 分钟压测、V15 狂按 A/B 录 movie 回放比对。⑨ **上游本地副本**：业主已下载上游最新代码（本轮未消费——GitHub 经代理可达，已按文件取快照；副本可服务下一梯队 V10/V14/V23）。⑩ **未推送**（push 需业主逐次明确指示）。 |
 | r10 | 2026-11-14 | **V9 两条尾巴全清（#851 真 ROM 到位 + 双向验证）+ V6 信源取证——业主人工下载 nesdev 材料（本轮零生产代码改动）。** ① **ROM 取证**：`mapper218bad.zip`（383 B，论坛 Drag 楼层 `download/file.php?id=31730`）解出 `mapper218bad.nes`（32784 B，SHA256 `efed56a8…78be4f`；zip SHA256 `3fa6f72c…f17d93`）；iNES 头 `4E 45 53 1A 02 00 A8 D8` ⇒ PRG 2×16KB、byte6=`0xA8`（4-screen 位）、byte7=`0xD8` ⇒ **mapper 0xDA=218 + CHR-RAM**，文件时间戳 Sep 4 04:06 与 #851（2026-09-03T22:16Z）吻合。② **绿腿**：修复版 `f11qa_blargg_runner --rom … --frames 600` 全程无崩溃（770 ms，$6000=0x34 是 ROM 自身输出非 blargg 签名）。③ **红腿（诚实登记）**：变异回旧写法后同 ROM **不段错误**——`VPageR+index` 的越界（最深 0x1800 B）落在**本仓布局的相邻活动数组**里 = 静默损坏；论坛出处 Drag（2026-09-03）原话「写 PPU $0814 触发复位、$0815 跳 ROM 随机位置、$0816 崩溃；ROM 只初始化 + 清空全部 PPU 内存」与旧写法踩坏 `vnapage_[]` 指针表的形态逐点吻合，zlago 同日据此开 #851；**布局无关的越界证明仍由合成锁测试承担**（r9 已证红）。④ **V6 信源**：wiki **无** `Famicom microphone` 独立页（业主实开确认空页）；`Standard controller` 页 Famicom 节载明——`$4016` 读格式 **`xxxx xMES`**（bit0 主手柄 / bit1 扩展口 / **bit2 = 麦克风，仅 $4016**）、**「游戏普遍追踪报告的 0↔1 翻转而非特定电平」**、麦克风音频在卡带边缘前混入 APU 输出、wiki 自注 TODO「个别机型报告疑似反装反相」⇒ **review 报告的「位 2/3」说法永久定性为未获证实**（wiki 只记 bit2），Mesen2 参照实现与 wiki 一致；V6 的「模拟量细节未取证」缺口就此收窄为「wiki 有据 + 数字位语义明确，模拟混音与机型差异不在数字位实现范围」。⑤ 材料（两页 wiki HTML + 论坛帖 HTML + zip + 解出 ROM）存 `Research_only/w204/`（gitignored）。⑥ 未推送（push 需业主逐次明确指示）。 |
+| r11 | 2026-11-14 | **波次实施：批 1 全清（V6）+ 批 4/5 再落四项（V25/V22/V23/V14 上半）——业主拍板「执行下一步，每次两个 agent 并行」。** **门禁终读数**：`ctest -LE perf` **38/38**（37→38 = V6 锁入门禁）；Rust **七条**全绿（root 299/0/20、gba-core 249/0/2、**debug 94/0**（V23 +1）、media 52/0、formats 153/0、utils 51/0、**lua 54/0**（crate 首次入门禁，基线 49））；两态 `cargo check` EXIT=0。① **实施方式**：两波 × 两路 agent（按文件域切分，V25+V22 强制同 agent——同一绑定面）；主会话逐条审 diff + 串行门禁 + **变异腿由主会话合并施加**（每条目标锁均见红，归因逐测登记）。② **V25**：KEY_TO_NAME 改 SDL scancode 基准（99 项逐行注明 SDL 常量名，值取自本机 vcpkg SDL_scancode.h）；**Lua 字段名零改名**——变化的是 96 键的读取下标（对照表进提交说明）；掩码改「值 ≠ 0」（双形态 sweep：归一化 0x80 与原始 0/1）。**计划偏差改正**：「&0x80 恒不相交」不成立——`fceWrapper_GetKeyboardState`（`fceu_callbacks.cpp:293-302`）把非零键态归一化 0x80 ⇒ 生产上多数键能读到位；主缺陷 = 96 键名整体错位 + 三个 0x01 例外键恒 false。⚠️ 已知缺口：scancode ≥ 256（MODE/媒体键）在 FFI 256 字节窗口外不可表示。③ **V22**：click 位测试 + 数值字段；**三 viewport 已各自支持中键**（GL/SDL/QWidget 的 `getMouseButtonState` 均含 `Qt::MiddleButton`）⇒ 只补 `GetMouseData` 一处；`GetMouseData` 行号 1233→1272（V15 落地后漂移）。④ **V23**：FFI 增 `is_fds`；FDS 判据 = **`GameInfo->type == GIT_FDS`**（⚠️ 计划的 grepFDS 惯例名不成立）；agent 独立复核上游 2.7.0/master 快照逐行号证实 `:557`/`:577`/`:588`；**.cdl 输出行为变更**（非 FDS 写指令不再误抹 PRG 槽）已声明；文档落 `debug-regression-checklist.md` §七.7（含 #771 原话）；验收③端到端对比**登记不做**（需构建上游）。⑤ **V14 上半**：TraceLogger 环形缓冲 10 访问点全 `.load/.store`，上游 `44d3e45d`/`0a1ef89e` diff 逐段对照；读端取 **V13 形**（局部快照 + 出循环一次 release store）——与 master 消费端的逐次 store 不同，但该形同为上游所出（同批 commit、AviRecordDiskThread 先例），按任务口径取本仓最小结构；复位逻辑竞态（§二末⑥）保持现状为非目标；**无机器红腿**（TSAN 未落地）——证明 = 上游对照 + 静态审查。⑥ **V6**：wiki + Mesen2 双信源落地（bit2 电平直读、仅 $4016、仅 P2；1996 翻转 hack 退役）；新桥导出 `kagami_bridge_set_famicom_mic` + sut_input 保留值 0x40；锁测试 T1–T6（nestest + 真 strobe + ARead 直读）；kgmqa-108 修复前后读数逐字相同（0x02 稳定，只登记不判）；**manifest 行与基线翻转留待同级评审**；变异 M-1..M-5 两轮合并实测（轮 1 = M-1 如实归因为 M-1+M-4 合并施加，T1/T3/T4/T6 红；轮 2 = M-2..M-5 合并，T3×10/T4×2/T5×4/T6×4 红）。⑦ **工具链新事实（坑 10 变体，已录 AGENTS.md）**：FFI 签名变更后的首次构建可与 cbindgen 头重生成**竞态**（ninja 并行下 debug.cpp.obj 读到旧头 ⇒ C2660）⇒ 直接重跑即可，头已重生成。⑧ **管道退出码陷阱（自踩）**：`cmd //c … | tail` 会把构建失败码吃成 0 ⇒ 此后门禁一律「重定向到文件 + echo BUILD_EXIT」；首跑 ctest 曾在陈旧二进制上 37/37（无效），已重跑。⑨ **f11qa-rom-runner 实际路径** = `build\tests\`（非 src/rust/target）；kgmqa id 须全名。⑩ 人工项待做：V25/V22 真机 Lua 读值与鼠标、V6 真机吹气、V13/V15 压测、V11 跨进程读档。⑪ 未推送（push 需业主逐次明确指示）。 |

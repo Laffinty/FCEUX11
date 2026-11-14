@@ -23,7 +23,7 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 | `docs/history/plans/FCEUX11-v2.0_GBAEUX11构建计划.md` | **已收口归档（r57）**：范围、阶段编排（§八）、已知限制（§9.1）、**不变式（§十）**、变更记录（§十四 r1–r57）——历史与取证事实源，**内容冻结不再续写**；长尾承接见下方「长尾」节 |
 | `docs/history/plans/FCEUX11-v2.0.1_GBAEUX11精度优化计划.md` | **已收口归档（用户裁决 2026-10-07）**：P0/线B/P4/线A/P3/P1 全部完成，**AGS 最终 30/33**；内容冻结不再续写。剩余 DMA DISPLAY START 与 DMA PRIORITY 两项 RE 见「长尾」节 |
 | `docs/history/plans/FCEUX11-v2.0.3_GBA卡带兼容性优化计划.md` | **已收口归档（2026-11-12）**：GBA **卡带兼容性**线——「商用手写卡带跑不起来」类问题。三段式：**S1 可复现门禁**（自建最小夹具 + 探针改造）→ **S2 止血**（vendor 核 panic 改容错、SWI 兜底）→ **S3 修根因**（SWI `0x16–0x2A`、存档芯片模型、GPIO/RTC、ROM 窗口镜像）。§一 是**已确认根因的事实底座**（含被否证的两个假设，**别照着做**）；附录 A 是 GBATEK 位级格式取证基线。⚠️ 随 v2.0.3 发布整体收口（PR #13 已并入 `main`），**内容冻结**；GBA 线的长尾项见下方「长尾」节与 v2.0.4 计划 §六 |
-| `docs/plans/FCEUX11-v2.0.4_残留精度与调试待办-构建计划.md` | **在途构建计划（2026-11-12 立项并升格，工作分支 `wip204`，NES 侧）**：v2.0.2 残留 review 报告的逐条复核结论 + **V1–V8 逐项解决方案**（目标/现状坐标/步骤/验收/风险）。**不纳入 v2.0.4 的项目已按业主指令删除**（不进理由与历史见 git 历史与 review 报告）。⚠️ 关键前提：**这些精度项的判红体系收益 = 0**（advisory + 冻结基线 False）⇒ 决策依据是「用户可感 / 解锁 / 防呆 / 成本」。**2026-11-13 追记（r7）**：本计划已追加**批 4/5/6 = V9–V25**（内存安全/线程安全/mapper 正确性/输入正确性面，由 `docs/history/plans/FCEUX11-v2.0.4_追加.md` 逐条核验后并入；原稿 12 项中 7 项属实 / 5 项部分属实，核验中**新发现 V24 / V25**；⚠️ **原稿有 15 处坐标与事实偏差，以主计划 §二 各节末的「文档偏差」为准，别照原稿做**；**r8 追记：V3 / V4 / V9 / V24 已落地**（批 2 全清 + 批 4 的两项），门禁 `ctest -LE perf` **36/36** + 六条 Rust 锁测试全绿（`fceux11-utils` 51/0 为 V24 新增）；**r9 追记（2026-11-14）：第一梯队四项落地——V11（VRC7 读档悬空指针）/ V13（AVI 四索引 atomic）/ V15（JSreturn 原子转移）/ V19（GUID C++ 兜底 + `guid_test` 入门禁 36→37）**，V9 变异腿实跑闭合（6145/8192 越界与数值推导逐字一致），门禁 `ctest -LE perf` **37/37** + 六条 Rust 锁测试全绿（与 r8 基线逐字一致）；⚠️ V19 的关键发现：**单腿变异测不出 C++ 半边**（双层零化互相掩盖）⇒ 变异验证须双腿齐拆；**r10 追记（2026-11-14）：V9 两条尾巴全清**——业主人工下载 nesdev 材料，#851 复现 ROM（mapper218bad.nes，SHA256 `efed56a8…`）在修复版装载 + 600 帧无崩溃，真 ROM 变异腿在本仓布局为**静默损坏**非段错误（布局无关越界证明由 mapper_load_test 承担）+ V6 信源取证（wiki `Standard controller` 只记 **bit2**，`Famicom microphone` 独立页不存在，「位 2/3」定性未证实；材料在 `Research_only/w204/`，gitignored）） |
+| `docs/plans/FCEUX11-v2.0.4_残留精度与调试待办-构建计划.md` | **在途构建计划（2026-11-12 立项并升格，工作分支 `wip204`，NES 侧）**：v2.0.2 残留 review 报告的逐条复核结论 + **V1–V8 逐项解决方案**（目标/现状坐标/步骤/验收/风险）。**不纳入 v2.0.4 的项目已按业主指令删除**（不进理由与历史见 git 历史与 review 报告）。⚠️ 关键前提：**这些精度项的判红体系收益 = 0**（advisory + 冻结基线 False）⇒ 决策依据是「用户可感 / 解锁 / 防呆 / 成本」。**2026-11-13 追记（r7）**：本计划已追加**批 4/5/6 = V9–V25**（内存安全/线程安全/mapper 正确性/输入正确性面，由 `docs/history/plans/FCEUX11-v2.0.4_追加.md` 逐条核验后并入；原稿 12 项中 7 项属实 / 5 项部分属实，核验中**新发现 V24 / V25**；⚠️ **原稿有 15 处坐标与事实偏差，以主计划 §二 各节末的「文档偏差」为准，别照原稿做**；**r8 追记：V3 / V4 / V9 / V24 已落地**（批 2 全清 + 批 4 的两项），门禁 `ctest -LE perf` **36/36** + 六条 Rust 锁测试全绿（`fceux11-utils` 51/0 为 V24 新增）；**r9 追记（2026-11-14）：第一梯队四项落地——V11（VRC7 读档悬空指针）/ V13（AVI 四索引 atomic）/ V15（JSreturn 原子转移）/ V19（GUID C++ 兜底 + `guid_test` 入门禁 36→37）**，V9 变异腿实跑闭合（6145/8192 越界与数值推导逐字一致），门禁 `ctest -LE perf` **37/37** + 六条 Rust 锁测试全绿（与 r8 基线逐字一致）；⚠️ V19 的关键发现：**单腿变异测不出 C++ 半边**（双层零化互相掩盖）⇒ 变异验证须双腿齐拆；**r10 追记（2026-11-14）：V9 两条尾巴全清**——业主人工下载 nesdev 材料，#851 复现 ROM（mapper218bad.nes，SHA256 `efed56a8…`）在修复版装载 + 600 帧无崩溃，真 ROM 变异腿在本仓布局为**静默损坏**非段错误（布局无关越界证明由 mapper_load_test 承担）+ V6 信源取证（wiki `Standard controller` 只记 **bit2**，`Famicom microphone` 独立页不存在，「位 2/3」定性未证实；材料在 `Research_only/w204/`，gitignored）；**r11 追记（2026-11-14）：批 1 全清（V6 落地）+ V25/V22/V23 落地 + V14 上半**——追加批 9/14 + V14 半，门禁 `ctest -LE perf` **38/38**（V6 锁入门禁）+ Rust 七条全绿（debug 94/0、lua 54/0 首次入门禁）；⚠️ 行为变更两处：V23 非 FDS 卡带 `.cdl` 输出改变（与上游一致化）、V6 按住麦克风时每次 $4016 读 bit2=1（旧为逐读交替）） |
 | `docs/history/plans/FCEUX11-v2.0.4_追加.md` | **已归档（2026-11-13，r7）**：v2.0.4 的**静态分析技术方向稿**（上游 2.7.0 + master 对标的 12 项候选）。已逐条核验并并入 v2.0.4 构建计划（V9–V25）；**内容冻结，且其中的坐标/事实已被核验修正**（15 处偏差登记在主计划 §二）⇒ **别照原稿做** |
 | `src/rust/crates/gba-core/ATTRIBUTION.md` | 上游出处、本地补丁集**逐处**说明、重新 vendor 流程 |
 | `COPYRIGHT_AUDIT.md` §5 | Rust vendor 树在 `src/` C/C++ 扫描范围之外的归属声明 |
@@ -246,7 +246,7 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 > **已于 2026-11-12 由 CI 复核通过**（`main` 发布提交 `45fec33` 上 CI #320 / F11QA #95 全绿）。
 
 > ⚠️ **不变式 1 的判据是 F11QA 矩阵 `108P/12F`**，本机跑的是它的**本地近似**
-> `ctest`。**本地确定性门禁 = `ctest -LE perf`（37 项，须全绿；计数随新增测试增长，
+> `ctest`。**本地确定性门禁 = `ctest -LE perf`（38 项，须全绿；计数随新增测试增长，
 > 以 `ctest -N -LE perf` 的 `Total Tests` 为准）**；
 > `bench_tolerance_test` 是 **advisory**（r55：full_frame 在本机随时钟上下文
 > 漂移 +23% —— 同一构建热采 132.9 / 套件内 ~145 / 套件后 ~163 ms，2.5/5/10%
@@ -484,6 +484,11 @@ cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo tes
 # v2.0.3 S4（FC 侧修复批次）要动 iNES loader，这条是它的门禁；基线 **153 项全绿**
 # （r9 加 1 条 S4 锁 + r11 加 2 条 S5 锁）。
 cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p fceux11-formats --lib"
+# **utils crate（r8 补录）**：V24 的 5 条锁在此；基线 **51 项全绿**。
+cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p fceux11-utils --lib"
+# **Lua 绑定 crate（r11 补录，2026-11-14）**：V25/V22 之前 `fceux11-lua` 的测试**不在任何门禁里**
+# （纪律 10 又一例）；V25/V22 落地时基线 49 → **54 项全绿**（+5 锁 +4 迁移）。动该 crate 必跑。
+cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p fceux11-lua --lib"
 
 # 两态 feature 检查（第二态同时复核不变式 8：关 feature 时 vendor 树退出编译图）
 cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo check --workspace --no-default-features"
@@ -532,6 +537,11 @@ $env:PATH="D:\Project\FCEUX11\vcpkg_installed\x64-windows\bin;$env:PATH"
     我改完 `build.rs` 的错误码之后 `ctest` 绿、头里却还是 `GBA_ERR_STATE 4`。已补
     `the_error_codes_reach_the_generated_header` 守这一条。**改完 `build.rs` 请直接查
     头文件的内容，不要假定构建跑过就等于它更新了。**
+    **⚠️ r11 补录的变体（2026-11-14 实测）**：改成员 crate 的 **FFI 签名**（如 V23 给
+    `fceux11_rust_debug_log_cd_data` 加参）后，**首次全量构建可能撞头重生成竞态**——
+    ninja 把 C++ 编译与 cargo/cbindgen 步骤并行，`debug.cpp.obj` 读到**旧头** ⇒
+    `C2660 函数不接受 15 个参数`。判据：报错引用的头行号处**当前内容已是新签名**（头 mtime
+    晚于源文件编辑）⇒ 直接重跑构建即可，不要去手改生成头。
 11. **不要用 PowerShell 的 `WriteAllText` / `WriteAllLines` 改仓库里的源文件。**
     前者会剥掉 UTF-8 BOM，后两者按 `Environment.NewLine`（CRLF）重排行尾。
     **⚠️ 行尾口径已更正（2026-11-06 实测）**：「仓库是 LF」只对 **git blob 存储**成立

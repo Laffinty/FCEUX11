@@ -8,8 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] — v2.0.4（在途）
 
 > **在途段**：随 v2.0.4 的工作累加，**发版时并入正式版本段**。
-> 对应计划：`docs/plans/FCEUX11-v2.0.4_残留精度与调试待办-构建计划.md`（批 2 = V3/V4、
-> 批 4 = V9/V11/V13/V15/V24、批 5 = V19 等）。
+> 对应计划：`docs/plans/FCEUX11-v2.0.4_残留精度与调试待办-构建计划.md`（批 1 = V1/V6、
+> 批 2 = V3/V4、批 4 = V9/V11/V13/V15/V24/V25、批 5 = V19/V22/V23（V14 半）等）。
 
 ### Fixed — 崩溃与内存安全（批 4）
 
@@ -34,6 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   结构逐字落盘，跨进程读档后 `sintbl` 等指针悬空 ⇒ 解引用崩溃/杂音（上游 `vrc7.cpp` 至 master
   **未修**，本仓修完即领先）。`StateRestore` 补 `OPLL_forceRefresh(VRC7Sound)`——只重建派生量、
   不动 phase/patch ⇒ 音色连续；放 `StateRestore` 而非 `Sync()`，避免每次 PRG/CHR 写触发。
+- **Lua `input.get()` 键名与实际按键整体错位**（V25）：键名表原按 **Windows VK 码**索引
+  SDL scancode 数组 ⇒ 全部 96 个键盘名读错位（`capslock` 读到 Q、`backspace` 读到 E），
+  且三个 toggle 键（capslock/numlock/scrolllock）恒 false。键名表改写为 **SDL scancode 基准**
+  （字段名不变，读取下标全换；对照表见提交说明）；按下判定改「值 ≠ 0」。
+  锁测试 49 → 54（crate 首次入门禁）；⚠️ 已知缺口：scancode ≥ 256 的键（媒体键等）在
+  FFI 256 字节窗口外不可表示（与旧行为一致）。
 - **AVI 环形缓冲索引的跨线程数据竞争**（V13）：`vbufHead/vbufTail/abufHead/abufTail` 四个裸
   `int` 被模拟线程（生产）与 Qt 磁盘线程（消费）无同步共享 ⇒ 消费端可能空转、尾帧丢失。
   改 `std::atomic<int>`，内存序照上游 master：对端索引 acquire 读 / 自有索引 relaxed 读 /
@@ -44,6 +50,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   + 模拟线程侧快照 `JSreturnEmu`，每帧在 `fceuWrapper.cpp` 帧首经 `emuThreadPollInputs()`
   原子移交；附常驻轻量探针（写者与 poller 同线程 ⇒ 去重告警一次，防未来接线绕过移交）。
   movie 回放路径不受影响（回放期核心整体跳过 driver Update）。
+- **Lua 鼠标读值**（V22）：`click` 位字被当等值判断 ⇒ 双键同按两个布尔都读不到、中键恒 nil；
+  驱动侧 `GetMouseData` 也从未上报中键。改位测试（`& 0x01/0x02/0x04`）+ 驱动补
+  `Qt::MiddleButton → 0x04`（三种 viewport 实现已各自支持，补一处分发即可）+ 对齐上游补
+  数值字段 `input.get().click`（行为增加：脚本遍历会多见一个 `click=0`）。
+
+### Fixed — 输入协议（批 1）
+
+- **FC 麦克风协议**（V6）：`$4016` bit2（Famicom II 麦克风）原是 1996 年的**逐读翻转 hack**
+  （按住时读数 1,0,1,0 交替、两个手柄口都受影响、注释自认「Not verified against hardware」）。
+  现按双信源（NESdev wiki `Standard controller` Famicom 节 + Mesen2 参照实现，均本机快照）
+  改为**电平直读**：按住 = 每次读 bit2=1、松开 = 0，仅 `$4016`、仅 P2 口，键映射
+  （P2 Start → 麦克风）保留，不留兼容开关。⚠️ **行为变更**：按住麦克风时每读 bit2=1。
+  新增 QA 桥导出 `kagami_bridge_set_famicom_mic` + manifest `sut_input` 保留值 0x40
+  （kgmqa-108 的 manifest 行与基线翻转留待同级评审）。锁测试 `input_famicom_mic_test`
+  入门禁（ctest 37 → 38），变异 M-1..M-5 实测各归其位。
 
 ### Fixed — 正确性与防御性修正（批 5）
 
@@ -55,6 +76,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   垃圾输入 → 全零 + 同输入连调两次一致 + 合法 UUID 按手拼常量与 `toString` 往返的阳性对照
   （防「什么都不写也全绿」的哑弹）。⚠️ 双层零化在 C++ 可达输入上互相掩盖 ⇒ 变异验证须
   **双腿齐拆**（C++ `ret{}` + Rust 置零）才见红——已实测，还原后全绿。
+- **CDL 写路径无条件清零**（V23）：⚠️ **行为变更**——非 FDS 卡带的 `.cdl` 输出自本版改变
+  （与上游 2.7.0 一致化）。此前 `LogCDData` 对所有机器把「写指令目标地址」的 PRG CDL 槽
+  无条件清零并回退计数 ⇒ 游戏的 mapper 写指令（寄存器多在 $8000-$FFFF）每次执行都会误抹
+  一处 code/data 标记，连带 SaveStrippedROM 把被误抹偏移当「未使用」从剥离 ROM 删掉。
+  现按上游仅 FDS 清零（FFI 增 `is_fds` 参数）。4C/6C 读标 data 位差异**不改码、只登记**
+  （上游 #771 维护者拒绝 revert，原话见 `docs/tech/debug-regression-checklist.md` §七.7）。
+  锁测试 93 → 94。
+- **TraceLogger 环形缓冲跨线程数据竞争**（V14 上半）：`logBufHead/logBufTail` 为
+  `volatile int` 被模拟线程（生产）与写盘线程（消费）共享。改 `std::atomic<unsigned int>`
+  （照抄上游 `44d3e45d`/`0a1ef89e`：写端 relaxed/acquire/release、读端局部快照 + 出循环
+  一次 release store——与 V13 的 AviRecordDiskThread 同构）。CDL 六计数器半边另批。
+  数据竞争无机器红腿（TSAN 未落地），证明方式为上游 diff 逐段对照 + 全访问点静态审查。
 
 ### Changed — 护栏与文本登记（批 2）
 
