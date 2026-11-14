@@ -607,6 +607,32 @@ $env:PATH="D:\Project\FCEUX11\vcpkg_installed\x64-windows\bin;$env:PATH"
     ⚠️ **「生成器对齐」（把 133 处按产物为准回填）仍未做** ⇒ 属独立工作项，
     且 **15 条 `failure_means` 属期望值变更 ⇒ 需同级评审**（改动会改 grade 语义）。
     ⇒ **在完成对齐之前，谁都不要直接跑这个生成器覆盖产物。**
+16. **Rust 工具链漂移会打穿 C++ 链接契约 —— `native-static-libs` 必须显式接线，
+    且 CI 的 Rust 版本必须锁定。**
+    2026-11-15 实测：GitHub F11QA job 报红，**本仓代码零改动**。根因链（逐环实测）：
+    CI 的 `dtolnay/rust-toolchain@stable` 于 2026-11-14 从 1.99.1 自动升到
+    **1.100.0** → 1.100 的 std 改用 `WaitOnAddress`/`WakeByAddress*` 做线程挂起 →
+    `fceux11_rust.lib` 里多出三个 `__imp_*` 未定义符号 → **rustc 不为原生 import
+    library 写 `/DEFAULTLIB` 指令** ⇒ MSVC 的 link.exe 不会自己补 → 链接行缺
+    `synchronization.lib` ⇒ 5 个 F11QA runner 全部 `LNK1120` ⇒ 构建中断、
+    迁移矩阵根本没产出 ⇒ R4 gate 报「矩阵未产出」而红。
+    - **权威清单**（不凭记忆列，和纪律 4 同族）：
+      `cargo rustc --release --target x86_64-pc-windows-msvc --features direct-adapter,gba --lib -- --print native-static-libs`
+      ⇒ 1.100.0 = `kernel32 ntdll userenv ws2_32 dbghelp **synchronization**`。
+    - **接线**：`src/rust/CMakeLists.txt` 导出 `FCEUX11_RUST_NATIVE_LIBS`；
+      `src/CMakeLists.txt` 把它与 `${FCEUX11_RUST_STATIC_LIB}` **写在同一次
+      `target_link_libraries` 调用里**（PUBLIC ⇒ 引擎 / GUI / 全部测试目标继承；
+      同一次调用还保证 import library 排在静态库**之后** —— 链接顺序敏感）。
+    - **CI 侧**：`f11qa.yml` / `ci.yml` 的 Rust 版本改为**显式锁定**（`RUST_TOOLCHAIN`
+      环境变量，并进缓存 key）⇒ 工具链升级从此是「显式决定」，不是「被悄悄改掉」。
+      升级 Rust 的动作顺序：先取 `native-static-libs` 清单 → 同步原生库列表 →
+      再改版本号（顺序反了就会重演本次事故）。
+    - **验证姿势**（本轮实测有效，别只读代码猜链接器行为）：用本机 `cargo +nightly`
+      （与 CI 同一版本列车）出一份 1.100 产物，**拿 CI 的完整链接行**（含
+      Qt/SDL/`fceux11_*.lib` 全套）在本机 link 一遍 —— 1.99 产物过 / 1.100 产物红 /
+      加 `synchronization.lib` 过，三腿把机制钉死。
+    - ⚠️ **判据陷阱**：本机 rustc（1.99.0）与 CI 不同 ⇒ **本机构建绿 ≠ CI 绿**。
+      本次本机构建一直是绿的，直到把 1.100 产物换进 `build/` 树才复现出来。
 
 ## 纪律（这几条都是被违反过之后写下来的）
 
