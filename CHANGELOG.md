@@ -24,6 +24,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   已取得并在修复版上验证：装载 + 600 帧全程无崩溃（⚠️ 旧写法在本仓内存布局下表现为静默
   损坏而非段错误——越界落点在相邻活动数组内，段错误是上游布局特有；布局无关的越界证明
   由上述锁测试承担）。
+- **CHR-RAM <8K 的 `$2007` 写越堆 + CHR 掩码下溢**（V10）：NES 2.0 且 CHR-RAM <8K 的卡带，
+  垫层只有 1 KB ⇒ `$2007` 写最多越堆 7 KB（上游 issue #859 同款）；且本仓曾有、被
+  `ad2914d` 以一段错误推理删除的**四行 CHR 掩码钳制**（上游 `cart.cpp:135-138`）一并回补
+  ——1K 芯片的 mask2/4/8 下溢成 `0xFFFFFFFF`，`setchrN` 会产出野指针。垫层改 8192
+  （上游逐字）：`memset` 只盖垫层、`FCEU_MemoryRand` 真实尺寸保留 ⇒ ≥8K 卡逐字节不变；
+  `SetupCartCHRMapping`/`AddExState` 保持真实尺寸 ⇒ 存档格式不变。
+  新锁 `test_setup_chr_mapping_clamp`（1K/8K/size==0 三组，期望值独立推导）；
+  变异 M1 实测：删钳制 ⇒ 恰 3 条断言红 → 还原绿。
+  ⚠️ **口径**：<8K 卡画面会变、其既有 movie 会漂移（读到确定性 0 而非堆垃圾）；
+  「零漂移」只承诺 ≥8K 卡——三金标基线（rom_regression/savestate/ppu_frame_diff）实测全绿。
 - **畸形 `.fm2` 的 GUID 字段可令进程中止**（V24）：`fceux11_rust_guid_scan` 按**字节**切片
   `String`，长度恰为 32 字节但含多字节 UTF-8 时切点落在字符中间 ⇒ panic；
   该函数是 `extern "C"` ⇒ panic 不可 unwind ⇒ **进程 abort**（`0xC0000409`）。
