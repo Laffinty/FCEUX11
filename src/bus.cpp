@@ -557,13 +557,21 @@ void Bus::setup_prg_mapping(uint32_t chip, uint8_t* p, uint32_t size, int ram) n
 }
 
 void Bus::setup_chr_mapping(uint32_t chip, uint8_t* p, uint32_t size, int ram) noexcept {
-    // hotfix1 P2-3 (H-04, CHR companion): same size==0 underflow as
-    // setup_prg_mapping above. The four belt-and-braces `if (chr_mask* >=
-    // UINT32_MAX) chr_mask* = 0` guards only fire when size is exactly a
-    // single bit set (so the shifted result is 1, then 0 after subtraction);
-    // a true size==0 still underflowed mask values, and callers relying on
-    // size==0 semantics ("no CHR") would see garbage mask reads. Treat
-    // size==0 as a clean unmapped chip.
+    // hotfix1 P2-3 (H-04, CHR companion): a size==0 mapping is a clean
+    // unmapped chip (early exit below; upstream reaches the clamp lines
+    // instead, which zero the underflowed masks with the same result).
+    //
+    // v2.0.4 V10: the four upstream clamp lines (cart.cpp:135-138 in fceux
+    // master and 2.7.0, restored verbatim) fire whenever `size >> N == 0` --
+    // i.e. the chip is smaller than that bank granularity -- because the
+    // `- 1` on the zero shifted result underflows uint32_t to UINT32_MAX.
+    // The hotfix1 note that used to live here claimed the guards "only fire
+    // when size is exactly a single bit set"; that reasoning was wrong (a 1K
+    // chip needs mask8 = (1024>>13)-1 = 0xFFFFFFFF clamped to 0, exactly the
+    // ordinary firing case) and was the basis for deleting the guards in
+    // ad2914d -- a regression this repo carried alone. Without the clamp,
+    // any setchrN(V) with V != 0 computes bank = V & 0xFFFFFFFF = V and
+    // forms the wild pointer chr_ptr_ + V*8192.
     if (size == 0) {
         chr_ptr_[chip]   = p;
         chr_size_[chip]  = 0;
@@ -581,6 +589,11 @@ void Bus::setup_chr_mapping(uint32_t chip, uint8_t* p, uint32_t size, int ram) n
     chr_mask2_[chip] = (size >> 11) - 1;
     chr_mask4_[chip] = (size >> 12) - 1;
     chr_mask8_[chip] = (size >> 13) - 1;
+    // Upstream cart.cpp:135-138 (restored v2.0.4 V10): compute first, clamp after.
+    if (chr_mask1_[chip] >= static_cast<uint32_t>(-1)) chr_mask1_[chip] = 0;
+    if (chr_mask2_[chip] >= static_cast<uint32_t>(-1)) chr_mask2_[chip] = 0;
+    if (chr_mask4_[chip] >= static_cast<uint32_t>(-1)) chr_mask4_[chip] = 0;
+    if (chr_mask8_[chip] >= static_cast<uint32_t>(-1)) chr_mask8_[chip] = 0;
     chr_ram_[chip] = static_cast<uint8_t>(ram);
 }
 

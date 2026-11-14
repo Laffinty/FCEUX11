@@ -82,6 +82,14 @@ int InitializeBoard(void) {
 			int flags = fceux11_rust_unif_board_flags((const char*)sboardname);
 			if (flags < 0) return 1;
 			if (!malloced[16]) {
+				// v2.0.4 V10 note: the CHR-RAM <8k heap overflow was fixed at
+				// the iNES allocation site (ines_init.cpp pads to 8k). This
+				// UNIF site has no padding of its own and relies on the Rust
+				// bridge fceux11_rust_unif_chrram_size (unif.rs
+				// chrram_size_kb) never returning less than 8 KB -- currently
+				// guaranteed. If that guarantee ever changes, this site needs
+				// the same 8k pad + SetupCartCHRMapping clamping already
+				// restored in bus.cpp. No behavior change here (v2.0.4 V10).
 				CHRRAMSize = fceux11_rust_unif_chrram_size(flags);
 				if ((UNIFchrrama = (uint8*)FCEU_malloc(CHRRAMSize))) {
 					SetupCartCHRMapping(0, UNIFchrrama, CHRRAMSize, 1);
