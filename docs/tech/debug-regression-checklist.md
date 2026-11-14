@@ -856,6 +856,30 @@ Lua break_asap、NSF 播放、viewer 刷新）」。
    ⇒ **「Break On... → Unlogged Code / Unlogged Data」必须配合 CD Logger
    正在运行才有意义**。本清单未单列这两项（L-1 已覆盖其门控面）。
 
+7. **CDL 与上游 FCEUX 的两处语义差异（设计决定，勿当 bug 修）**
+   （2026-11-14，v2.0.4 V23 登记 对照上游 2.7.0 `src/debug.cpp:557` 与
+   `:577-588`；本仓 Rust 侧实现是 `fceux11-debug/src/debug.rs` 的
+   `log_cd_data`）：
+
+   - **读标 data 是否排除 4C/6C：F11 不排除，上游排除**。上游在 data 标记
+     外层多了 `(opcode[0] != 0x4C) && (opcode[0] != 0x6C)`
+     （上游 2.7.0 `debug.cpp:557`），F11 没有这个条件——间接 JMP 的跳转
+     目标在 F11 会被标 data 位。**F11 保留上游 2024-09-13 前（commit
+     `65f4a482`）的行为；上游 #771（
+     <https://github.com/TASEmulators/fceux/issues/771>）至今 open，
+     维护者以『不能破坏 PRG ROM 写语义』为由明确拒绝 revert**
+     （原话 "We can't break PRG ROM writes. Reverting would not be
+     acceptable, either."）。若要跟进上游加回排除，须先评估既有 CDL
+     反汇编脚本是否依赖跳转目标 data 位。**本轮不改代码，只登记差异。**
+   - **写路径清零范围：FDS-only（v2.0.4 V23 已对齐上游）**。上游只在
+     `GameInfo->type == GIT_FDS` 时把写目标的 CDL 槽清零并回退计数
+     （`debug.cpp:577-588`）；F11 此前**无条件**清零——普通卡带的 mapper
+     写指令（寄存器多在 `$8000-$FFFF`）每次执行都会抹掉一处 PRG 偏移的
+     code/data 标记，连带 `SaveStrippedROM`（`CodeDataLogger.cpp:704-716`）
+     把被误抹的偏移当「未使用」从剥离 ROM 中删掉。本轮起按 `is_fds`
+     门控，**现有 `.cdl` 输出会因此变化（与上游一致化）**。锁测试：
+     `lcd_write_non_fds_keeps_slot` / `lcd_write_fds_clears_slot`。
+
 ---
 
 ## 八、相关文档

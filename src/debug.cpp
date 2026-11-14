@@ -506,6 +506,7 @@ void LogCDData(uint8 *opcode, uint16 A, int size)
 		opcode[0],
 		optype[opcode[0]],
 		opwrite[opcode[0]],
+		GameInfo && GameInfo->type == GIT_FDS,
 		static_cast<uintptr_t>(size),
 		indirectnext != 0,
 		&cc, &dc, &uc);
