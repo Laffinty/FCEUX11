@@ -42,9 +42,9 @@ name: F11QA
 
 on:
   push:
-    branches: [main, wip1.8, wip2.0, wip203]
+    branches: [main, wip1.8, wip2.0, wip203, wip204]
   pull_request:
-    branches: [main, wip1.8, wip2.0, wip203]
+    branches: [main, wip1.8, wip2.0, wip203, wip204]
   workflow_dispatch:  # allow manual trigger
 
 jobs:
