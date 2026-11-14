@@ -1288,6 +1288,14 @@ void GetMouseData(uint32 (&d)[3])
 		{
 			b |= 0x02;
 		}
+		// v2.0.4 V22: middle button was never reported, so the Lua binding's
+		// middleclick (bit 0x04) could never become true. All three viewport
+		// backends (GL/SDL/QWidget) already handle Qt::MiddleButton inside
+		// getMouseButtonState.
+		if (consoleWindow->viewport_Interface->getMouseButtonState(Qt::MiddleButton))
+		{
+			b |= 0x04;
+		}
 	}
 
 	t = PtoV(nx, ny);
