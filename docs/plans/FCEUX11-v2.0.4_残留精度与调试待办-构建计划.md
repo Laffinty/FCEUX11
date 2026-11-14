@@ -98,8 +98,8 @@
 | V3 护栏登记 | ✅ **完成**（r8） | A4-1 否决护栏进 `src/video.cpp`（64 KiB/帧拷贝处，写明「勿再做消费计数门控」+ chunk-8 任意帧异步消费 ⇒ 金标漂移/谓词恒真的否决理由）；`FCEU_SoundCPUHook` 的「有意省略探点」登记进 `src/sound.cpp`（并把探点口径修正为 **6 个**，实测坐标见 §二 V3）。**纯注释、零行为变更** |
 | V4 文本修订批 | ✅ **完成**（r8） | 5 条 `known_limit` 改写（037/038/056/078/107，逐条回源码复核）；`docs/tech/{cpu,F11QA,f11qa-accuracy-backlog}.md` 过期措辞订正；死文件 `src/tests/CMakeLists.txt` **整份删除**（零构建引用 + 覆盖未丢失已核）；v1.8 计划的 3 处活引用改指 `docs/history/plans/`（**生成器与产物逐字一致已验**）。⚠️ `expected` / `failure_means` / `pass_to_fail` **零改动** |
 | V5 PGO | ⬜ 未开始 | |
-| V6 麦克风 | ⬜ 未开始 | |
-| V7 profiler 菜单 | ⬜ 未开始 | |
+| V6 麦克风 | ✅ **完成**（r11） | bit2 电平直读、仅 `$4016`、仅 P2（wiki `Standard controller` Famicom 节 + Mesen2 双信源），1996 逐读翻转 hack 退役；桥 `kagami_bridge_set_famicom_mic` + 锁测试 T1–T6 入门禁（37→38）。⚠️ 人工项待做：真机吹气 |
+| V7 profiler 菜单 | ✅ **完成**（r12） | Advanced → Misc Tools → Profiler Report，**仅 `__FCEUX11_PROFILER_ENABLE__` 构建注册**（非 profiler 构建连 QAction 成员/MOC 槽都不存在）；wrapper 锁 + 先暂停再读双保险后调 `FCEU_profiler_report` 写 tmpfile 读回（零残留）→ 只读对话框。⚠️ 人工项待做：profiler 构建下真实点击 |
 | V8 A7 实验 | ✅ **完成**（r14；结论=**不值得，收益上限 ≈ 0**） | 工具侧已落地（生成器 `--variant a7` + `src/ops_table_a7.inc` + `src/ops_table_variant.h` + CMake 开关，**`src/x6502.cpp` 行数中性**）；A/B 读数：S1 nestest −0.67%、S2 `instr_v5_all` +1.32%（**方向相反、±1.3% 属噪声**）⇒ **收益上限 ≈ 0**，而代价是 256 个 handler 的「单 Cpu 实例」语义前提 ⇒ **建议永久封口**（A7 本体维持不进范围） |
 | **计划外 A** | ✅ **完成** | 断点关键字死代码回归（v0.3.5 `704078f` 引入）修复 + 5 断言锁测试（r5④）——走查 NSF-1 带出 |
 | **计划外 B** | 🔴 **未定位根因**（r14 完成一轮只读 RE） | GUI 下任何 yielding Lua 脚本运行中崩溃（0xC00000FD/0xC000041D，时长随机 2s～68s+，堆 ~4MB/s 增长，突发深递归）。**r14 新事实**：① `__chkstk@Qt6Gui+0x4754C7` 是 **Qt6Gui 自带的 CRT 栈探针**，**不能**用来定位递归点（r5 的这条线索作废）；② 崩溃在 **GUI 线程**（唯一会进 Qt6Gui 的线程）；③ **不是 Rust panic**（`panic="abort"` 的签名是 `0xC0000409`，与观察到的两个码不符）；④ 「创建线程 ≠ 续跑线程」是结构性的（mlua `Lua` 是 `!Send`，本仓用 `AtomicPtr` 绕过类型系统）。**r14 产出**：可脚本化的自动复现（`.zcode/repro/`，gitignored）；**下一步**：先拿 GUI 线程完整回溯（**本机无 Windows SDK / cdb / WinDbg**，需业主批准安装），再动续跑逻辑。详见 §二「计划外 B」小节 |
