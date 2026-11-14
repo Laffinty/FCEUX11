@@ -226,6 +226,23 @@ if(FCEUX11_BUILD_TESTS)
     # Same CI-launch pathology as apu_frame_timing_test above; see that note.
     set_tests_properties(input_snesmouse_test PROPERTIES TIMEOUT 300)
 
+    # v2.0.4 V6 — Famicom microphone protocol lock tests (kgmqa-108 chain).
+    # Loads fixtures/nestest.nes so PowerNES installs the $4016/$4017 read
+    # handler (JPRead), then asserts the level-read mic report on $4016 D2:
+    # pressed=1 on EVERY read (no per-read toggle), released=0, the
+    # controller-I shift sequence untouched, $4017 never carries the bit,
+    # P1-side Start never produces it (P2-only peripheral), and the
+    # replaceP2StartWithMicrophone gate (P2 Start key mapping, preserved).
+    # Mutation legs are documented at the top of the test file.
+    fceux11_add_test_executable(fceux11_input_famicom_mic_test
+        f11qa/input_famicom_mic_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME input_famicom_mic_test
+             COMMAND fceux11_input_famicom_mic_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    set_tests_properties(input_famicom_mic_test PROPERTIES TIMEOUT 300)
+
     fceux11_add_test_executable(fceux11_mapper_core_test
         f11qa/core/mapper_test.cpp
         git_info_stub.cpp
@@ -488,7 +505,7 @@ if(FCEUX11_BUILD_TESTS)
             cpu_test ppu_test apu_test bus_test mapper_core_test
         savestate_core_test golden_savestate_test bench_tolerance_test
         ppu_frame_diff_test apu_wav_diff_test apu_wav_hq_diff_test
-        apu_frame_timing_test input_snesmouse_test
+        apu_frame_timing_test input_snesmouse_test input_famicom_mic_test
         cart_class_test fds_load_test
         driver_callbacks_test core_driver_boundary_test
         ppu_rendering_lut_test ppu_phase_c_test ppu_phase_d_test

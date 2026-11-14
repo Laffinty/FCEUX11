@@ -111,7 +111,6 @@ static DECLFR(JPRead)
 {
 	lagFlag = 0;
 	uint8 ret=0;
-	static bool microphone = false;
 
 	ret|=joyports[A&1].driver->Read(A&1);
 
@@ -127,16 +126,28 @@ static DECLFR(JPRead)
 	if(portFC.driver)
 		ret = portFC.driver->Read(A&1,ret);
 
-	// Not verified against hardware.
-	if (replaceP2StartWithMicrophone) {
-		if (joy[1]&8) {
-			microphone = !microphone;
-			if (microphone) {
-				ret|=4;
-			}
-		} else {
-			microphone = false;
-		}
+	// v2.0.4 V6 (kgmqa-108): Famicom microphone report — bit2 of $4016,
+	// LEVEL read (pressed=1, released=0), not part of the shift sequence.
+	// Sources (V6 step 0 — no-from-memory discipline, both on this machine):
+	//  - NESdev wiki "Standard controller", Famicom section (r10 snapshot,
+	//    Research_only/w204/Standard controller - NESdev Wiki.html): $4016
+	//    reads as xxxx xMES — bit0 controller I, bit1 expansion port, bit2
+	//    "Microphone status bit (Famicom, $4016 only)". Famicom games
+	//    commonly track 0<->1 transitions of the report rather than a
+	//    specific level — which is exactly why the 1996 per-read-toggle
+	//    below was a protocol defect (a held mic must read 1 on EVERY read,
+	//    not alternate). Mic audio is mixed into the APU output before the
+	//    cartridge edge: analog domain, deliberately not modeled here.
+	//  - Mesen2 reference implementation (.zcode/mesen2_NesController.h):
+	//    :85 mic lives on the port-1 (P2) Famicom controller only;
+	//    :116-118 `if(addr == 0x4016 && IsPressed(Buttons::Microphone))
+	//    output |= 0x04;` — level read, no shift, $4016 only.
+	// The P2 Start key mapping is preserved: replaceP2StartWithMicrophone
+	// routes the P2 Start button into the microphone (that is the mapping,
+	// not the protocol). QA injection presses the same button through the
+	// port-1 gamepad buffer (f11qa_bridge.cpp kagami_bridge_set_famicom_mic).
+	if (replaceP2StartWithMicrophone && !(A&1) && (joy[1]&8)) {
+		ret |= 4;
 	}
 
 	if(PlayInputFile)

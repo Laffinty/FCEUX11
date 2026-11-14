@@ -59,6 +59,37 @@ void kagami_bridge_kill(void);
 /// bridge is not initialised.
 int kagami_bridge_set_input(int port, int esi_type);
 
+/// Famicom microphone injection (v2.0.4 V6 / kgmqa-108).
+///
+/// The microphone is a second-controller (P2) peripheral: its report is
+/// bit2 of $4016 as a LEVEL read (pressed=1, released=0 — NESdev wiki
+/// "Standard controller" Famicom section `xxxx xMES`; Mesen2
+/// NesController.h:116-118), and it is NOT part of the shift sequence nor
+/// present on $4017. The preserved key mapping routes the P2 Start button
+/// into the microphone (`replaceP2StartWithMicrophone`), so "pressing the
+/// mic" here means setting the P2 Start bit in a persistent port-1 gamepad
+/// buffer — the exact path the Qt driver feeds every frame (UpdateGP
+/// shifts byte1 into joy[1]; JPRead reads joy[1]&8).
+///
+/// `port` must be 1 (P2 / second pad only — Mesen2 gates the mic on
+/// `port == 1 && type == FamicomControllerP2`).
+///
+/// `on != 0`: enables the mic protocol (`replaceP2StartWithMicrophone`,
+/// persists for the session) and presses the mic (P2 Start bit set).
+/// `on == 0`: releases the mic (bit cleared). The protocol enable is the
+/// key mapping, not the per-read level, so it intentionally persists —
+/// toggling on/off is what produces the 0<->1 report transitions Famicom
+/// games track.
+///
+/// Attaches SI_GAMEPAD to port 1 with a persistent bridge-owned buffer
+/// (the kagami_bridge_init() default is SI_NONE/nullptr). A later
+/// kagami_bridge_set_input(1, ...) re-points the port and detaches the
+/// mic buffer — call this function after any set_input on port 1.
+///
+/// Returns 0 on success, -1 on a bad port, -2 when the bridge is not
+/// initialised.
+int kagami_bridge_set_famicom_mic(int port, int on);
+
 /// Enable the new PPU (newppu = 1).  Must be called after init and
 /// before load_rom for the new-PPU rendering path.
 void kagami_bridge_set_newppu(int on);
