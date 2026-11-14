@@ -1312,7 +1312,7 @@ iNES 路径**根本不做板级名匹配**（`src/ines_init.cpp:38-39` 只比 `n
 | ⑪ | `src/tests/` 整目录 | `src/tests/CMakeLists.txt` 已于 r8 删除（从不参与构建），但该目录**仍有 5 个 `.cpp` + 旧金标 `fixtures/golden_hashes.json`（5 条，活的在 `tests/fixtures/`，13 条）+ `AGENTS.md` + `Testing/Temporary/CTestCostData.txt`** ⇒ 整目录仍是死资产。r8 只按授权范围删了 CMakeLists 并修了 `src/tests/AGENTS.md:122` 的悬空引用；**整目录清理由业主另行裁决** | V4（待裁决） |
 | ⑫ | `docs/tech/precision.md:31` | 同一句过期中断描述仍在（「中断只在指令边界轮询（无 hijack/branch-delay…）」）—— V4 改了 `docs/tech/cpu.md` 的三处，但 precision.md 这一处不在当批所有权内 | V4（**r14 已落地**：改写为「两段式已建模（指令内轮询点采样 + 下一指令边界派发 + BRK 向量级劫持），未建模 branch-delay 与周期精确断言时刻，残留差距是 VBL NMI 断言时刻量化 G5」，并附 2026-11-14 更正说明） |
 | ⑬ | `tests/CMakeLists.txt` 的 `fceux11_input_famicom_mic_test` 目标 | **LTCG 链接崩溃（构建基础设施缺陷，r14 查出并已修）**：MSVC 14.51 上该目标的链接以 `exit -1` 失败且**无 LNK 报错**，只留下一个 **2 MiB 的不可用 `.exe`**（⇒ 运行时报「文件损坏」）。与 `src/bus.cpp` / `src/ppu_sprite_lut.cpp` 早已规避的「c2.dll 从 IL 物化出 2 MB 假镜像」同族。**触发条件**：任何改动 `fceux11_core` 之后需要整体重链时都会命中（本轮两次 `cmake --build build` 各命中一次） | **r14 已修**：按仓库既有先例对该 TU 加 `/GL-`（`set_source_files_properties(... COMPILE_FLAGS "/GL-")`）⇒ 链接恢复正常，产物 4.9 MB 可执行，ctest 39/39 全绿 |
-| ⑭ | `scripts/phase2_build_tests_json.py` ↔ `tests/tests.json` | **生成器与产物仍有 133 个「用例×字段」对不一致（r15 实测）**：其中 **15 条用例的 `known_limit` / `provenance`** 是手工维护层（生成器不持有），另有 **~10 条 `failure_means`** 与大量 `input`（`working_dir` / `args`）差异。⚠️ **危险**：`failure_means` 参与 `compute_grade`（advisory vs blocking）⇒ **重跑生成器会静默改写这些字段**（含 grade 语义），而 `known_limit` 虽不参与判定却是带日期的溯源记录。**r15 已把危害面从「丢 3 条用例」收到「字段漂移」**：121/122/123 三条（含 V1 的 kgmqa-123）已纳入生成器且**逐字一致**，`kgmqa-046` 的 `--rom` 也已对齐 ⇒ 用例**清单**（123 条、顺序）现在完全一致 | **待业主裁决**：把 133 对漂移全部对齐生成器是**独立工作项**（需逐条确认每处漂移「以哪边为准」），本轮只登记不擅自改（否则会顺手改掉 r8/r14 的文本登记与 grade 语义）。复现命令：`python scripts/phase2_build_tests_json.py /tmp/gen.json` 后与 `tests/tests.json` 逐条比对 |
+| ⑭ | `scripts/phase2_build_tests_json.py` ↔ `tests/tests.json` | **生成器已严重过时：重跑它会「打断 88 条用例 + 翻转 15 条 `failure_means`」**（r15 实测分类，133 对漂移）：**85 条 `input.binary` 还是旧名**（`fceux11_*` → 现已是 `f11qa_*`）⇒ 生成的清单指向**不存在的二进制**；**84 条 `input.args` 缺失**（产物里补了 `--rom/--frames`）；**83 条 `input.working_dir` 不同**；**15 条 `failure_means`**：产物是 `advisory`（业主裁决降级），生成器仍是 `blocking` ⇒ **改判红体系与 grade 语义**（`failure_means` 参与 `compute_grade`）。⚠️ 另有 15 条 `known_limit` / 15 条 `provenance` 属**手工维护层**（带日期的溯源记录，生成器不持有）。**r15 已加硬护栏**：直接写 `tests/tests.json` 时先比对现产物，发现上述漂移就**拒绝覆盖并打印报告**（EXIT=2，产物逐字未动）；要看生成结果请写到别的路径。**「生成器对齐」（把 133 处按产物为准回填）仍未做** ⇒ 属**独立工作项**且**需业主裁决**（15 条 `failure_means` 属期望值变更，按纪律需同级评审） |
 
 ---
 
@@ -1659,9 +1659,12 @@ curl.exe -s -x http://127.0.0.1:7897 "https://api.github.com/repos/TASEmulators/
 3. **V5 · PGO 结论的适用范围**：读数来自**仓内夹具**训练负载（blargg CPU 测试等），
    **不是商业游戏**（SMB3/Akumajou/Zelda 需业主提供、不入库）⇒ 结论只覆盖「CPU 密集型
    工作负载」，不能直接外推到商业游戏场景。
-4. **生成器↔产物仍有 133 个字段对漂移**（含 10 条 `failure_means`）⇒ **重跑
-   `scripts/phase2_build_tests_json.py` 会静默改写 grade 语义** ⇒ 跑之前必须先备份
-   `tests/tests.json`（§二末 ⑭ / AGENTS.md 坑 15）。
+4. **生成器已严重过时，禁止直接重跑**：`scripts/phase2_build_tests_json.py` 与产物有
+   **133 处漂移**（85 条 `input.binary` 旧名 / 84 条 `input.args` 缺失 / 83 条
+   `input.working_dir` 不同 / **15 条 `failure_means`**）⇒ 重跑会**打断 88 条用例**并
+   **翻转 15 条 `failure_means`（改 grade 语义）**。⚠️ r15 已给生成器加**硬护栏**：
+   直接写 `tests/tests.json` 会**拒绝覆盖**并打印漂移报告（EXIT=2）；要看生成结果请写到
+   别的路径。**「生成器对齐」未做**（15 条 `failure_means` 属期望值变更 ⇒ 需同级评审）。
 5. **人工验收未做**（8 项）：V6 真机吹气 / V7 profiler 构建真实点击 / V11 Lagrange Point
    跨进程读档 / V13 录 AVI ≥10 分钟 / V15 按 A/B 录 movie 回放 / V25+V22 真机 Lua 读值与鼠标 /
    V14 CDL 一致性读数 / V10 真 movie 基线录制（可选）+ ASan 与 `oam3.nes` 验收①（ROM 需外部提供）。

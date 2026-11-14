@@ -592,16 +592,21 @@ $env:PATH="D:\Project\FCEUX11\vcpkg_installed\x64-windows\bin;$env:PATH"
     或干脆把脚本注释写成纯 ASCII/英文（自写的一次性脚本建议后者，从根上避开）。
     同族：**函数名别撞内置别名**（`Measure` 撞 `Measure-Object` ⇒ 报
     "A positional parameter cannot be found"）。
-15. **`tests/tests.json` 是「半手工维护」的产物：重跑 `scripts/phase2_build_tests_json.py`
-    会静默改写 133 个「用例×字段」对（2026-11-14 r15 实测）。** 其中 **10 条用例的
-    `failure_means`** 参与 `compute_grade`（advisory vs blocking）⇒ 重跑生成器会**改掉
-    grade 语义**；另有 15 条用例的 `known_limit` / `provenance` 属**手工维护层**
-    （生成器不持有、只有产物有，是带日期的溯源记录）。
-    r15 已把最狠的那条雷排掉：**121/122/123（含 V1 的 kgmqa-123）此前只存在于产物里，
-    生成器不覆盖 ⇒ 重跑会静默丢掉它们**；现在生成器覆盖全部 123 条且这三条**逐字一致**，
-    用例清单（顺序+集合）也完全一致 ⇒ **「丢用例」已不可能**；
-    但**字段漂移仍未对齐**（属独立工作项，需业主裁决「每处以哪边为准」）。
-    ⇒ **跑生成器前先备份 `tests/tests.json`**（或先输出到临时文件做比对，别直接覆盖产物）。
+15. **`tests/tests.json` 是「半手工维护」的产物，而生成器已严重过时——直接重跑它会
+    「打断 88 条用例 + 翻转 15 条 `failure_means`」（2026-11-14 r15 实测）。**
+    分类：**85 条 `input.binary` 还是旧名**（`fceux11_*` → 现已是 `f11qa_*`，生成的清单
+    指向**不存在的二进制**）· **84 条 `input.args` 缺失** · **83 条 `input.working_dir` 不同**
+    · **15 条 `failure_means`**：产物是 `advisory`（业主裁决降级），生成器仍是 `blocking`
+    ⇒ **改判红体系与 grade 语义**；另有 15 条 `known_limit` / 15 条 `provenance` 属
+    **手工维护层**（带日期的溯源记录，生成器不持有）。
+    r15 已把「丢 3 条用例（121/122/123）」的雷排掉（生成器现在覆盖全部 123 条且这三条
+    **逐字一致**，用例清单的顺序+集合也与产物完全一致），**并给生成器加了硬护栏**：
+    直接写 `tests/tests.json` 时先比对现产物，发现上述漂移就**拒绝覆盖**并打印报告
+    （EXIT=2，产物逐字未动）；要看生成结果请写到别的路径
+    （`python scripts/phase2_build_tests_json.py /tmp/gen.json`）。
+    ⚠️ **「生成器对齐」（把 133 处按产物为准回填）仍未做** ⇒ 属独立工作项，
+    且 **15 条 `failure_means` 属期望值变更 ⇒ 需同级评审**（改动会改 grade 语义）。
+    ⇒ **在完成对齐之前，谁都不要直接跑这个生成器覆盖产物。**
 
 ## 纪律（这几条都是被违反过之后写下来的）
 

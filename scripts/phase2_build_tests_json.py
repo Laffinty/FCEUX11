@@ -1,6 +1,19 @@
 """
 Phase 2 — tests.json v1.8 生成器（v1）
 数据驱动：47 项 v1.17 迁移 + 65 项 rom-suite + 8 项其他 = 120 项
++ r15 追加：kgmqa-121/122/123（共 123 项）
+
+⚠️⚠️ **2026-11-14（v2.0.4 r15）本脚本与产物 `tests/tests.json` 仍有 133 处漂移，
+   直接重跑会「打断 88 条用例 + 翻转 15 条 failure_means（改 grade 语义）」：
+     * 85 条 `input.binary` 还是旧名（`fceux11_*` → 现已是 `f11qa_*`）；
+     * 84 条 `input.args` 缺失（产物里补了 `--rom/--frames` 等）；
+     * 83 条 `input.working_dir` 不同；
+     * 15 条 `failure_means`：产物是 `advisory`（业主裁决降级），本脚本仍是 `blocking`
+       ⇒ 重生成会把它们翻回 blocking ⇒ **改判红体系与 grade 语义**。
+   ⇒ **本脚本现在带护栏**：直接写 `tests/tests.json` 时会先比对现产物，
+   发现上述漂移就**拒绝覆盖**并打印报告；要看生成结果请写到别的路径
+   （例：`python scripts/phase2_build_tests_json.py /tmp/gen.json`），
+   或在**完成一次「生成器对齐」**（把上述 133 处按产物为准回填进本脚本）之后再解除。
 """
 import json
 import sys
@@ -1072,6 +1085,55 @@ def build_cases_g_j():
 # 主入口
 # ============================================================================
 
+def check_drift_before_write(generated_cases, out_path):
+    """护栏（v2.0.4 r15）：直接覆盖现产物前，先比对漂移。
+
+    只在「目标文件已存在」且漂移里含 **failure_means（改 grade 语义）** 或
+    **input（改用例实际跑什么）** 时拒绝覆盖并打印报告。写到别的路径
+    （用来观察生成结果）不受限制。
+    """
+    if not os.path.exists(out_path):
+        return True
+    try:
+        with open(out_path, encoding='utf-8') as f:
+            existing = json.load(f)
+    except Exception:
+        return True
+    ex = {c['kgmqa_id']: c for c in existing.get('cases', [])}
+    gen = {c['kgmqa_id']: c for c in generated_cases}
+    blocking = []
+    for cid, ac in ex.items():
+        gc = gen.get(cid)
+        if gc is None:
+            continue
+        if ac.get('failure_means') != gc.get('failure_means'):
+            blocking.append((cid, 'failure_means', ac.get('failure_means'), gc.get('failure_means')))
+        if ac.get('input') != gc.get('input'):
+            blocking.append((cid, 'input', ac.get('input'), gc.get('input')))
+    if not blocking:
+        return True
+    print('')
+    print('=' * 78)
+    print('REFUSING TO OVERWRITE — generator/artifact drift is grade-relevant')
+    print('=' * 78)
+    print(f'target : {out_path}')
+    print(f'drift  : {len(blocking)} case/field pairs would change')
+    print('')
+    for cid, key, av, gv in blocking[:40]:
+        print(f'  {cid}  [{key}]')
+        print(f'      artifact  : {av}')
+        print(f'      generated : {gv}')
+    if len(blocking) > 40:
+        print(f'  ... and {len(blocking) - 40} more')
+    print('')
+    print('To inspect the generated file without touching the artifact, write elsewhere:')
+    print(f'   python scripts/phase2_build_tests_json.py {out_path}.generated.json')
+    print('To make the artifact match the generator (or the generator match the artifact),')
+    print('align the drift deliberately first — 15 failure_means changes touch the grade.')
+    print('=' * 78)
+    return False
+
+
 def main():
     cases = []
     cases.extend(build_cases_a_e())        # 001-047 (47 项) + 插在中间的 122/123
@@ -1102,6 +1164,9 @@ def main():
         'cases': cases,
     }
     out_path = sys.argv[1] if len(sys.argv) > 1 else 'tests/tests.json'
+    if not check_drift_before_write(cases, out_path):
+        print('\nREFUSED: nothing was written.')
+        sys.exit(2)
     with open(out_path, 'w', encoding='utf-8') as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
     print(f'Wrote {len(cases)} cases to {out_path}')
