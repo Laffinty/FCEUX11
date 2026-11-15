@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <vector>
 
 #include "types.h"
 #include "fceu.h"
@@ -495,6 +496,86 @@ static bool check_registered_forwarder_controls() {
     return ok;
 }
 
+// ==================== v2.0.5 BUG-V205-01: CHR count that is not a power of two ====================
+//
+// A legal iNES 1.0 cart may declare a CHR bank count that is not a power of
+// two (6 banks = 48 KiB is the common case).  The file is then exactly
+// header-sized, but the emulator maps a ROUNDED (power-of-two) CHR buffer,
+// so the tail past the file's own bytes has to be filled with 0xFF -- which
+// is what upstream FCEUX 2.6.6 / 2.8.0 produce (memset the rounded buffer to
+// 0xFF, then read what the file has).
+//
+// Before the fix this repo's Rust loader ran its file-boundary check against
+// the ROUNDED count, so such a cart was rejected outright with "Unknown ROM
+// file format" -- a cart that upstream loads fine.
+//
+// The lock pins the observable result: the cart loads, the file's own CHR
+// bytes are in place, and the padding past them is 0xFF.
+static bool check_non_power2_chr_rom(const std::filesystem::path& dir) {
+    const uint32_t mapper = 140;      // JALECO JF-11/14 -- the reported number
+    const uint32_t prg_banks = 2;
+    const uint32_t chr_banks = 6;     // NOT a power of two
+    const size_t prg_bytes = prg_banks * 16384;
+    const size_t chr_file_bytes = chr_banks * 8192;
+    const size_t chr_rounded_bytes = 8 * 8192;   // what gets allocated/mapped
+
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);
+    const std::filesystem::path rom = dir / "bugv20501_chr6.nes";
+    {
+        std::ofstream f(rom, std::ios::binary | std::ios::trunc);
+        if (!f) {
+            printf("FAIL: cannot write the CHR-6 ROM\n");
+            return false;
+        }
+        uint8_t hdr[16] = {0};
+        hdr[0] = 'N'; hdr[1] = 'E'; hdr[2] = 'S'; hdr[3] = 0x1A;
+        hdr[4] = static_cast<uint8_t>(prg_banks);
+        hdr[5] = static_cast<uint8_t>(chr_banks);
+        hdr[6] = static_cast<uint8_t>((mapper & 0x0F) << 4);
+        hdr[7] = static_cast<uint8_t>(mapper & 0xF0);
+        f.write(reinterpret_cast<const char*>(hdr), sizeof(hdr));
+        std::vector<uint8_t> prg(prg_bytes, 0xEA);
+        std::vector<uint8_t> chr(chr_file_bytes, 0xEB);
+        f.write(reinterpret_cast<const char*>(prg.data()), prg.size());
+        f.write(reinterpret_cast<const char*>(chr.data()), chr.size());
+    }
+
+    FCEUGI* gi = fceu11::LoadGame(rom.string().c_str(), 1, true);
+    if (!gi) {
+        printf("FAIL: a ROM with 6 CHR banks did not load (BUG-V205-01)\n");
+        return false;
+    }
+    bool ok = true;
+    if (gi->mappernum != static_cast<int>(mapper)) {
+        printf("FAIL: loaded as mapper %d\n", gi->mappernum);
+        ok = false;
+    }
+    if (!VROM) {
+        printf("FAIL: no CHR buffer was allocated\n");
+        ok = false;
+    } else {
+        // The file's own CHR bytes are in place ...
+        const uint8_t first = VROM[0];
+        const uint8_t last_file_byte = VROM[chr_file_bytes - 1];
+        // ... and the tail past them is the 0xFF padding (upstream's rule).
+        const uint8_t pad_first = VROM[chr_file_bytes];
+        const uint8_t pad_last = VROM[chr_rounded_bytes - 1];
+        printf("      CHR[0]=0x%02X CHR[%zu]=0x%02X pad[0]=0x%02X pad[last]=0x%02X\n",
+               first, chr_file_bytes - 1, last_file_byte, pad_first, pad_last);
+        if (first != 0xEB || last_file_byte != 0xEB) {
+            printf("FAIL: the file's CHR bytes are not in place\n");
+            ok = false;
+        }
+        if (pad_first != 0xFF || pad_last != 0xFF) {
+            printf("FAIL: the CHR tail is not 0xFF padding\n");
+            ok = false;
+        }
+    }
+    fceu11::CloseGame();
+    return ok;
+}
+
 int main() {
     setvbuf(stdout, NULL, _IONBF, 0);
     printf("=== Mapper Load Test ===\n\n");
@@ -620,6 +701,12 @@ int main() {
     if (!check_mapper252_power(sweep_dir)) failed = true;
 
     if (!check_registered_forwarder_controls()) failed = true;
+
+    // v2.0.5 BUG-V205-01: a ROM whose CHR bank count is not a power of two
+    // must load, with the file's CHR bytes in place and 0xFF padding after
+    // them (upstream's rule).
+    printf("[BUG-V205-01] CHR bank count that is not a power of two ... \n");
+    if (!check_non_power2_chr_rom(sweep_dir)) failed = true;
 
     fceu11::Kill();
 

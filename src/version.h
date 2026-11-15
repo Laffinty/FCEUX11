@@ -100,6 +100,19 @@
 // 存档头（`state.cpp:397`）与录像头（`movie_record.cpp:591`），改了会让
 // v2.0.2 产出的存档/录像与本版**互读失败**。hotfix 编号只由 `FCEU_HOTFIX_TAG` 承载。
 // （v2.0.3 起整版恢复递增口径，并经读取侧核实：版本字段信息性、从不拒绝比对。）
+// v2.0.4_hotfix1（2026-11-16）— v2.0.4 的 hotfix 发布：
+// 内容 = v2.0.4 的全部成果 + **BUG-V205-01 修复**（loader 误拒「CHR 数量非 2 幂」
+// 的合法 iNES 1.0 ROM ⇒ 打开时弹 "Unknown ROM file format." 错误框）。
+// 根因：本仓 Rust loader 的 CHR 边界检查用了**舍入后**的 CHR 数量，而上游
+// FCEUX 2.6.6 / 2.8.0 不做该检查（memset 舍入缓冲为 0xFF 后只读文件实有的字节）
+// ⇒ 上游能装、本仓不能。修复 = 边界检查与拷贝改用**头里的原始 CHR 数量**，
+// 分配/映射/哈希仍用舍入值（上游同款；尾部按上游语义补 0xFF）。
+// v2.0.5 线已并行开工（A1 恢复 75 个未注册 mapper 的板级 Power），但 hotfix
+// 只取 BUG-V205-01 这一项。
+//
+// ⚠️ **数值口径不动**：`FCEU_VERSION_NUMERIC` 仍为 20004 —— 它进 FCSX 电影模式
+// 存档头（`state.cpp:397`）与录像头（`movie_record.cpp:591`），hotfix 编号只由
+// `FCEU_HOTFIX_TAG` 承载（与 v2.0.2_hotfix1 同一口径）。
 inline constexpr int FCEU_VERSION_MAJOR = 2;
 inline constexpr int FCEU_VERSION_MINOR = 0;
 inline constexpr int FCEU_VERSION_PATCH = 4;
@@ -110,8 +123,8 @@ inline constexpr int FCEU_VERSION_MAJOR_DECODE(int x) { return x / 10000; }
 inline constexpr int FCEU_VERSION_MINOR_DECODE(int x) { return (x / 100) % 100; }
 inline constexpr int FCEU_VERSION_PATCH_DECODE(int x) { return x % 100; }
 
-// v2.0.4 — 整版发布，无 hotfix 后缀
-#define FCEU_HOTFIX_TAG ""
+// v2.0.4_hotfix1 — hotfix 发布
+#define FCEU_HOTFIX_TAG "_hotfix1"
 
 #define FCEU_VERSION_STRING "2.0.4" FCEU_HOTFIX_TAG " " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
 #define FCEU_DISPLAY_VERSION "v2.0.4" FCEU_HOTFIX_TAG

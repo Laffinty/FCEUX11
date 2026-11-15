@@ -44,6 +44,17 @@ pub struct FceuRomSizes {
     /// Raw (not-rounded) PRG size in 16 KiB units, before .
     /// Needed for non-power-of-2 ROM loading and debug printing.
     pub rom_size_raw: u32,
+    /// Raw (not-rounded) CHR size in 8 KiB units.
+    ///
+    /// v2.0.5 BUG-V205-01: the *file* only carries the header's raw CHR
+    /// bank count.  `vrom_size_8kb` is rounded up to a power of two (that
+    /// is the size to allocate and to map), but the boundary check and the
+    /// copy out of the file must use this raw count -- otherwise a legal
+    /// iNES 1.0 cart with a non-power-of-two CHR count (e.g. 6) is
+    /// rejected as "Unknown ROM file format", which upstream FCEUX (2.6.6
+    /// and 2.8.0) does not do: it reads what the file has and leaves the
+    /// tail of the rounded buffer at the 0xFF it memset it to.
+    pub vrom_size_raw: u32,
 }
 
 // ------------------------------------------------------------------
@@ -91,17 +102,42 @@ pub unsafe extern "C" fn fceux11_rust_cart_compute_rom_sizes(
     };
 
     // ---- CHR ROM size ----
-    out.vrom_size_8kb = if !is_nes2 {
-        uppow2(h.vrom_size as u32)
+    //
+    // Two numbers, two jobs (v2.0.5 BUG-V205-01):
+    //
+    //   * `vrom_size_8kb` is the ROUNDED count (power of two).  That is the
+    //     size to allocate and to map, exactly like upstream FCEUX 2.6.6 /
+    //     2.8.0, which keep `VROM_size` at the power of two.
+    //   * `vrom_size_raw` is the header's own count.  The file only carries
+    //     that many banks, so the boundary check and the copy out of the
+    //     file must use it.  Upstream has no boundary check at all (it
+    //     reads what the file has and leaves the tail of the rounded
+    //     buffer at the 0xFF it memset it to) -- this repo's Rust loader
+    //     does check, and checking against the ROUNDED count rejected
+    //     legal iNES 1.0 carts whose CHR count is not a power of two.
+    let chr_raw = if !is_nes2 {
+        h.vrom_size as u32
     } else {
         let upper = (h.upper_rom_vrom_size & 0xF0) >> 4;
         if upper != 0x0F {
-            uppow2((h.vrom_size as u32) | ((upper as u32) << 8))
+            (h.vrom_size as u32) | ((upper as u32) << 8)
         } else {
-            // exponent-multiplier notation (NES 2.0)
+            // exponent-multiplier notation (NES 2.0): already exact
             let e = (h.vrom_size >> 2) as u32;
             let m = ((h.vrom_size & 0b11) as u32) * 2 + 1;
             ((1u32 << e).wrapping_mul(m)) >> 13
+        }
+    };
+    out.vrom_size_raw = chr_raw;
+    out.vrom_size_8kb = if !is_nes2 {
+        uppow2(chr_raw)
+    } else {
+        let upper = (h.upper_rom_vrom_size & 0xF0) >> 4;
+        if upper != 0x0F {
+            uppow2(chr_raw)
+        } else {
+            // exponent-multiplier notation (NES 2.0)
+            chr_raw
         }
     };
 
@@ -289,6 +325,7 @@ mod tests {
                 vrom_size_8kb: 0,
                 chrram_size: 0,
                 rom_size_raw: 0,
+                vrom_size_raw: 0,
             };
             let header = FceuInesHeader {
                 id: [0x4E, 0x45, 0x53, 0x1A],
@@ -320,6 +357,7 @@ mod tests {
                 vrom_size_8kb: 0,
                 chrram_size: 0,
                 rom_size_raw: 0,
+                vrom_size_raw: 0,
             };
             let header = FceuInesHeader {
                 id: [0x4E, 0x45, 0x53, 0x1A],
@@ -350,6 +388,7 @@ mod tests {
                 vrom_size_8kb: 0,
                 chrram_size: 0,
                 rom_size_raw: 0,
+                vrom_size_raw: 0,
             };
             let header = FceuInesHeader {
                 id: [0x4E, 0x45, 0x53, 0x1A],
@@ -381,6 +420,7 @@ mod tests {
                 vrom_size_8kb: 0,
                 chrram_size: 0,
                 rom_size_raw: 0,
+                vrom_size_raw: 0,
             };
             // PRG: exponent=3, multiplier=3  => (1<<3)*3 = 24 >> 14 = 0
             // CHR: exponent=3, multiplier=3  => (1<<3)*3 = 24 >> 13 = 0

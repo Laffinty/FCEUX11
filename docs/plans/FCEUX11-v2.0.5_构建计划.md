@@ -705,6 +705,7 @@ GBA 侧「BIOS SWI 全部实现」—— 详见长尾盘点文档 §四。
 | r1 | 2026-11-15 | **首版**：① 上游快照身份核实为 **master 2.8.0**（非 2.7.0）；② 全量比对 172 个共有板子文件 + 装载基础设施层；③ **发现本仓两批静默失效缺陷**：42 个 mapper 号缺注册（**运行时实证**）、17 个 MMC3 家族变体 `on_power` 被基类顶掉；④ 归纳上游真优势 6 类（U1–U7）；⑤ 按业主口径纳入长尾 7 条（LT-03/04/08/09/10/16/17），登记 10 条排除；⑥ 给出 3 个裁决项（D1 LT-01 第一步 / D2 PGO 默认 ON / D3 mapper 92 模型）；⑦ 登记 LT-03 的归因更正 |
 | r2 | 2026-11-16 | **A1 落地（A1-a）**：① **实施期更正：缺注册且板级 Power 非空的号是 75 个，不是 42**——r1 的名单漏了 `Latch_Init` 家族（它给每个调用者装 `LatchPower`）与委托 Init（`Mapper255_Init`→`Mapper225_Init`、`AA6023_Init`→`CommonInit` 等）；derive 方法 = 运行时探针（未注册全表）× 逐板 Init 链静态分析（剥注释后自洽：bmap 234 号 = 注册 159 + 未注册 75，**§1.2 的「270/273」也把 36 个注释条目算进去了，一并更正**）。② 修复 = `src/ines.cpp` 条件化（注册命中 ⇒ forwarder；未命中 ⇒ 保留板级 Power/Reset/Close，与 UNIF 路径同款）；**A1-b 否决**——`find_mapper` 上限 512 而 547 在名单里。③ 门禁落在 `fceux11_mapper_load_test`：S1 分类完备（bmap 每号 ∈ 注册表 ∪ 75 名单，自维护）+ S2 sweep（75 号合成 ROM 实装载断言保留，变异腿 75/75 红）+ S3 mapper 252 执行锚点（CartBR handler 身份 + PRG 标签字节）+ S4 控制组（注册号必须仍走 forwarder）。④ **实施期方法论发现（纪律 3 活例）**：「写-回读」锁在本仓**无牙**——未映射读返回 CPU 数据总线锁存（`Bus::ANullImpl` → `g_cpu.db()`）而 `X6502_DMW` 恰好锁存写入值 ⇒ 开总线回声让 0x5A 假绿；S3 第一版正中此坑，靠变异腿当场抓出后改为 handler 身份断言。⚠️ **同族风险登记：`check_mapper198_power`（S5-A3，$5000 写-回读）结构与旧版 S3 相同，其变异腿当年如何避开回声未复核——登记为观察项，不在本轮处置**。⑤ 门禁实测：目标级重建后 `fceux11_mapper_load_test` PASSED（75/75 + 锚点 0xFC）、`ctest -LE perf` **41/41** 全绿；变异腿（还原无条件覆盖）sweep 75 红 + S3 红 + S4 保持绿。⑥ **验收①口径适配**：A1-a 下「bmap 里每个号都必须在注册表里」不可达（75 个号按设计保持未注册）⇒ 语义改写为「bmap 里有实现的号必须有有效 Power 路径：注册表命中（forwarder→strategy 捕获）∨ 75 名单（legacy 保留，S2 sweep 锁死）」——S1 把两个集合钉死并自维护。⑦ §7.2 的 dump B 复跑（人工）仍待业主 |
 | r3 | 2026-11-16 | **新增 §九 · 缺陷登记：BUG-V205-01（loader 误拒 CHR 非 2 幂 ROM ⇒ 错误弹框）**——业主人工验证 A1 时用 v2.0.4 发布包打开 `打砖块 [Nokoh汉化].nes`（mapper 140）触发反复错误弹框。**已实证的根因**：本仓 Rust loader 对 CHR 数量做 `uppow2` 舍入（与上游同）**并新增了上游没有的文件边界检查** ⇒ 「CHR 数量非 2 幂」（头 6 → 布局 8）的合法 iNES 1.0 ROM 被判为 "Unknown ROM file format."；**上游 2.6.6 / 2.8.0 不做该边界检查**（直接 `FCEU_fread`，读不足就少读）⇒ 上游能装、本仓不能 = **本仓独有的收紧（回归）**；v2.0.3 的 S4（`fb26feb`）修了 PRG 侧同类问题但 **CHR 侧未同步**。**影响面不止 mapper 140**：任何 CHR 数量非 2 幂的 iNES 1.0 ROM 一律被拒。**「反复弹框」的确切机制尚未实证**（已排除一个假设：模态框嵌套事件循环 ⇒ 定时器重入，最小复现证伪）；代码上一处可疑时序已登记（`ConsoleWindow.cpp:747-751` 的 `errorMsgValid` 在含模态 `exec()` 的 `showErrorMsgWindow()` **返回之后**才清零）⇒ 修复方向已明确，**本轮只登记不修**，待下次立项 |
+| r4 | 2026-11-16 | **BUG-V205-01 修复落地（v2.0.4_hotfix1）**：① 改法 = **边界检查与拷贝改用头里的原始 CHR 数量**，**分配/映射/哈希仍用舍入值**（上游同款；⚠️ 不是去掉 `uppow2`——映射与 ROM 矫正表的 CRC 键都依赖舍入后的缓冲）；落点 = `cart.rs`（新增 `vrom_size_raw`）+ `ines.rs`（两个 FFI 结构体透传 + 边界检查改 raw + 哈希传 `(raw, padded)`）+ `ines_load.cpp`（CHR 拷贝用 raw 长度，尾部按上游语义补 0xFF）。② 门禁 **3 条新锁**：`fceux11-formats` 基线 **154 → 156**（CHR=6 可装 + 短文件仍被拒）+ `fceux11_mapper_load_test` 端到端（装载成功 + 文件字节在位 + 尾部 0xFF）；**变异验证双向**：边界检查改回舍入值 ⇒ Rust 锁转红（155/1）+ 端到端锁转红 + 「短文件仍被拒」保持绿。③ 实测：三个 Nokoh ROM 全部能装（修复前三个都是 Unknown ROM file format）；`ctest -LE perf` **41/41**；Rust 八条全绿（根 299/0/20 · vendor 249 · debug 94 · media 52 · formats 156 · utils 51 · lua 54 · 两态 check EXIT=0）。④ 版本口径：`FCEU_HOTFIX_TAG = "_hotfix1"` ⇒ `v2.0.4_hotfix1`，⚠️ **`FCEU_VERSION_NUMERIC` 保持 20004**（hotfix 冻结数值）⇒ v2.0.4 的存档/录像仍可读；产物内字符串已回查确认。⑤ **§9.6 方向 2（Qt 弹框防呆）本轮未做**——「反复弹框」机制仍未实证（假设已被最小复现证伪）⇒ 无证据改动不做，降级为观察项。⑥ **本 hotfix 只取 BUG-V205-01 这一项**，A1 属 v2.0.5 线，不并入本次发布 |
 
 ---
 
@@ -716,7 +717,7 @@ GBA 侧「BIOS SWI 全部实现」—— 详见长尾盘点文档 §四。
 
 ### BUG-V205-01 · loader 误拒「CHR 数量非 2 幂」的合法 iNES 1.0 ROM ⇒ 错误弹框
 
-**状态**：🔴 待修（登记于 2026-11-16）
+**状态**：✅ **已修（2026-11-16，v2.0.4_hotfix1）** —— 见 §9.8；本条同时保留为**回归锁**的来源
 **报告来源**：业主人工验证 A1 修复时撞上（用 v2.0.4 发布包 `C:\Users\ikrx2\Desktop\fceux11-v2.0.4-windows-amd64\fceux11.exe`
 打开 `C:\Users\ikrx2\Desktop\roms\mapper140\打砖块 [Nokoh汉化].nes` ⇒ 反复错误弹框）
 **与 A1 的关系**：**无关**（A1 是 mapper 注册接线；本条是 loader 的文件边界检查）——只是人工验证时顺带撞上
@@ -824,3 +825,46 @@ Research_only\w205\probe\b140_probe_build.bat
 # 期望（修复后）：三个 ROM 的 ines_load -> 1，且 LoadGame 返回非 null
 # GUI 侧：Alt+F -> O -> 选 打砖块 [Nokoh汉化].nes -> 应能装载（不再弹 "Unknown ROM file format."）
 ```
+
+#### 9.8 ✅ 修复实施记录（2026-11-16 · v2.0.4_hotfix1）
+
+**改法**（= §9.6 的方向 1；方向 2 的 Qt 防呆**本轮未做**，见下）：
+
+| 落点 | 改动 |
+|---|---|
+| `src/rust/crates/fceux11-formats/src/cart.rs` | `FceuRomSizes` 新增 `vrom_size_raw`；`compute_rom_sizes` 把它算成**头里的原始 CHR 银行数**（iNES 1.0 取 `header[5]`；NES 2.0 取「高位拼装」或指数记法的精确值）。`vrom_size_8kb` 仍是**舍入值**（分配/映射用） |
+| `src/rust/crates/fceux11-formats/src/ines.rs` | `FceuInesParseResult` / `FceuInesCartResult` 各自新增 `vrom_size_raw` 并透传；**边界检查改用 `chr_raw_bytes`**（`offset + chr_raw_bytes > file_len`）；**哈希改传 `(chr_raw_bytes, chr_size_bytes)`** ⇒ 与 PRG 侧同款（读 raw、补 0xFF 到 padded） |
+| `src/ines_load.cpp` | CHR 拷贝改用 `cart.vrom_size_raw << 13`（文件实有字节数），**尾部保持 `memset` 的 0xFF**（= 上游语义） |
+
+⚠️ **不是「去掉 `uppow2`」**：上游 2.6.6 / 2.8.0 也舍入，且**映射与 ROM 矫正表的 CRC 键都依赖舍入后的缓冲区** ⇒
+要改的是「**边界检查用哪个数**」，不是「**分配用哪个数**」。
+
+**门禁（3 条新锁）**：
+- `fceux11-formats`（**基线 154 → 156**）：
+  - `a_non_power_of_two_chr_rom_loads_with_raw_slices` —— 头 CHR=6 的 ROM **能装**；
+    `chr_size` = 8 银行（舍入、分配用）、`vrom_size_raw` = 6（文件用）；CHR 切片 = 文件的 6 银行；
+    哈希 = **raw CHR + 0xFF 补到舍入值**（= 上游口径，且**必须**≠ raw-only 哈希）。
+  - `a_truncated_chr_rom_is_still_rejected` —— 头说 6 银行、文件只有 4 银行 ⇒ **仍被拒**
+    （防呆：修复不得把硬错误变成读越界）。
+- `fceux11_mapper_load_test`（端到端，C++ 侧）：CHR=6 的合成 ROM（mapper 140）**装载成功**
+  + 文件自己的 CHR 字节在位（`0xEB`）+ **尾部是 0xFF**（`pad[0]=pad[last]=0xFF`）。
+
+**变异验证（纪律 3）**：把边界检查改回舍入值 ⇒
+`a_non_power_of_two_chr_rom_loads_with_raw_slices` **转红**（155 passed / 1 failed），
+`a_truncated_chr_rom_is_still_rejected` **保持绿**（正确：短文件两种实现下都该被拒），
+C++ 端到端锁**转红**（同源变异）⇒ 三条锁都有牙。
+
+**实测读数**：
+- 三个 Nokoh ROM 全部 `ines_load -> 1` 且 `LoadGame` 返回非 null（修复前三个都是 "Unknown ROM file format."）。
+- `ctest -LE perf` **41/41** 全绿；Rust 八条全绿（根 299/0/20 · vendor 249 · debug 94 ·
+  media 52 · **formats 156** · utils 51 · lua 54 · 两态 `cargo check` EXIT=0）。
+- 版本口径：`FCEU_HOTFIX_TAG = "_hotfix1"` ⇒ `FCEU_DISPLAY_VERSION = "v2.0.4_hotfix1"`；
+  ⚠️ **`FCEU_VERSION_NUMERIC` 保持 20004**（hotfix 冻结数值，与 v2.0.2_hotfix1 同一口径）
+  ⇒ v2.0.4 产出的存档/录像在本版**仍可正常读取**。产物内字符串已回查确认
+  （`FCEUX11 v2.0.4_hotfix1`）。
+
+**未做 / 留尾巴**：
+- **§9.6 方向 2（Qt 弹框防呆）本轮未做** —— 因为「反复弹框」的机制**仍未实证**
+  （§9.5 的假设已被最小复现证伪），贸然改 `ConsoleWindow.cpp` 的弹框时序属于无证据改动；
+  该项**降级为观察项**，等业主提供弹框的确切文字与复现描述后再定。
+- **mapper 140 的板级正确性仍未验证**（业主已明确暂不考虑）：本条只保证「能装载」。

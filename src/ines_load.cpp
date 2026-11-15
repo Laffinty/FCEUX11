@@ -226,7 +226,17 @@ int iNESLoadCore(const char *name, FCEUFILE *fp, CartInfo& iNESCart, FceuMallocP
 			return LOADER_HANDLED_ERROR;
 		}
 		memset(VROM, 0xFF, cart.chr_size);
-		memcpy(VROM, cart.chr_data, cart.chr_size);
+		// v2.0.5 BUG-V205-01: copy only the CHR bytes the file actually
+		// carries (the header's raw bank count), not the rounded-up size.
+		// A legal iNES 1.0 cart may declare a non-power-of-two CHR count
+		// (e.g. 6); the file is then exactly header-sized and the rounded
+		// buffer's tail stays 0xFF -- which is what upstream FCEUX 2.6.6 /
+		// 2.8.0 produce (memset 0xFF, then FCEU_fread of what the file
+		// has).  Copying the rounded size read past the end of the file.
+		const size_t chr_file_bytes = (size_t)cart.vrom_size_raw << 13;
+		const size_t chr_copy_bytes =
+			chr_file_bytes < (size_t)cart.chr_size ? chr_file_bytes : (size_t)cart.chr_size;
+		memcpy(VROM, cart.chr_data, chr_copy_bytes);
 	}
 
 	// VS UniSystem detection
