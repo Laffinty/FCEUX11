@@ -62,12 +62,29 @@ int iNESLoad(const char *name, FCEUFILE *fp, int OverwriteVidMode) {
 	GameInterface = iNESGI;
 	currCartInfo = &iNESCart;
 
+	// v2.0.5 A1-a: install the CartInfo_*Forward lifecycle only when the
+	// MapperEntry registry produced a concrete Cart object.  On a registry
+	// miss the Power/Reset/Close pointers stay at whatever the board's
+	// MapperNN_Init installed (ines_load.cpp iNES_Init -> bmap): the
+	// placeholder's on_power/on_reset/on_close are no-ops, so the legacy
+	// pointers are the only effective path.  Overwriting them unconditionally
+	// silently disabled the board Power of every unregistered mapper (75
+	// numbers as of the 2026-11-15 derivation in
+	// tests/f11qa/boards/mapper_load_test.cpp; SetWriteHandler / EXPREGS
+	// seeds / SRAM mapping / IRQ hooks never installed; mapper 252's "blue
+	// screen" symptom traces here).  The UNIF loader (src/unif.cpp) already
+	// uses this conditional form.
 	auto cart_obj = fceu11::create_cart_for_mapper(MapperNo, fceu11::g_bus);
-	fceu11::assign_cart(cart_obj ? std::move(cart_obj) : nullptr);
-	iNESCart.cart_obj = fceu11::g_cart;
-	iNESCart.Power = CartInfo_PowerForward;
-	iNESCart.Reset = CartInfo_ResetForward;
-	iNESCart.Close = CartInfo_CloseForward;
+	if (cart_obj) {
+		fceu11::assign_cart(std::move(cart_obj));
+		iNESCart.cart_obj = fceu11::g_cart;
+		iNESCart.Power = CartInfo_PowerForward;
+		iNESCart.Reset = CartInfo_ResetForward;
+		iNESCart.Close = CartInfo_CloseForward;
+	} else {
+		fceu11::assign_cart(nullptr);
+		iNESCart.cart_obj = fceu11::g_cart;
+	}
 
 	if (currCartInfo && currCartInfo->cart_obj)
 		currCartInfo->cart_obj->install_expansion_audio(fceu11::g_apu);

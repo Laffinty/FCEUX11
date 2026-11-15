@@ -3,15 +3,22 @@
 #include <cstdlib>
 #include <cstring>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <string>
 
 #include "types.h"
 #include "fceu.h"
 #include "driver.h"
+#include "cart.h"
 #include "ines.h"
 #include "x6502.h"
 #include "ppu.h"             // NTARAM -- mapper 218's CHR-RAM -> NTARAM mapping lock
 #include "boards/registry.h"
 #include "boards/mmc3.h"
+
+extern CartInfo iNESCart;     // defined in src/ines.cpp
+extern BMAPPINGLocal bmap[];  // defined in src/ines_bmap.h / src/ines.cpp
 
 struct MapperTestCase {
     const char* filename;
@@ -211,6 +218,283 @@ static bool check_effective_mapper_rule() {
     return ok;
 }
 
+// ==================== v2.0.5 A1: unregistered mapper board-power preservation ====================
+//
+// History: before v2.0.5, src/ines.cpp installed CartInfo_PowerForward (and
+// the Reset/Close forwarders) UNCONDITIONALLY after the registry lookup.  For
+// a mapper without a MapperEntry registry entry g_cart stays on the no-op
+// placeholder, so those forwarders routed Power/Reset/Close into empty
+// virtuals and the board-installed functions (MapperNN_Init -> info->Power)
+// never ran: no SetWriteHandler / EXPREGS seeds / SRAM mapping / IRQ hooks
+// for those numbers at all (v2.0.5 plan §1.4(A); mapper 252's "blue screen"
+// symptom traced here).
+//
+// The fix (A1-a): install the forwarders only when the registry produced a
+// concrete Cart object; on a registry miss keep the board-installed pointers.
+// The UNIF loader (src/unif.cpp) already used exactly this conditional form.
+//
+// The sweep list below pins EVERY bmap[] number whose Init chain installs
+// info->Power and which has no registry entry: 75 numbers, derived 2026-11-15
+// from the runtime registry probe (Research_only/w205/probe, run against the
+// shipped libraries) plus a per-board Init-chain analysis.  It supersedes the
+// plan's provisional 42-number list, which missed the Latch_Init family
+// (Latch_Init installs LatchPower for its callers) and delegate inits
+// (Mapper255_Init -> Mapper225_Init, AA6023_Init -> CommonInit, ...).
+// Registration status per number is asserted at runtime by the sweep, so a
+// future registration of one of these numbers keeps the lock green.
+
+static const uint32_t kUnregisteredBoardPowerMappers[] = {
+    8, 29, 101, 107, 113, 134, 140, 144, 152, 153, 154, 155, 157, 159, 171,
+    174, 178, 180, 184, 196, 197, 200, 201, 202, 203, 204, 207, 208, 209,
+    211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 225, 226,
+    227, 228, 229, 230, 231, 232, 233, 234, 235, 238, 240, 241, 242, 243,
+    244, 246, 252, 253, 255, 256, 257, 258, 259, 260, 261, 268, 342, 354,
+    361, 366, 470, 547,
+};
+
+static bool mapper_in_a1_list(uint32_t n) {
+    for (uint32_t m : kUnregisteredBoardPowerMappers) {
+        if (m == n) return true;
+    }
+    return false;
+}
+
+// Generic minimal iNES ROM: 1 x 16 KiB PRG (NOP sled), no CHR banks ->
+// CHR-RAM.  Same recipe as tests/fixtures/generate_test_roms.py, whose
+// fixtures already load successfully for ~200 mapper numbers.  Header
+// assembled field-by-field per that generator's documented encoding; the
+// first two PRG bytes carry the mapper number so each synthetic ROM has a
+// distinct CRC32 and cannot collide with the ROM-correction table.
+static bool write_minimal_ines_rom(const std::filesystem::path& path,
+                                   uint32_t mapper) {
+    uint8_t hdr[16] = {0};
+    hdr[0] = 'N';
+    hdr[1] = 'E';
+    hdr[2] = 'S';
+    hdr[3] = 0x1A;
+    hdr[4] = 1;  // 1 x 16 KiB PRG
+    hdr[5] = 0;  // 0 x 8 KiB CHR banks -> CHR-RAM
+    // mapper low nibble lives in byte 6 bits 4-7 (both formats)
+    hdr[6] = static_cast<uint8_t>((mapper & 0x0F) << 4);
+    if (mapper < 256) {
+        // iNES 1.0: mapper high nibble in byte 7 bits 4-7
+        hdr[7] = static_cast<uint8_t>(mapper & 0xF0);
+    } else {
+        // iNES 2.0: bits 2-3 of byte 7 = 0b10, mid nibble in bits 4-7,
+        // high nibble in byte 8 bits 0-3 (the mapper 406 fixture loads this
+        // way since v2.0.3 S4).
+        hdr[7] = static_cast<uint8_t>((((mapper >> 4) & 0x0F) << 4) | 0x08);
+        hdr[8] = static_cast<uint8_t>((mapper >> 8) & 0x0F);
+    }
+    std::ofstream f(path, std::ios::binary | std::ios::trunc);
+    if (!f) return false;
+    f.write(reinterpret_cast<const char*>(hdr), sizeof(hdr));
+    // exactly 16384 PRG bytes: 2-byte mapper tag prefix, rest NOP sled
+    uint8_t prg[16384];
+    prg[0] = static_cast<uint8_t>(mapper & 0xFF);
+    prg[1] = static_cast<uint8_t>((mapper >> 8) & 0xFF);
+    memset(prg + 2, 0xEA, sizeof(prg) - 2);
+    f.write(reinterpret_cast<const char*>(prg), sizeof(prg));
+    return static_cast<bool>(f);
+}
+
+// A1-S1 - classification completeness: every bmap[] entry with a non-null
+// init must be either registered in the MapperEntry registry or pinned in
+// the sweep list above (unregistered board-power numbers, preserved by the
+// A1-a legacy path).  A future board file added to bmap without registration
+// turns this red and forces classification: register it, or pin it here so
+// its power preservation stays locked by the sweep.  Also asserts the pinned
+// list has no stale entries that bmap no longer backs.
+static bool check_bmap_classification() {
+    bool ok = true;
+    int bmap_count = 0, registered = 0, listed = 0;
+    for (const BMAPPINGLocal* e = bmap; e->init; ++e) {
+        ++bmap_count;
+        const uint32_t n = static_cast<uint32_t>(e->number);
+        if (fceu11::find_mapper(n)) {
+            ++registered;
+            continue;
+        }
+        if (mapper_in_a1_list(n)) {
+            ++listed;
+            continue;
+        }
+        printf("FAIL: mapper %u (\"%s\") is in bmap but neither registered "
+               "nor pinned in the A1 sweep list\n",
+               n, e->name ? e->name : "");
+        ok = false;
+    }
+    for (uint32_t m : kUnregisteredBoardPowerMappers) {
+        bool in_bmap = false;
+        for (const BMAPPINGLocal* e = bmap; e->init; ++e) {
+            if (static_cast<uint32_t>(e->number) == m) {
+                in_bmap = true;
+                break;
+            }
+        }
+        if (!in_bmap) {
+            printf("FAIL: sweep-listed mapper %u is not backed by bmap "
+                   "(stale list entry)\n", m);
+            ok = false;
+        }
+    }
+    printf("      bmap init-bearing numbers: %d = registered %d + sweep-listed %d\n",
+           bmap_count, registered, listed);
+    return ok;
+}
+
+// A1-S2 - the sweep: for every unregistered board-power mapper, a real load
+// must keep the board-installed Power pointer (iNESCart.Power != the
+// forwarder) -- that is the fix's contract, exercised through the real
+// iNESLoad wiring.  If a future change registers one of these numbers, the
+// load routes through a strategy cart instead and iNESCart.Power == the
+// forwarder, which is also accepted (the strategy captured the legacy power
+// at construction), so the assertion is conditional on the registry state.
+static bool check_unregistered_power_sweep(const std::filesystem::path& dir) {
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+    std::filesystem::create_directories(dir, ec);
+    if (ec) {
+        printf("FAIL: cannot create the sweep directory\n");
+        return false;
+    }
+    bool ok = true;
+    const int total = static_cast<int>(
+        sizeof(kUnregisteredBoardPowerMappers) / sizeof(kUnregisteredBoardPowerMappers[0]));
+    int idx = 0;
+    for (uint32_t mapper : kUnregisteredBoardPowerMappers) {
+        ++idx;
+        const std::filesystem::path rom =
+            dir / ("a1_mapper_" + std::to_string(mapper) + ".nes");
+        if (!write_minimal_ines_rom(rom, mapper)) {
+            printf("[%2d/%d] mapper %3u FAIL (cannot write the synthetic ROM)\n",
+                   idx, total, mapper);
+            ok = false;
+            continue;
+        }
+        printf("[%2d/%d] A1 sweep mapper %3u ... ", idx, total, mapper);
+        FCEUGI* gi = fceu11::LoadGame(rom.string().c_str(), 1, true);
+        if (!gi) {
+            printf("FAIL (load returned null)\n");
+            ok = false;
+            continue;
+        }
+        if (gi->mappernum != static_cast<int>(mapper)) {
+            printf("FAIL (loaded as mapper %d)\n", gi->mappernum);
+            ok = false;
+            fceu11::CloseGame();
+            continue;
+        }
+        const bool registered = fceu11::find_mapper(mapper) != nullptr;
+        const bool forwarder = (iNESCart.Power == &CartInfo_PowerForward);
+        if (registered && !forwarder) {
+            printf("FAIL (registered, but Power is not the forwarder)\n");
+            ok = false;
+        } else if (!registered && forwarder) {
+            printf("FAIL (unregistered: the forwarder clobbered the board "
+                   "Power -- MxxPower never runs)\n");
+            ok = false;
+        } else {
+            printf("OK (%s)\n", registered ? "registry path" : "board power preserved");
+        }
+        fceu11::CloseGame();
+    }
+    std::filesystem::remove_all(dir, ec);
+    return ok;
+}
+
+// A1-S3 - execution anchor: mapper 252 (SAN GUO ZHI PIRATE).  M252Power
+// installs CartBR as the read handler over $6000-$7FFF AND $8000-$FFFF, and
+// Sync() maps PRG bank 0 at $8000.  Nothing else in the load path installs
+// those handlers, so their presence proves the board Power EXECUTED, not
+// merely that its pointer survived.
+//
+// ⚠️ A plain "write $6000 then read it back" lock is TOOTHLESS here: reads
+// on unmapped ranges return the CPU data-bus latch (Bus::ANullImpl ->
+// g_cpu.db(), src/bus.cpp) and X6502_DMW latches the written value
+// (src/x6502.cpp), so the open bus echoes 0x5A back with no handler at all.
+// Found by this very lock's mutation leg during implementation.  The check
+// therefore compares handler identities against &CartBR and poisons the
+// bus latch before reading, so an open-bus echo cannot fake the value.
+static bool check_mapper252_power(const std::filesystem::path& dir) {
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);  // the sweep may have removed it
+    const std::filesystem::path rom = dir / "a1_mapper_252.nes";
+    if (!write_minimal_ines_rom(rom, 252)) {
+        printf("FAIL: cannot write the mapper 252 ROM\n");
+        return false;
+    }
+    FCEUGI* gi = fceu11::LoadGame(rom.string().c_str(), 1, true);
+    if (!gi) {
+        printf("FAIL: the mapper 252 ROM did not load\n");
+        return false;
+    }
+    if (gi->mappernum != 252) {
+        printf("FAIL: loaded as mapper %d\n", gi->mappernum);
+        fceu11::CloseGame();
+        return false;
+    }
+    X6502_DMW(0x6000, 0x5A);  // poison the open-bus data latch (would echo 0x5A)
+    const bool rd8000 = (GetReadHandler(0x8000) == &CartBR);
+    const bool rd6000 = (GetReadHandler(0x6000) == &CartBR);
+    const uint8_t prg0 = X6502_DMR(0x8000);  // CartBR -> PRG tag byte 0xFC
+    printf("      read handler $8000=CartBR:%d $6000=CartBR:%d PRG[0x8000]=0x%02X\n",
+           rd8000 ? 1 : 0, rd6000 ? 1 : 0, prg0);
+    fceu11::CloseGame();
+    bool ok = true;
+    if (!rd8000 || !rd6000) {
+        printf("FAIL: M252Power's CartBR read handlers are not installed -- "
+               "the board Power did not run\n");
+        ok = false;
+    }
+    if (prg0 != 0xFC) {
+        printf("FAIL: $8000 does not read the PRG tag byte (0x%02X != 0xFC) -- "
+               "either M252Power did not run or the open bus is echoing\n", prg0);
+        ok = false;
+    }
+    return ok;
+}
+
+// A1-S4 - controls: registered mappers must keep the forwarder wiring (the
+// strategy carts captured the legacy power at construction).  Guards against
+// flipping the A1-a branch the wrong way.
+static bool check_registered_forwarder_controls() {
+    struct CtrlCase {
+        const char* path;
+        int mapper;
+    };
+    const CtrlCase cases[] = {
+        { "fixtures/mapper_nrom.nes", 0 },
+        { "fixtures/mapper_mmc3.nes", 4 },
+        { "fixtures/mapper_mmc3_191_nonpow2.nes", 191 },
+        { "fixtures/mapper_mapper199.nes", 199 },
+    };
+    bool ok = true;
+    for (const CtrlCase& c : cases) {
+        printf("[A1-S4] mapper %3d (%s) ... ", c.mapper, c.path);
+        FCEUGI* gi = fceu11::LoadGame(c.path, 1, true);
+        if (!gi) {
+            printf("FAIL (load returned null)\n");
+            ok = false;
+            continue;
+        }
+        if (gi->mappernum != c.mapper) {
+            printf("FAIL (loaded as mapper %d)\n", gi->mappernum);
+            ok = false;
+            fceu11::CloseGame();
+            continue;
+        }
+        if (iNESCart.Power != &CartInfo_PowerForward) {
+            printf("FAIL (registered, but Power is not the forwarder)\n");
+            ok = false;
+        } else {
+            printf("OK (forwarder)\n");
+        }
+        fceu11::CloseGame();
+    }
+    return ok;
+}
+
 int main() {
     setvbuf(stdout, NULL, _IONBF, 0);
     printf("=== Mapper Load Test ===\n\n");
@@ -318,6 +602,24 @@ int main() {
     } else {
         failed = true;
     }
+
+    // ==================== v2.0.5 A1 ====================
+    printf("\n--- v2.0.5 A1: unregistered mapper board-power preservation ---\n");
+    const std::filesystem::path sweep_dir =
+        std::filesystem::temp_directory_path() / "f11qa_a1_sweep";
+
+    printf("[A1-S1] bmap classification completeness ... \n");
+    if (!check_bmap_classification()) failed = true;
+
+    printf("[A1-S2] unregistered board-power sweep (%u numbers) ...\n",
+           static_cast<unsigned>(sizeof(kUnregisteredBoardPowerMappers) /
+                                 sizeof(kUnregisteredBoardPowerMappers[0])));
+    if (!check_unregistered_power_sweep(sweep_dir)) failed = true;
+
+    printf("[A1-S3] mapper 252 WRAM execution anchor ... \n");
+    if (!check_mapper252_power(sweep_dir)) failed = true;
+
+    if (!check_registered_forwarder_controls()) failed = true;
 
     fceu11::Kill();
 
