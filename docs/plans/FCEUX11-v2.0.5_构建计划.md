@@ -704,3 +704,123 @@ GBA 侧「BIOS SWI 全部实现」—— 详见长尾盘点文档 §四。
 |---|---|---|
 | r1 | 2026-11-15 | **首版**：① 上游快照身份核实为 **master 2.8.0**（非 2.7.0）；② 全量比对 172 个共有板子文件 + 装载基础设施层；③ **发现本仓两批静默失效缺陷**：42 个 mapper 号缺注册（**运行时实证**）、17 个 MMC3 家族变体 `on_power` 被基类顶掉；④ 归纳上游真优势 6 类（U1–U7）；⑤ 按业主口径纳入长尾 7 条（LT-03/04/08/09/10/16/17），登记 10 条排除；⑥ 给出 3 个裁决项（D1 LT-01 第一步 / D2 PGO 默认 ON / D3 mapper 92 模型）；⑦ 登记 LT-03 的归因更正 |
 | r2 | 2026-11-16 | **A1 落地（A1-a）**：① **实施期更正：缺注册且板级 Power 非空的号是 75 个，不是 42**——r1 的名单漏了 `Latch_Init` 家族（它给每个调用者装 `LatchPower`）与委托 Init（`Mapper255_Init`→`Mapper225_Init`、`AA6023_Init`→`CommonInit` 等）；derive 方法 = 运行时探针（未注册全表）× 逐板 Init 链静态分析（剥注释后自洽：bmap 234 号 = 注册 159 + 未注册 75，**§1.2 的「270/273」也把 36 个注释条目算进去了，一并更正**）。② 修复 = `src/ines.cpp` 条件化（注册命中 ⇒ forwarder；未命中 ⇒ 保留板级 Power/Reset/Close，与 UNIF 路径同款）；**A1-b 否决**——`find_mapper` 上限 512 而 547 在名单里。③ 门禁落在 `fceux11_mapper_load_test`：S1 分类完备（bmap 每号 ∈ 注册表 ∪ 75 名单，自维护）+ S2 sweep（75 号合成 ROM 实装载断言保留，变异腿 75/75 红）+ S3 mapper 252 执行锚点（CartBR handler 身份 + PRG 标签字节）+ S4 控制组（注册号必须仍走 forwarder）。④ **实施期方法论发现（纪律 3 活例）**：「写-回读」锁在本仓**无牙**——未映射读返回 CPU 数据总线锁存（`Bus::ANullImpl` → `g_cpu.db()`）而 `X6502_DMW` 恰好锁存写入值 ⇒ 开总线回声让 0x5A 假绿；S3 第一版正中此坑，靠变异腿当场抓出后改为 handler 身份断言。⚠️ **同族风险登记：`check_mapper198_power`（S5-A3，$5000 写-回读）结构与旧版 S3 相同，其变异腿当年如何避开回声未复核——登记为观察项，不在本轮处置**。⑤ 门禁实测：目标级重建后 `fceux11_mapper_load_test` PASSED（75/75 + 锚点 0xFC）、`ctest -LE perf` **41/41** 全绿；变异腿（还原无条件覆盖）sweep 75 红 + S3 红 + S4 保持绿。⑥ **验收①口径适配**：A1-a 下「bmap 里每个号都必须在注册表里」不可达（75 个号按设计保持未注册）⇒ 语义改写为「bmap 里有实现的号必须有有效 Power 路径：注册表命中（forwarder→strategy 捕获）∨ 75 名单（legacy 保留，S2 sweep 锁死）」——S1 把两个集合钉死并自维护。⑦ §7.2 的 dump B 复跑（人工）仍待业主 |
+| r3 | 2026-11-16 | **新增 §九 · 缺陷登记：BUG-V205-01（loader 误拒 CHR 非 2 幂 ROM ⇒ 错误弹框）**——业主人工验证 A1 时用 v2.0.4 发布包打开 `打砖块 [Nokoh汉化].nes`（mapper 140）触发反复错误弹框。**已实证的根因**：本仓 Rust loader 对 CHR 数量做 `uppow2` 舍入（与上游同）**并新增了上游没有的文件边界检查** ⇒ 「CHR 数量非 2 幂」（头 6 → 布局 8）的合法 iNES 1.0 ROM 被判为 "Unknown ROM file format."；**上游 2.6.6 / 2.8.0 不做该边界检查**（直接 `FCEU_fread`，读不足就少读）⇒ 上游能装、本仓不能 = **本仓独有的收紧（回归）**；v2.0.3 的 S4（`fb26feb`）修了 PRG 侧同类问题但 **CHR 侧未同步**。**影响面不止 mapper 140**：任何 CHR 数量非 2 幂的 iNES 1.0 ROM 一律被拒。**「反复弹框」的确切机制尚未实证**（已排除一个假设：模态框嵌套事件循环 ⇒ 定时器重入，最小复现证伪）；代码上一处可疑时序已登记（`ConsoleWindow.cpp:747-751` 的 `errorMsgValid` 在含模态 `exec()` 的 `showErrorMsgWindow()` **返回之后**才清零）⇒ 修复方向已明确，**本轮只登记不修**，待下次立项 |
+
+---
+
+## 九、缺陷登记（待修 BUG · 只登记不修）
+
+> **本节登记「已实证的根因 + 修复方向」，但本轮不动代码**（业主指示：等下次修复）。
+> 每条按「现象 / 实证链 / 根因分层 / 影响面 / 未实证部分 / 修复方向 / 验收 / 非目标」记，
+> 纪律 4 适用：**位级格式与上游行为以代码为准，不凭记忆**。
+
+### BUG-V205-01 · loader 误拒「CHR 数量非 2 幂」的合法 iNES 1.0 ROM ⇒ 错误弹框
+
+**状态**：🔴 待修（登记于 2026-11-16）
+**报告来源**：业主人工验证 A1 修复时撞上（用 v2.0.4 发布包 `C:\Users\ikrx2\Desktop\fceux11-v2.0.4-windows-amd64\fceux11.exe`
+打开 `C:\Users\ikrx2\Desktop\roms\mapper140\打砖块 [Nokoh汉化].nes` ⇒ 反复错误弹框）
+**与 A1 的关系**：**无关**（A1 是 mapper 注册接线；本条是 loader 的文件边界检查）——只是人工验证时顺带撞上
+
+#### 9.1 现象
+
+- 打开该 ROM ⇒ **装载失败** ⇒ 弹错误框（弹框文本 = `Unknown ROM file format.`）。
+- 业主观察到的是**反复弹框**（本条的「反复」机制**尚未实证**，见 §9.5）。
+
+#### 9.2 实证链（本轮实跑，探针在 `Research_only/w205/probe/b140_load_probe.cpp`）
+
+**先证伪「ROM 是坏头」**——三个 ROM 的头部与文件大小**完全吻合**（delta = 0，无 trainer、无坏头）：
+
+| ROM | 大小 | 头 PRG/CHR | flags6 | mapper | 头部需求 vs 文件大小 |
+|---|---|---|---|---|---|
+| 哆啦A梦 [Nokoh汉化].nes | 180240 | 8 / 6 | 0xC1（四屏） | 140 | 180240 = 180240 ✅ |
+| 太空射击战 [Nokoh汉化].nes | 180240 | 4 / 14 | 0xC1（四屏） | 140 | 180240 = 180240 ✅ |
+| 打砖块 [Nokoh汉化].nes | 81936 | 2 / 6 | 0xC0（水平） | 140 | 81936 = 81936 ✅ |
+
+**再分层定位（探针逐层调用 Rust FFI）**：
+
+```
+[raw] parse_header   -> 1   mapper=140 nes2=0 prg16k=2 prgraw=2 chr8k=8   ← 头说 6，布局说 8
+[raw] compute_layout -> 1   prg_bytes=32768 chr_bytes=65536 round=1
+[raw] ines_load      -> 0                                            ← 边界检查在这里失败
+[ERR] Unknown ROM file format.
+```
+
+- `chr8k=8` 的来源：`fceux11_rust_cart_compute_rom_sizes`
+  （`src/rust/crates/fceux11-formats/src/cart.rs:94-96`）对 **CHR 数量也做 `uppow2`**
+  ⇒ 头里的 6（= 49152 字节）被舍入成 8（= 65536 字节）。
+- `ines_load -> 0` 的原因：`src/rust/crates/fceux11-formats/src/ines.rs:1052`
+  的边界检查 `offset + chr_size > file_len`
+  ⇒ 16 + 32768 + 65536 = 98320 > 81936 ⇒ **拒绝**。
+- 三个 ROM 全中同一机制（180240 那两个同理：CHR 6→8、14→16）。
+
+#### 9.3 根因分层
+
+| 层 | 本仓 | 上游 2.6.6 基线 | 上游 2.8.0 master | 判定 |
+|---|---|---|---|---|
+| CHR 数量 `uppow2` | ✅ 有 | ✅ 有（`ines.cpp:860`） | ✅ 有（`ines.cpp:882`） | **与上游同** |
+| **文件边界检查** | ✅ 有（`ines.rs:1052`，引入于 `1062394`「v1.10 Cryptex 全 Rust 迁移」） | ❌ **无**（直接 `FCEU_fread(VROM, 0x2000, VROM_size, fp)`，读不足就少读，VROM 尾部保持 `memset` 的 0xFF） | ❌ **无**（`ines.cpp:980` 同款） | **本仓独有 ⇒ 收紧即回归** |
+
+⇒ **上游能装载这些 ROM，本仓不能**。这不是「上游比我们强」，是**本仓比上游更严**把合法 ROM 挡在门外。
+⇒ **同一类问题的 S4 只修了一半**：v2.0.3 的 `fb26feb`（S4·FC 侧修复批次）把 **PRG** 侧的
+边界检查改成「用头里的 raw 字节数」（GitHub issue #12 的非 2 幂 PRG），**CHR 侧没有同步改** ⇒
+同一类遗漏，PRG 侧已修、CHR 侧仍在。
+
+#### 9.4 影响面（**不止 mapper 140**）
+
+- 任何 **CHR 数量非 2 幂**（3 / 5 / 6 / 9 / 10 / 12 …）的 **iNES 1.0** ROM 一律被拒 ⇒
+  「装不上 → 报错弹框」与板子本身无关（mapper 140 只是本例）。
+- 该目录三张 Nokoh 汉化 ROM 全中（CHR = 6 / 6 / 14）。
+- 与 mapper 140 的**板级正确性无关**（业主已明确：暂不考虑 mapper 140 的支持）——本条只管
+  「能不能装载」。
+
+#### 9.5 未实证部分（⚠️ 如实登记）
+
+- **「反复弹框」的机制未实证**：代码路径上，装载失败 ⇒ `FCEU_PrintError("Unknown ROM file format.")`
+  （`src/fceu.cpp:590`）⇒ Qt `msgLog_PrintError`（`MsgLogViewer.cpp:334`）⇒
+  `consoleWindow->QueueErrorMsgWindow()`（`ConsoleWindow.cpp:493`）⇒ 主线程 `update()` 里
+  `showErrorMsgWindow()` 弹**模态** `QMessageBox`（`ConsoleWindow.cpp:479-491`）。
+- **已排除的假设**：「模态框的嵌套事件循环让 gameTimer 重入 ⇒ 无限叠框」——
+  最小复现（`Research_only/w205/probe/qt_modal_repro.cpp`，Qt6 + offscreen）**只弹 1 次**，
+  假设**未获支持**（offscreen 平台是否派发定时器事件存疑，故不能据此断定真桌面行为）。
+- **仍存疑的可疑时序**（修复时必须一并看）：
+  `src/drivers/Qt/ConsoleWindow.cpp:747-751`
+  ```cpp
+  if ( errorMsgValid ) {
+      showErrorMsgWindow();     // 内含 msgBox.exec()（模态）
+      errorMsgValid = false;    // ← 只在弹框【关闭之后】才清零
+  }
+  ```
+  标志的清零晚于模态框 ⇒ **若**框被关闭期间又有新错误入队，就会再弹一次。
+  ⇒ 无论「反复」的真正成因是什么，**「先清标志再弹框」都是低成本防呆**，建议随本条一并修。
+- **需要业主补充**（下次修前）：弹框的**确切文字与出现次数**（截图或复现描述）、
+  是否**每次点掉都会再弹**、是否伴随 GUI 无响应。
+
+#### 9.6 修复方向（下次立项时执行，本轮只登记）
+
+1. **主修 · CHR 边界检查与 PRG 侧对齐（S4 同款）**：
+   - **分配 / 映射 / 哈希**继续用舍入值（`uppow2`，上游同款，映射需要 2 幂）；
+   - **边界检查改用头里的原始 CHR 数量**（raw bytes），读不足的部分按上游语义
+     **用 0xFF 补齐**（上游 `memset(VROM, 0xFF, ...)` + `FCEU_fread` 少读 ⇒ 尾部即 0xFF）；
+   - 落点：`src/rust/crates/fceux11-formats/src/ines.rs:1050-1058`（CHR 段）
+     + `src/rust/crates/fceux11-formats/src/cart.rs:94-96`（把 **raw** CHR 数量单独传出）。
+   - ⚠️ **不要**简单地把 `uppow2` 去掉——上游也舍入，且映射/哈希依赖舍入后的尺寸；
+     要改的是**边界检查用哪个数**，不是**分配用哪个数**。
+2. **附带 · 弹框防呆**：`ConsoleWindow.cpp:747-751` 改为**先清 `errorMsgValid` 再弹框**
+   （或加 reentrancy guard），使「框未关完又有新错误」不会叠成无限弹框。
+3. **验收**：
+   - 三张 Nokoh ROM 全部能装载（`LoadGame` 返回非 null）；
+   - 新增锁测试（落在 `fceux11-formats` 或 `fceux11_mapper_load_test`）：
+     **CHR 数量非 2 幂的合成 ROM 必须能装载**（变异腿：把边界检查改回舍入值 ⇒ 必须转红）；
+   - 与上游对照：同一 ROM 在上游 FCEUX 2.6.6 / 2.8.0 能装 ⇒ 本仓必须也能；
+   - `ctest -LE perf` **41/41** 全绿（不变式 1）。
+4. **非目标**：不追 mapper 140（JALECO JF-11/14）的板级正确性；不改 PRG 侧已修好的 raw 逻辑；
+   不动 A1 的接线；不碰 GBA。
+
+#### 9.7 复现步骤（下次修时用）
+
+```powershell
+# 探针（一次性，不入库）：分层打印 Rust loader 的每一步判定
+Research_only\w205\probe\b140_probe_build.bat
+# 期望（修复后）：三个 ROM 的 ines_load -> 1，且 LoadGame 返回非 null
+# GUI 侧：Alt+F -> O -> 选 打砖块 [Nokoh汉化].nes -> 应能装载（不再弹 "Unknown ROM file format."）
+```
