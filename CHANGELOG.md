@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed — 内存安全
+
+- **SFORMAT 短标签的定长 `memcpy` 越界**（计划外 E / 长尾 LT-17）：`src/state.cpp` 的
+  `AddExState()` 把 SFORMAT 的 `desc`（约定是 **4 字节 ASCII 标签**）**定长拷 4 字节**，
+  而 `src/boards/supervision.cpp`（mapper 16/53）用的是 **2 字符标签 `"L1"`/`"L2"`**
+  ⇒ 字面量只有 3 字节（含 NUL）⇒ **读穿 1 字节**。
+  ASan 读数：`global-buffer-overflow / READ of size 4`，
+  栈为 `AddExState` → `Supervision16_Init` → `iNES_Init`（加载 Supervision 卡时触发）。
+  **上游 FCEUX 2.7.0 同款**（`src/state.cpp:907` 是同一行 `memcpy(tmp,sf->desc,4)`，
+  `src/boards/supervision.cpp` 是同一对 `"L1"/"L2"`）——上游没有 ASan 门禁遮它。
+  改法：**按实际长度拷贝**（4 字符标签逐字不变，短标签不再越界）；
+  ⚠️ 该缓冲只用于「重名检测」的 map 键、**不参与存档块名** ⇒ **不改存档格式**、无需版本迁移说明；
+  顺带消除「两个不同短标签越读到同一字节 ⇒ 被误判成重名并 `exit(0)`」的潜在假阳性。
+  验证：ASan 门禁修复前 **40/41**（`mapper_byte_diff_rust_smoke` 失败）→ 修复后 **41/41**。
+- ⚠️ **顺带记录一件必须知道的事**：`build-asan` 树的产物此前停在 **2026-11-14 14:39**，
+  而 V10 的修复提交是 **16:48** ⇒ **ASan 门禁自那以后从未真正执行过**（一次都没有）。
+  本条缺陷与「V10 的 ASan + `oam3.nes` 验收」都是在**重建该树之后**才首次真正跑起来的；
+  今后动 ASan 门禁前，先确认产物比最后一次源码改动新。
+
 ## [2.0.4] - 2026-11-15
 
 > **v2.0.4 正式发布**：残留精度与调试待办收口（构建计划 r13–r16：**20/22 项落地**；

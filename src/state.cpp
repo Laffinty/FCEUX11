@@ -922,8 +922,17 @@ void AddExState(void *v, uint32 s, int type, const char *desc)
 		std::map<std::string,bool> names;
 		while(sf->v)
 		{
+			// SFORMAT 的 desc 约定是「4 字节 ASCII 标签」，但板子也可以用更短的
+			// 标签（本仓：supervision.cpp 的 "L1"/"L2"；上游 2.7.0 同款）。
+			// 短标签的字面量不足 4 字节（含 NUL），定长 memcpy 4 字节会读穿
+			// 字符串字面量 —— ASan 报 global-buffer-overflow（上游同款缺陷）。
+			// ⇒ 按实际长度拷贝：4 字符标签逐字不变，短标签不再越界。
+			// 注意：这里的 tmp 只用于「重名检测」的 map 键，不参与存档块名，
+			//     所以改它**不改变存档格式**。
 			char tmp[5] = {0};
-			memcpy(tmp,sf->desc,4);
+			size_t tag_len = 0;
+			while (tag_len < 4 && sf->desc[tag_len] != '\0') tag_len++;
+			memcpy(tmp, sf->desc, tag_len);
 			std::string desc = tmp;
 			if(names.find(desc) != names.end())
 			{
