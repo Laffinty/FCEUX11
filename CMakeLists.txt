@@ -115,7 +115,19 @@ if(FCEUX11_PGO_USE)
         message(FATAL_ERROR "FCEUX11_PGO_USE requires MSVC toolchain")
     endif()
     add_compile_options(/GL)
-    add_link_options(/LTCG /USEPROFILE)
+    # /wd4961 — a module with no usable profile makes LTCG emit C4961
+    # ("profile data not found / unusable .pgd").  Modules that were never
+    # executed in Phase 1 (e.g. the small unit-test targets) hit this, and the
+    # repo builds with /WX => without the suppression the *link* of those
+    # targets fails with C2220 ("warning treated as error") and aborts the
+    # whole build.
+    # It only suppresses the "no profile for this module" diagnostic; a
+    # genuinely broken profile still fails.
+    # NOTE: this is a *compiler* warning (emitted by the LTCG code generator),
+    # so it must be disabled with /wd on the compile side; the link-side
+    # /IGNORE:4961 alone does NOT suppress it.
+    add_compile_options(/wd4961)
+    add_link_options(/LTCG /USEPROFILE /IGNORE:4961)
     message(STATUS "FCEUX11: PGO profile-use build enabled (/USEPROFILE)")
 endif()
 

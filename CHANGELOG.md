@@ -26,6 +26,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   本条缺陷与「V10 的 ASan + `oam3.nes` 验收」都是在**重建该树之后**才首次真正跑起来的；
   今后动 ASan 门禁前，先确认产物比最后一次源码改动新。
 
+### Fixed — 构建（PGO）
+
+- **`FCEUX11_PGO_USE` 全量构建失败**（长尾 LT-04 取数时暴露）：LTCG 的代码生成阶段会对
+  **没有 profile 数据的模块**发 **C4961**（"profile data not found / unusable `.pgd`"），
+  而本仓用 `/WX`（警告即错误）⇒ 升级为 **C2220** ⇒ **链接失败**（`LNK1257 代码生成失败`）
+  ⇒ **任何没在 Phase-1 跑过的目标**（例如若干小单测）都会让整个 `PGO_USE` 构建挂掉。
+  ⇒ 在 `CMakeLists.txt` 的 `FCEUX11_PGO_USE` 分支加 **`/wd4961`**（编译侧；
+  ⚠️ 链接侧的 `/IGNORE:4961` **压不住**，因为 C4961 是 LTCG 代码生成器（编译器）发出的）。
+  实测：原先失败的 `fceux11_config_store_test` / `fceux11_enum_class_bitflags_test` /
+  `fceux11_ppu_simd_probe_*` / `fceux11_i18n_regression_test` 随后正常链接。
+- **PGO 收益首次取到实测值**（长尾 LT-04 闭合）：训练场景（魔界村 / SMB3 / 塞尔达各 12,000 帧）
+  → Phase-2 `/USEPROFILE`（`.pgd` 被更新 ⇒ profile 确实被链接器吃掉）→
+  与**同生成器、同 `/GL` + `/LTCG`** 的基线树对比（基线必须也带 `/LTCG`，
+  否则量到的是「LTCG + PGO」的合计收益）：**魔界村 578.6→762.0 fps（+31.7%）、
+  SMB3 579.6→792.1 fps（+36.7%）** ⇒ **PGO 在本仓有真实收益（吞吐 +32%~37%）**。
+  ⚠️ **是否把 PGO 设为默认 ON 尚未决策**（属发布策略：需要「插桩 → 训练 → 重建」三步流程，
+  且训练用 ROM / `.pgc` 必须入库或可复现）——**在业主裁决前默认保持 OFF**。
+
 ## [2.0.4] - 2026-11-15
 
 > **v2.0.4 正式发布**：残留精度与调试待办收口（构建计划 r13–r16：**20/22 项落地**；
