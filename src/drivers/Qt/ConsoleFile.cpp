@@ -265,6 +265,31 @@ void consoleWin_t::openROMFile(void)
 	dialog.setOption(QFileDialog::DontUseNativeDialog, !useNativeFileDialogVal);
 	dialog.setSidebarUrls(urls);
 
+	{
+		// BUG-V205-03: hold one EXTRA reference on the GUI thread's STA for
+		// the lifetime of the native dialog -- deliberately NOT balanced
+		// with CoUninitialize.
+		//
+		// On Windows 11 the modern common file dialog (windows.storage.dll)
+		// mis-manages the calling thread's apartment references: after a
+		// close/open cycle its machinery ends up running on an internal
+		// host thread instead of the caller's STA, and its close-time
+		// EnableWindow(owner) becomes a cross-thread SendMessage that the
+		// GUI thread -- parked inside the remoted Show() in a COM-only wait
+		// -- never pumps.  Result: permanent mutual deadlock, reproduced
+		// four times with byte-identical stacks (v2.0.5 plan §9.11/E13).
+		//
+		// Controlled experiment (plan §9.20, A/B/C/D): without this extra
+		// reference the deadlock hit within 1-2 cycles in five independent
+		// observations; with it, 17 consecutive dialog opens across two
+		// sessions never hung.  The extra reference is plain integer
+		// bookkeeping (no resource behind it) and is intentionally left
+		// unbalanced for the life of the process; the exact reason a
+		// TRANSIENT balanced pair is NOT sufficient is logged as an open
+		// question in §9.20.
+		CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+	}
+
 	ret = dialog.exec();
 
 	if ( ret )
@@ -391,8 +416,11 @@ void consoleWin_t::loadNSF(void)
 
 	g_config->setOption ("SDL.LastOpenNSF", filename.toStdString().c_str() );
 
-	// BUG-V205-03: same deferral as openROMFile -- LoadGame() must not run
-	// inside the native file-dialog's unwind window (see the comment there).
+	// BUG-V205-03: same STA reference shim as openROMFile (the dialog itself
+	// needs it -- see the full comment there), plus the same deferral of
+	// LoadGame() out of the dialog's unwind window.
+	CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+
 	QTimer::singleShot( 0, this, [this, filename](void)
 	{
 		FCEU_WRAPPER_LOCK();

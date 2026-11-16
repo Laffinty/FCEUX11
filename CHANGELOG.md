@@ -53,49 +53,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **双击 ROM 打开（走命令行）这条路径基本不可用**；GUI 文件对话框不受影响
   （Qt 给的是 Unicode 路径）。
 
-### Fixed — 命令行参数
-
-- **`--no-console` 会让命令行 ROM 被静默忽略**（BUG-V205-02，同上一条实批发现）：
-  `Config::parse()` 遇到不认识的参数直接返回 -1，而 `--no-console` 是驱动自己
-  消费的开关、不在配置项表里 ⇒ `--no-console <rom>` 的 ROM 路径被解析失败吞掉，
-  游戏根本没加载（配置项 `SDL.LastOpenFile` 也不会被更新，可据此判定）。
-  ⚠️ 这是本仓**原有**行为（`--no-console` 是 v0.3.15.x PHASE-3 引入的开关），
-  此前尝试过两种修法并**都未采用**：
-  - 在解析器里注册「无值开关」⇒ 改 `Config` 类布局后 exe 在参数解析前异常退出，
-    原因未查明，**已回退**（不把未查清的改动带进发布）；
-  - 把该开关从 `argv` 里剔除 ⇒ `parse()` 返回的是**下标**、`argv[romIndex]`
-    取的却是原数组 ⇒ 下标错位，会加载错文件，**已回退**。
-  修法（`src/drivers/common/configSys.cpp` + `src/drivers/Qt/fceuWrapper.cpp`）：
-  解析器加一个**文件级静态登记表**（自由函数 `fceux11_config_register_pass_through_flag`，
-  **不触碰 `configSys.h`、`Config` 对象布局逐字不变**——正是此前翻车的点）；
-  驱动在 `fceuWrapperPreInit` 认到 `--no-console` 时登记它，解析器遇已登记开关则
-  **跳过且不吞下一个参数、不改变任何下标**。
-  验证（判据 = 独立配置目录生成 cfg 的 `SDL.LastOpenFile`）：
-  修复前 `--no-console <rom>` ⇒ LastOpenFile 停在默认值（ROM 被吞，红态当场实证于
-  v2.0.4_hotfix1 发布包）；修复后 ⇒ ROM 正常装载；不带开关与中文名 ROM 两条
-  对照路径的读数修复前后逐字一致 ⇒ 无回归。
-
-### Fixed — GUI（文件对话框与错误弹框）
-
-- **「关闭 ROM」后立刻「打开 ROM」⇒ GUI 永久卡死**（BUG-V205-03，业主 2026-11-16
-  实测报告，触发样本 `mapper21/格拉米世界2.nes`，已在业主机完成两次真复现）：
-  **原生（IFileDialog / COMDLG32）文件对话框**收尾时，其 COM 工作线程要给主窗口
-  发一条 `EnableWindow`（普通 Win32 消息），而 GUI 线程装载 ROM 的重活恰好压在
-  对话框收尾窗口里，随后卡进 `IFileDialog::Show()` 的 COM 等待（只泵 COM/RPC、
-  不派发普通消息）⇒ 两侧互等，整个应用变砖（此时自动存档也不会发生）。
-  修法（`src/drivers/Qt/ConsoleFile.cpp`）：`openROMFile` / `loadNSF` 的装载
-  改用 `QTimer::singleShot(0, …)` **推迟到对话框调用栈完全出栈之后**——
-  GUI 线程在对话框收尾窗口内始终正常泵消息，死锁环两条边都断开。
-  ⚠️ `SDL.UseNativeFileDialog` 默认值不变（改默认属产品决定）；
-  若遇到疑似卡死，可在配置里把该开关设为 0 临时规避（改用 Qt 对话框，不进 COM）。
-  ⚠️ 死锁场景无法自动化触发（自动化键盘路径实测不触发，人手鼠标路径触发）⇒
-  修复效果以人手复核为准。
-- **错误弹框防呆**（BUG-V205-01 的附带项）：`ConsoleWindow.cpp` 的 `update()`
-  原来在模态错误框**返回之后**才清 `errorMsgValid` 标志 ⇒ 框存续期间重入的
-  `update()` 可能**叠出第二个模态框**、新入队的错误可能被**静默丢弃**。改为
-  **先清标志再弹框**：每个入队错误恰好弹一次（不叠框、不丢错）。
-  ⚠️ 属防呆加固——业主最初观察到的「反复弹框」机制仍未实证，本条不对其定性。
-
 ### Fixed — 内存安全
 
 - **SFORMAT 短标签的定长 `memcpy` 越界**（计划外 E / 长尾 LT-17）：`src/state.cpp` 的
@@ -132,6 +89,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   SMB3 579.6→792.1 fps（+36.7%）** ⇒ **PGO 在本仓有真实收益（吞吐 +32%~37%）**。
   ⚠️ **是否把 PGO 设为默认 ON 尚未决策**（属发布策略：需要「插桩 → 训练 → 重建」三步流程，
   且训练用 ROM / `.pgc` 必须入库或可复现）——**在业主裁决前默认保持 OFF**。
+
+## [2.0.4_hotfix2] - 2026-11-17
+
+> **v2.0.4 的第二个 hotfix 发布**：内容 = v2.0.4_hotfix1 的全部成果 +
+> **BUG-V205-02**（`--no-console` 吞掉命令行 ROM）+ **BUG-V205-03**
+> （「关闭 ROM」后立刻「打开 ROM」⇒ GUI 永久卡死）+ BUG-V205-01 的
+> 错误弹框防呆尾巴。
+> ⚠️ **版本数值不动**：`FCEU_VERSION_NUMERIC` 仍为 **20004**（hotfix 编号只由
+> `FCEU_HOTFIX_TAG` 承载）⇒ v2.0.4 / v2.0.4_hotfix1 产出的存档/录像在本版
+> **仍可正常读取**。
+
+### Fixed — 命令行参数
+
+- **`--no-console` 会让命令行 ROM 被静默忽略**（BUG-V205-02）：
+  `Config::parse()` 遇到不认识的参数直接返回 -1，而 `--no-console` 是驱动自己
+  消费的开关、不在配置项表里 ⇒ `--no-console <rom>` 的 ROM 路径被解析失败吞掉，
+  游戏根本没加载（配置项 `SDL.LastOpenFile` 也不会被更新，可据此判定）。
+  ⚠️ 这是本仓**原有**行为（`--no-console` 是 v0.3.15.x PHASE-3 引入的开关），
+  此前尝试过两种修法并**都未采用**：
+  - 在解析器里注册「无值开关」⇒ 改 `Config` 类布局后 exe 在参数解析前异常退出，
+    原因未查明，**已回退**（不把未查清的改动带进发布）；
+  - 把该开关从 `argv` 里剔除 ⇒ `parse()` 返回的是**下标**、`argv[romIndex]`
+    取的却是原数组 ⇒ 下标错位，会加载错文件，**已回退**。
+  修法（`src/drivers/common/configSys.cpp` + `src/drivers/Qt/fceuWrapper.cpp`）：
+  解析器加一个**文件级静态登记表**（自由函数 `fceux11_config_register_pass_through_flag`，
+  **不触碰 `configSys.h`、`Config` 对象布局逐字不变**——正是此前翻车的点）；
+  驱动在 `fceuWrapperPreInit` 认到 `--no-console` 时登记它，解析器遇已登记开关则
+  **跳过且不吞下一个参数、不改变任何下标**。
+  验证（判据 = 独立配置目录生成 cfg 的 `SDL.LastOpenFile`）：
+  修复前 `--no-console <rom>` ⇒ LastOpenFile 停在默认值（ROM 被吞，红态当场实证于
+  v2.0.4_hotfix1 发布包）；修复后 ⇒ ROM 正常装载；不带开关与中文名 ROM 两条
+  对照路径的读数修复前后逐字一致 ⇒ 无回归。
+
+### Fixed — GUI（文件对话框死锁与错误弹框）
+
+- **「关闭 ROM」后立刻「打开 ROM」⇒ GUI 永久卡死**（BUG-V205-03）：
+  **Windows 11 原生（IFileDialog / windows.storage.dll）文件对话框**在
+  关闭/打开循环后会把对话框机制转到内部宿主线程上执行，其收尾的
+  `EnableWindow(owner)` 因此变成一条跨线程 `SendMessage`；而 GUI 线程
+  卡在 `IFileDialog::Show()` 转发调用的 COM-only 等待里（只泵 COM/RPC、
+  不派发普通消息）⇒ 两侧互等，整个应用变砖（此时自动存档也不会发生）。
+  等待链 + 裸栈取证：两次独立复现的栈**逐字一致**，且**两个栈里都没有任何
+  本仓代码帧、没有本仓锁**——环完全落在 Windows 侧的对话框实现内部。
+  修法两层（`src/drivers/Qt/ConsoleFile.cpp`）：
+  1. 装载动作（`CloseGame`+`LoadGame`）改用 `QTimer::singleShot(0, …)`
+     **推迟到对话框调用栈完全出栈之后**（正确卫生；单测证明它单独不够）；
+  2. **STA 引用垫片**：每次打开原生对话框前，给主线程 STA 显式多持有一个
+     引用（`CoInitializeEx(NULL, COINIT_APARTMENTTHREADED)`，**故意不配对
+     `CoUninitialize`**）。对照实验（同机/同操作/同 cfg，四个二进制）：
+     无垫片 5 次独立观察**全部在 1–2 轮循环内死锁**；带垫片 **18 次对话框
+     打开（两次会话）零死锁**；「临时配对」形态的对照腿在 >5 轮后才死
+     （该结果同时证伪了「套间引用被泄漏至拆除」这一最简洁机制解释——
+     精确的 Windows 侧机制仍未钉死，详见 v2.0.5 构建计划 §9.20）。
+     每次打开只多一个引用计数字（无资源对应），进程退出无需归零。
+  ⚠️ `SDL.UseNativeFileDialog` 配置项保留；默认值 1 下死锁已随本版修复，
+  用户无需手动改 0（改 0 仍可作为彻底绕开 COM 路径的备选）。
+  ⚠️ 死锁场景无法自动化触发（自动化键盘路径实测不触发，人手鼠标路径触发）
+  ⇒ 修复效果以人手复核为准（本版已由业主人手实测确认正常）。
+- **错误弹框防呆**（BUG-V205-01 的附带项）：`ConsoleWindow.cpp` 的 `update()`
+  原来在模态错误框**返回之后**才清 `errorMsgValid` 标志 ⇒ 框存续期间重入的
+  `update()` 可能**叠出第二个模态框**、新入队的错误可能被**静默丢弃**。改为
+  **先清标志再弹框**：每个入队错误恰好弹一次（不叠框、不丢错）。
+  ⚠️ 属防呆加固——业主最初观察到的「反复弹框」机制仍未实证，本条不对其定性。
 
 ## [2.0.4_hotfix1] - 2026-11-16
 

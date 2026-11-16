@@ -123,8 +123,9 @@ inline constexpr int FCEU_VERSION_MAJOR_DECODE(int x) { return x / 10000; }
 inline constexpr int FCEU_VERSION_MINOR_DECODE(int x) { return (x / 100) % 100; }
 inline constexpr int FCEU_VERSION_PATCH_DECODE(int x) { return x % 100; }
 
-// v2.0.4_hotfix1 — hotfix 发布
-#define FCEU_HOTFIX_TAG "_hotfix1"
+// v2.0.4_hotfix2 — hotfix 发布（BUG-V205-02/03：--no-console 吞 ROM、
+// 文件对话框 COM 死锁——推迟装载 r7 + 主线程 STA 引用垫片 r8）
+#define FCEU_HOTFIX_TAG "_hotfix2"
 
 #define FCEU_VERSION_STRING "2.0.4" FCEU_HOTFIX_TAG " " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
 #define FCEU_DISPLAY_VERSION "v2.0.4" FCEU_HOTFIX_TAG
