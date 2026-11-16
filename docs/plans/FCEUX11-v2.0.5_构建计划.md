@@ -1046,14 +1046,20 @@ C++ 端到端锁**转红**（同源变异）⇒ 三条锁都有牙。
 **死锁环（等待链 + 线程栈实测，见 §9.13）**：
 
 ```
-① 对话框工作线程  tid=8512
-   栈：COMDLG32.dll → windows.storage.dll → combase.dll → RPCRT4.dll
-   卡在：win32u!NtUserEnableWindow  ⇒  SendMessage(EnableWindow) → GUI 线程
-   等待：GUI 线程回消息（同步 SendMessage 必须等对方处理）
+① 文件对话框的 COM 工作线程（第一次 tid=8512 / 第二次 tid=8800）
+   栈：COMDLG32.dll+0x13620 → USER32.dll+0x20f1b → win32u!NtUserEnableWindow
+       → COMDLG32.dll+0xc69e0 / +0x6cbf2 / +0x841e4 → windows.storage.dll → combase → RPCRT4
+   卡在：关闭对话框时**重新启用 owner 窗口**（= FCEUX 主窗口）
+        ⇒ 这是**进程内同步 SendMessage** ⇒ 必须由 GUI 线程处理
+   等待：GUI 线程回消息
 
-② GUI（主）线程   tid=4380
-   栈：KERNELBASE → ntdll!ZwWaitForMultipleObjects → combase.dll → RPCRT4.dll
-   卡在：IFileDialog::Show() 的 COM/RPC 等待（不泵 Win32 消息）
+② GUI（主）线程（第一次 tid=4380 / 第二次 tid=996）
+   栈：RPCRT4!NdrClientCall3 → RPCRT4!NDRSContextUnmarshall2
+       → combase!CoWaitForMultipleHandles+0x1de9/+0xbe4
+       → KERNELBASE!WaitForMultipleObjectsEx+0x123 → ntdll!ZwWaitForMultipleObjects
+   卡在：**正在等 Show() 那个 RPC 调用的回包**
+       ⇒ `CoWaitForMultipleHandles` 是 STA 消息泵：**只派发 COM/RPC 消息，不派发普通 Win32 消息**
+       ⇒ ① 那条 EnableWindow 永远排不上
    等待：对话框结束
 ```
 
@@ -1102,6 +1108,7 @@ C++ 端到端锁**转红**（同源变异）⇒ 三条锁都有牙。
 | E10 | 包装锁协议差异（D1–D4）**确实存在**，但与本条卡死无因果 | 源码逐行对照（`fceuWrapper.cpp:1243-1309` vs 上游 `:1443-1606`）；E7 已排除其为死锁点 |
 | E11 | **对照 A：不关闭、直接打开** ⇒ **不死锁**（第二次 `Loading` 完成、窗口持续应答 `WM_NULL`） | `control_exp.py`：`RESULT: HANG=False` |
 | E12 | **对照 B：连续 3 轮「关闭→打开」**（自动化用**键盘 Enter** 关对话框）⇒ **不死锁** | `cycles.py`：3 轮全部正常 |
+| E13 | **第二次独立复现（22:13，仍为业主人手操作）⇒ 栈与第一次逐字相同**（`COMDLG32+0x13620`、`USER32+0x20f1b`、`combase!CoWaitForMultipleHandles+0x1de9`、`RPCRT4!NdrClientCall3` 等偏移全部一致）⇒ **根因确证**（两次独立复现、同一死锁环） | `waitchain_6540_221355.txt` + 手工栈扫描（22:15） |
 
 #### 9.14 ⚠️ 未实证部分（如实登记）
 
@@ -1109,7 +1116,8 @@ C++ 端到端锁**转红**（同源变异）⇒ 三条锁都有牙。
   - 对照 A（**不关闭、直接打开**）⇒ **不死锁** ⇒ 「关闭」确实是必要条件；
   - 对照 B（**连续 3 轮 关闭→打开**，自动化用**键盘 Enter** 关对话框）⇒ **不死锁**；
   - 业主**人手操作**（鼠标点对话框的「打开」按钮）⇒ **死锁**（21:33 那次）。
-  ⇒ **未定的剩余变量**：① 对话框是**鼠标点「打开」**还是**键盘 Enter** 关闭；② 会话状态（业主 cfg `SDL.AutoSaveState = 99` vs 实验用的 `0`）；③ 时序。**这决定修复面的大小，务必在业主机上再验一轮。**
+  ⇒ **未定的剩余变量**：① 对话框是**鼠标点「打开」**还是**键盘 Enter** 关闭；② 会话状态（业主 cfg `SDL.AutoSaveState = 99` vs 实验用的 `0`）；③ 时序。
+  ⇒ **22:13 的第二次业主复现（t+5.4 s 触发）栈与 21:33 逐字相同**，⇒ 死锁环本身已无疑问；剩余变量只决定**触发概率/触发面**，**不影响 §9.15 的三条修法**（三条都与「谁赢了这个竞态」无关）。
 - **是否与 Windows 版本 / 文件对话框实现强相关**：本轮只在 Win11（26100）的
   **现代 IFileDialog**（`windows.storage` + `combase`）上复现；经典 `GetOpenFileName`
   路径是否也有此问题**未验证**。
