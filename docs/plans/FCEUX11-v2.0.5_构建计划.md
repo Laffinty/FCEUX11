@@ -812,7 +812,7 @@ GBA 侧「BIOS SWI 全部实现」—— 详见长尾盘点文档 §四。
 | r3 | 2026-11-16 | **新增 §九 · 缺陷登记：BUG-V205-01（loader 误拒 CHR 非 2 幂 ROM ⇒ 错误弹框）**——业主人工验证 A1 时用 v2.0.4 发布包打开 `打砖块 [Nokoh汉化].nes`（mapper 140）触发反复错误弹框。**已实证的根因**：本仓 Rust loader 对 CHR 数量做 `uppow2` 舍入（与上游同）**并新增了上游没有的文件边界检查** ⇒ 「CHR 数量非 2 幂」（头 6 → 布局 8）的合法 iNES 1.0 ROM 被判为 "Unknown ROM file format."；**上游 2.6.6 / 2.8.0 不做该边界检查**（直接 `FCEU_fread`，读不足就少读）⇒ 上游能装、本仓不能 = **本仓独有的收紧（回归）**；v2.0.3 的 S4（`fb26feb`）修了 PRG 侧同类问题但 **CHR 侧未同步**。**影响面不止 mapper 140**：任何 CHR 数量非 2 幂的 iNES 1.0 ROM 一律被拒。**「反复弹框」的确切机制尚未实证**（已排除一个假设：模态框嵌套事件循环 ⇒ 定时器重入，最小复现证伪）；代码上一处可疑时序已登记（`ConsoleWindow.cpp:747-751` 的 `errorMsgValid` 在含模态 `exec()` 的 `showErrorMsgWindow()` **返回之后**才清零）⇒ 修复方向已明确，**本轮只登记不修**，待下次立项 |
 | r4 | 2026-11-16 | **BUG-V205-01 修复落地（v2.0.4_hotfix1）**：① 改法 = **边界检查与拷贝改用头里的原始 CHR 数量**，**分配/映射/哈希仍用舍入值**（上游同款；⚠️ 不是去掉 `uppow2`——映射与 ROM 矫正表的 CRC 键都依赖舍入后的缓冲）；落点 = `cart.rs`（新增 `vrom_size_raw`）+ `ines.rs`（两个 FFI 结构体透传 + 边界检查改 raw + 哈希传 `(raw, padded)`）+ `ines_load.cpp`（CHR 拷贝用 raw 长度，尾部按上游语义补 0xFF）。② 门禁 **3 条新锁**：`fceux11-formats` 基线 **154 → 156**（CHR=6 可装 + 短文件仍被拒）+ `fceux11_mapper_load_test` 端到端（装载成功 + 文件字节在位 + 尾部 0xFF）；**变异验证双向**：边界检查改回舍入值 ⇒ Rust 锁转红（155/1）+ 端到端锁转红 + 「短文件仍被拒」保持绿。③ 实测：三个 Nokoh ROM 全部能装（修复前三个都是 Unknown ROM file format）；`ctest -LE perf` **41/41**；Rust 八条全绿（根 299/0/20 · vendor 249 · debug 94 · media 52 · formats 156 · utils 51 · lua 54 · 两态 check EXIT=0）。④ 版本口径：`FCEU_HOTFIX_TAG = "_hotfix1"` ⇒ `v2.0.4_hotfix1`，⚠️ **`FCEU_VERSION_NUMERIC` 保持 20004**（hotfix 冻结数值）⇒ v2.0.4 的存档/录像仍可读；产物内字符串已回查确认。⑤ **§9.6 方向 2（Qt 弹框防呆）本轮未做**——「反复弹框」机制仍未实证（假设已被最小复现证伪）⇒ 无证据改动不做，降级为观察项。⑥ **本 hotfix 只取 BUG-V205-01 这一项**，A1 属 v2.0.5 线，不并入本次发布 |
 | r5 | 2026-11-16 | **线 C 落地（计划外 · 加载卡顿）**：① **C1 根因**——每次加载 ROM 都走 `DriverInitialize → InitSound → SDL_OpenAudio`，本机 WASAPI 后端**找不到音频端点**，`SDL_OpenAudio` 要**整整 8 秒**才失败，而**这 8 秒在 GUI 线程持有 `FCEU_WRAPPER_LOCK` 期间** ⇒ 模拟线程被挡、窗口无响应；证据 = stderr 时间戳 `0.70s → 8.70s`，交叉验证 = 换 `SDL_AUDIODRIVER=directsound/winmm` 后 8 秒空档**完全消失**。② **改法四条**（`sdl-sound.cpp`）：设备打开**搬到后台线程**（调用方不再等探测）/ 已开且采样率一致则**复用**（旧代码每次加载都重开一次、必失败，还会拆掉重建音频回调线程与环形缓冲）/ 失败后退避 **60 秒** / WASAPI 失败后**回退 directsound、winmm**。③ **实测：ROM 加载完成时刻 9.49 s → 0.29 s**（判据 = cfg 的 `SDL.LastOpenFile` 被更新，不用 stdout——**stdout 重定向时是全缓冲**，进程被 kill 会丢缓冲，本轮据此误判过两次）。④ **C2**：命令行中文名 ROM 此前**必然失败**（`main()` 的 argv 是本地 ANSI(GBK)，文件层按 UTF-8 处理）⇒ 改用 `QApplication::arguments()`（宽字符命令行）重建 UTF-8 `argv`（`main.cpp`）。⑤ **C3 未修**：给配置解析器加「无值开关」注册机制 ⇒ **改 `Config` 类布局后 exe 在参数解析前异常退出（原因未查明）**，已回退；改用「从 argv 剔除该开关」⇒ **下标错位会加载错文件**，已回退 ⇒ 登记 **BUG-V205-02**（本仓原有行为，非本轮引入）。⑥ 门禁：全量重建 EXIT=0、`ctest -LE perf` **41/41**、`cargo check --workspace` EXIT=0；改动**只在 driver 层**，未触碰 core/Rust/mapper 逻辑。⑦ **未实证**：本轮执行会话是**无交互桌面**（`SendKeys` 被拒、截屏失败）⇒ **GUI 点击路径未端到端验证**，待业主机上复核；**本机三个音频后端全失败 ⇒ 本机 FCEUX11 无声**（与改动无关，改动前同样无声）；**启动后仍有一个非主线程满载单核**（旧版同样存在、与加载慢无因果，函数未定位，登记为观察项）。⑧ 提交 `36af048`（**已推送到 `main`**）。 |
-| r6 | 2026-11-16 | **新增 §九 · 缺陷登记：BUG-V205-03（关闭 ROM 后立刻打开 ROM ⇒ GUI 永久卡死）**——业主人工实测 v2.0.4_hotfix1 发布包；**业主补充触发条件：必须先「关闭 ROM」再「立刻打开 ROM」**。① **触发路径已核对到坐标**：关闭 = `ConsoleFile.cpp:304-309`（GUI 线程**持**包装锁）→ 中间是**原生模态文件对话框**（业主 cfg `SDL.UseNativeFileDialog=1`；此时 GUI 线程**不持锁**、模拟线程照跑）→ 打开 = `ConsoleFile.cpp:287-290`（再**持**锁做 `CloseGame()+LoadGame()`）⇒ **「关→开」与「只开」的唯一差别就在这两段锁作用域之间**。② **根因定位到协议层**：本仓包装锁与上游 2.8.0 存在**四处协议级差异**，且全部落在该路径上——**D1** 全局 `mutexLocks` 计数（上游是 `thread_local` 深度）/ **D2** `fceuWrapperUnLock()` 在计数为 0 时**跳过真正的 `mutex->unlock()`**（上游无条件解锁）/ **D3** 模拟线程抢锁失败**放弃重试**（上游自旋直到拿到）/ **D4** **无「GUI 要锁⇒模拟线程让位」的 preempt 协议**（上游有 `reqEmuLock` + `emuThreadPreempt*Logic`）；另有**顺序差异**：本仓**先发帧完成信号后解锁**（上游相反）⇒ GUI 可能在模拟线程仍持锁时被唤醒。③ **已实证**：卡死表现为**窗口停止应答而进程存活**（`SendMessageTimeout(WM_NULL)` 超时）⇒ 是**阻塞不是崩溃**；GUI 侧取锁是**阻塞式** ⇒ 任何锁失衡都表现为永久卡死。④ **未实证（如实登记）**：「卡死瞬间是哪把锁被谁永久持有」**尚未钉死**——本轮 GUI 自动化虽能经 **UI Automation** 精确命中菜单项（可访问名 `关闭 ROM(C)⇥Ctrl+C`）并驱动原生对话框，但**未能可靠验证「关闭」是否真的发生**（存档时间戳不变；且**进程总 CPU 不能作判据**——本仓有 r5 ⑦ 登记的常驻满载线程），且本机 **OpenGL 后端会崩**（`Qt6OpenGL.dll!glGenTextures` ⇒ `0xC0000005`）⇒ **本轮未拿到可确认的真复现**，§9.12 的机制推演**未经验证**。⑤ **排除两类工件**（避免下轮重踩）：跨线程 `SendMessage` 驱动原生对话框会**死等**（等待链实测：驱动线程 `SendMessage` → GUI 线程空转 9000+ 次上下文切换）⇒ 改用 `SendInput` 键盘输入；`OpenThreadWaitChainSession` 的 Flags **必须传 0**（传 `WCTP_OPEN_ALL_FLAGS` 报 `ERROR_INVALID_PARAMETER`）。⑥ **本轮建成复现装置**（`Research_only/w205/probe/`，gitignored）：**库级探针**（链真实驱动库，复刻全序列 + 崩溃栈捕获 + 看门狗）、**等待链转储器** `wct_dump.exe`、**UIA 端到端自动化**、**线程级 CPU 统计**；**下轮第一步 = 拿到业主机（有交互桌面 + 正常 GL）跑一次带等待链快照的真复现**，再按 §9.16 对齐上游协议动刀。⑦ 本轮**只登记不修** |
+| r6 | 2026-11-16 | **新增 §九 · 缺陷登记：BUG-V205-03（关闭 ROM 后立刻打开 ROM ⇒ GUI 永久卡死）**——业主人工实测 v2.0.4_hotfix1 发布包，触发样本 `mapper21/格拉米世界2.nes`；业主补充触发条件：**先「关闭 ROM」再「立刻打开 ROM」**。① **同日 21:33 完成真复现**（业主机，有交互桌面 + 正常 GL：NVIDIA 582.28 / GL 3.3.0）：业主手动操作、机器全程记录 ⇒ **卡死复现**（`HANG at t+128.6s`，app `Responding=False`，连续 6 次快照等待链逐字一致 ⇒ 死锁稳定非瞬态）。② **根因已实证（等待链 + 双方线程栈 + 窗口枚举 + app 日志四路互证）**：**原生（IFileDialog / COMDLG32）文件对话框的 COM 工作线程 tid=8512 卡在 `EnableWindow` 的 `SendMessage` → GUI 线程**（栈：`COMDLG32 → windows.storage → combase → RPCRT4`），而 **GUI 线程 tid=4380 卡在 `IFileDialog::Show()` 的 COM/RPC 等待**（栈：`KERNELBASE → ntdll!ZwWaitForMultipleObjects → combase → RPCRT4`）⇒ **互等死锁**；物证：**「打开 ROM 文件」窗口仍存在但已隐藏**（`exec()` 永不返回）+ **第二次 ROM 装载已完成**（stdout 有第二次 `Loading … mapper21` → `Power on` → `Initializing video`）⇒ 卡住的是 GUI 线程，不是装载。③ **推翻了本条初版登记的根因**：初版基于静态分析写成「包装锁协议失衡」（全局计数 / 跳过解锁 / 抢锁失败即放弃 / 无 preempt 让位 —— 与上游 2.8.0 的四处差异）——**等待链证明 GUI 线程节点里没有任何锁**（无 CriticalSection / Mutex）⇒ 那四处差异**独立存在但与本条无因果**，已降级为顺带修项。④ **仍缺**：为什么「必须先关闭 ROM」尚未做对照实验（决定修复面大小）；「每线程 CPU」仍缺（`GetThreadTimes` 对更高权限进程 `ACCESS_DENIED`）；上游 2.8.0 是否同病未核。⑤ **本轮建成取证装置**（`Research_only/w205/probe/`，gitignored）：`launch_watch.py`（启动 + 全程记录：等待链 / 线程栈 / 截图 / app 日志）、`stack_scan.cpp`（不依赖展开器的栈扫描）、`pe_export.py`（地址→导出符号）、`wct_dump.exe`、`shot.ps1`。⑥ **修复方向**：先做对照实验 ⇒ 主修 = **不要在文件对话框的 COM 回调里同步装载 ROM**（推迟到对话框完全关闭之后）；规避 = `SDL.UseNativeFileDialog` 默认改 0（属产品决定）；兜底 = GUI 取包装锁带超时。⑦ 本轮**只登记不修** |
 
 ---
 
@@ -1014,119 +1014,153 @@ C++ 端到端锁**转红**（同源变异）⇒ 三条锁都有牙。
 - 不带 `--no-console` 的行为**不变**；
 - `ctest -LE perf` **41/41** 全绿。
 
-### BUG-V205-03 · 「关闭 ROM」后立刻「打开 ROM」⇒ GUI 永久卡死（包装锁握手失衡）
+### BUG-V205-03 · 「关闭 ROM」后立刻「打开 ROM」⇒ GUI 永久卡死（**原生文件对话框 × COM 回调死锁**）
 
-**状态**：⛔ **本轮只登记不修**（2026-11-16 登记；根因已定位到**协议层**，但「卡死瞬间是哪把锁被谁永久持有」尚未钉死 ⇒ 见 §9.14）
+**状态**：⛔ **本轮只登记不修**（2026-11-16 登记 → **同日 21:33 已在业主机上完成真复现，根因已实证**）
 **报告来源**：业主人工实测 —— 发布包 `C:\Users\ikrx2\Desktop\fceux11-v2.0.4_hotfix1-windows-amd64\fceux11.exe`（= 本仓 `main` @ `ba35b0f` 之后）
-**业主补充的触发条件（重要）**：**必须先「关闭 ROM」，再「立刻打开 ROM」才会触发**；只打开不关、或关后等一会儿再开，都不复现。
+**业主补充的触发条件**：**先「关闭 ROM」，再「立刻打开 ROM」**；触发样本 = `C:\Users\ikrx2\Desktop\roms\mapper21\格拉米世界2.nes`（mapper 21 = Konami VRC2/VRC4 A）。
+
+> ⚠️ **本条在同一天内被修正过一次**：初次登记时基于静态分析把根因写成「包装锁协议失衡」（见下方 §9.13 的 D1–D4）。
+> **该推演已被 21:33 的真复现推翻** —— 等待链与线程栈证明死锁**不在包装锁上**，而在
+> **Windows 原生文件对话框（IFileDialog / COMDLG32）的 COM 回调路径**。
+> 保留 D1–D4 作为**独立存在的协议缺陷**（仍值得修），但**不是本条卡死的原因**。
 
 #### 9.9 现象
 
-- 状态：已有一个 ROM 在跑 ⇒ 「文件 > 关闭 ROM」⇒ **马上**「文件 > 打开 ROM」⇒ **整个窗口卡死**（不响应）。
-- 业主原话：「会卡死」；表现为窗口无响应、菜单点不动（**不是崩溃**：无错误框、进程仍在）。
+- 已有一个 ROM 在跑 ⇒ 「文件 > 关闭 ROM」⇒ **马上**「文件 > 打开 ROM」⇒ 选同一个 ROM ⇒ 「打开」
+  ⇒ **窗口彻底卡死**：菜单点不动、画面停在最后一帧、任务管理器里进程还在（**不是崩溃**）。
+- **第二次装载其实完成了**：app 的 stdout 显示第二次 `Loading ... mapper21/格拉米世界2.nes` →
+  `Power on` → `Initializing video...` → `NTSC mode set` **全部打印完毕** ⇒
+  **ROM 数据没问题，卡住的是 GUI 线程**（画面停在最后一帧 = GUI 线程不再 repaint）。
 
 #### 9.10 触发路径（代码坐标已核对）
 
-| 步 | 动作 | 代码 | 线程 | 包装锁 |
-|---|---|---|---|---|
-| ① | 文件 > 关闭 ROM | `ConsoleFile.cpp:304-309` `consoleWin_t::closeROMCB()` | GUI（主）线程 | **持有** ⇒ `CloseGame()` ⇒ `DriverKill()` ⇒ `GameInfo=0` ⇒ 释放 |
-| ② | （菜单关 → 再开 →）文件 > 打开 ROM | `ConsoleFile.cpp:205-293` `consoleWin_t::openROMFile()` | GUI（主）线程 | **不持有** ⇒ `dialog.exec()`（**原生文件对话框**：业主 cfg `SDL.UseNativeFileDialog = 1`）⇒ 阻塞在模态循环 |
-| ③ | 选文件后 | `ConsoleFile.cpp:287-290` | GUI（主）线程 | **持有** ⇒ `CloseGame()` + `LoadGame()` ⇒ 释放 |
+| 步 | 动作 | 代码 | 说明 |
+|---|---|---|---|
+| ① | 文件 > 关闭 ROM | `ConsoleFile.cpp:304-309` `closeROMCB()` | GUI 线程持包装锁跑 `CloseGame()` |
+| ② | 文件 > 打开 ROM | `ConsoleFile.cpp:205-293` `openROMFile()` | **原生**文件对话框（业主 cfg `SDL.UseNativeFileDialog = 1`）⇒ `dialog.exec()` 进入 **COM 等待** |
+| ③ | 选中文件 → 打开 | `ConsoleFile.cpp:287-290` | **在对话框的 COM 回调里**同步跑 `CloseGame()+LoadGame()`（stdout 证实第二次装载已完成） |
 
-⇒ **②③ 之间 GUI 线程不持锁、模拟线程在跑**（`GameInfo==NULL` ⇒ 模拟线程每 ~100 ms 抢一次锁再放掉），这正是「关→开」与「只开」的唯一差别。
+#### 9.11 ✅ 根因（**已实证**）：原生文件对话框的 COM 回调 × GUI 线程 ⇒ 互等死锁
 
-#### 9.11 根因分层：**本仓的包装锁协议与上游 2.8.0 存在四处协议级差异，且全部落在这条路径上**
+**死锁环（等待链 + 线程栈实测，见 §9.13）**：
 
-对照基准 = 上游快照 `C:\Users\ikrx2\Desktop\新建文件夹 (2)\fceux-master\src\drivers\Qt\fceuWrapper.cpp`（master 2.8.0）。
+```
+① 对话框工作线程  tid=8512
+   栈：COMDLG32.dll → windows.storage.dll → combase.dll → RPCRT4.dll
+   卡在：win32u!NtUserEnableWindow  ⇒  SendMessage(EnableWindow) → GUI 线程
+   等待：GUI 线程回消息（同步 SendMessage 必须等对方处理）
 
-| # | 维度 | 本仓 | 上游 2.8.0 | 后果 |
-|---|---|---|---|---|
-| **D1** | 锁深度记账 | **全局** `std::atomic<int> mutexLocks`（`fceuWrapper.cpp:134`），GUI 线程与模拟线程**共用一个计数器** | `thread_local int wrapperMutexLockDepth`（`fceuWrapper.cpp:1443`）**每线程各记一份** | 计数与「谁真的持有 QMutex」**可以脱钩** |
-| **D2** | 解锁时的兜底 | `fceuWrapperUnLock()` **先看全局计数**，`>0` 才 `mutex->unlock()`，否则只打印 `Error: Mutex is Already UnLocked` **并跳过真正的解锁**（`fceuWrapper.cpp:1289-1304`） | `fceuWrapperUnLock()` **无条件** `--mutexLocks; --depth; emulatorMutex.unlock()`（`:1549-1558`） | **计数一旦错位，QRecursiveMutex 会被永久留在「已锁」状态，而计数说「没锁」** |
-| **D3** | 模拟线程抢锁失败时 | **放弃并返回 -1**，退避 16→256 ms 后重试（`fceuWrapper.cpp:1375-1399`） | **自旋直到拿到锁**：`do { tryLock(); } while (!lock_acq);`（`:1601-1606`） | GUI 线程阻塞在 `mutex->lock()` 期间，**模拟线程可反复抢走锁**（本仓无「让位」协议） |
-| **D4** | 「GUI 要锁 ⇒ 模拟线程让位」协议 | **无**；只有粗粒度 `mutexPending`（`:1370-1373`，**只在帧间看**） | `emuThreadPreemptEntryLogic/ExitLogic` + `reqEmuLock`（`:1442-1481`）：GUI 线程 `++reqEmuLock` 宣告「我要锁」，模拟线程**在取锁前主动让出** | 本仓 GUI 线程与模拟线程**争抢同一把锁，无优先级** ⇒ 配合 D2 的「跳过解锁」，一次错位即永久卡死 |
+② GUI（主）线程   tid=4380
+   栈：KERNELBASE → ntdll!ZwWaitForMultipleObjects → combase.dll → RPCRT4.dll
+   卡在：IFileDialog::Show() 的 COM/RPC 等待（不泵 Win32 消息）
+   等待：对话框结束
+```
 
-补充两处**顺序差异**（同一路径上，方向都指向「更容易撞上」）：
+⇒ **对话��的工作线程等 GUI 线程回消息，GUI 线程等对话框结束 ⇒ 互等 ⇒ 永久死锁。**
 
-- 本仓 `fceuWrapperUpdate()` **先 `signalFrameFinished()` 再 `fceuWrapperUnLock()`**（`:1539-1543`）⇒ GUI 线程可能在**模拟线程仍持锁**时被唤醒（`emuFrameFinish()` → `QCoreApplication::processEvents()`）；上游是**先解锁再发信号**（`:1637-1641`）。
-- 本仓 `CloseGame()` 的断点分支用 `fceuWrapperIsLocked()` 判断「是否持锁」，而该函数读的是**全局计数**（`:1306-1309`）⇒ 在 D1 错位时会**在 GUI 线程里解掉别人的锁**（上游同函数也是读全局计数，但上游有 `thread_local` 深度兜底 ⇒ 错位被限死在单线程内）。
+**物证（三条互相印证）**：
 
-#### 9.12 为什么「关→开」会踩到而「只开」不会（机制推演）
+1. **app 里那个「打开 ROM 文件」窗口仍然存在、但已隐藏**（枚举窗口：`Qt6110QWindowIcon` / 标题 `打开 ROM 文件` / `IsWindowVisible = False`）
+   ⇒ **对话框关了，但 `dialog.exec()` 永不返回**（`exec()` 等的是 `Show()` 返回，不是窗口销毁）。
+2. **GUI 线程的栈顶是 `combase.dll` + `RPCRT4.dll`** ⇒ 它确实卡在 COM/RPC 里，而不是在 FCEUX 自己的代码里。
+3. **等待链里 8512 的节点是 `SendMessage → tid=4380`** ⇒ 对话框线程在等 GUI 线程；而 GUI 线程的节点里**没有指向任何锁**（不是包装锁！）。
 
-1. 「关闭 ROM」在 GUI 线程**持锁**状态下跑完 `CloseGame()`：`GameInfo` 归零、`DriverKill()` 拆音频/视频、模拟线程被挡在锁外。
-2. 「打开 ROM」的**原生模态对话框**在 GUI 线程里跑一个 **Win32 模态循环**：此时 **Qt 事件循环不转**，但**模拟线程照跑**（`GameInfo==NULL` ⇒ 走 `fceuWrapperUpdate()` 的 else 分支：`fceuWrapperUnLock(); msleep(100);` ⇒ **每 ~100 ms 抢一次锁、放一次锁**）。
-3. 对话框关闭后，GUI 线程执行 `FCEU_WRAPPER_LOCK()`（`ConsoleFile.cpp:287`）= **阻塞式** `consoleWindow->mutex->lock()`（`ConsoleWindow.cpp:220` 是 `QRecursiveMutex`）。
-4. **若此刻模拟线程正持锁**，GUI 线程只能等；而按 **D3/D4**，模拟线程可以在 GUI 等待期间**反复重新抢到锁**（每轮只持有一帧的时长）⇒ GUI 线程的等待被拉长。
-5. **若期间发生一次 D2 描述的「计数错位 ⇒ 跳过真正的 `mutex->unlock()`」**，则 QMutex **永久保持锁定** ⇒ 此后任何一次 `FCEU_WRAPPER_LOCK()` 都**永久阻塞** ⇒ **窗口彻底卡死**（Windows 会显示「未响应」）。
+**为什么画面停在 X1 logo**：GUI 线程卡住 ⇒ 120 Hz 的 `gameTimer` 不再触发 ⇒
+`emuFrameFinish()/updatePeriodic()` 不再跑 ⇒ `transferVideoBuffer()` 不再把帧贴到窗口
+⇒ **窗口永远显示最后一帧**（启动时的 FCEUX11 logo）。
 
-⚠️ **第 5 步是推演，不是实证**（见 §9.14）。
+**为什么「关闭 ROM 后立刻打开」才触发（当前最可能解释，仍属**推演**）：
+原生（现代）文件对话框在打开时会**禁用 owner 窗口、关闭时再 `EnableWindow` 启用**；
+这个「启用」是**同步 `SendMessage`** ⇒ 必须由 owner 所在线程处理。
+**关闭 ROM 之后**，GUI 线程在对话框的 COM 回调里还要同步做一次完整的 `CloseGame()+LoadGame()`（重活），
+于是 `EnableWindow` 恰好落在这段**不泵消息**的窗口里 ⇒ 死锁；
+而「不关闭就直接打开」时，ROM 已在跑，回调里的工作量/时序不同 ⇒ 未必命中。
+⚠️ **这一条尚未做对照实验**（见 §9.14）。
 
-#### 9.13 已实证的部分（可复核）
+#### 9.12 对本仓的影响面
+
+- **必现于该路径**：只要「原生文件对话框」+「GUI 线程在 COM 回调里做重活」同时成立，
+  Windows 11 的现代文件对话框就有这条死锁路径。
+- **用户侧后果**：整个应用变砖（菜单/热键/退出全失效），只能杀进程；
+  且此时 `SDL.AutoSaveState = 99` 的业主配置下**连自动存档都不会发生** ⇒ 未存档进度可能丢失。
+- **与 ROM/板级无关**：mapper 21 只是本轮命中的样本（mapper 44 未命中 ⇒ 更像**时序**而非板级差异）。
+
+#### 9.13 ✅ 已实证清单（可复核，原始件在 `Research_only/w205/probe/`）
 
 | # | 事实 | 证据 |
 |---|---|---|
-| E1 | 触发序列 = 两次**独立的包装锁作用域**，中间夹一个**不持锁的原生模态对话框** | `ConsoleFile.cpp:287-290` / `:304-309` / `:267`；业主 cfg `SDL.UseNativeFileDialog = 1` |
-| E2 | 本仓包装锁与上游 2.8.0 存在 **D1–D4 四处协议级差异**（逐条对照上表，含上游行号） | 两份 `fceuWrapper.cpp` 源码逐行对照 |
-| E3 | 本仓 `fceuWrapperUnLock()` 存在**「计数为 0 ⇒ 跳过真正的解锁」**的分支 | `fceuWrapper.cpp:1289-1304` |
-| E4 | GUI 线程的取锁是**阻塞式** `mutex->lock()` ⇒ 任何锁失衡都表现为**永久卡死而非崩溃** | `fceuWrapper.cpp:1243-1252` + `ConsoleWindow.cpp:220` |
-| E5 | 模拟线程在 `GameInfo==NULL` 时**每 ~100 ms 抢放一次包装锁**（⇒ 与 GUI 线程争锁） | `fceuWrapper.cpp:1571-1581` |
-| E6 | 本仓**先发帧完成信号、后解锁**（上游相反） | `fceuWrapper.cpp:1539-1543` vs 上游 `:1637-1641` |
-| E7 | **挂起判据本身可用**：本机 GUI 自动化确实观察到过「窗口停止应答 `WM_NULL`、进程仍存活」的实例（**不是崩溃**）⇒ 「卡死 = 阻塞」这一形态成立 | `Research_only/w205/probe/gui_repro2.py` 的 `SendMessageTimeout(WM_NULL)` 判据；⚠️ **但该实例是否与业主场景同因未证实**（关闭动作未被可靠验证，见 §9.14） |
-| E8 | 库级探针（**直接链真实驱动库**、Qt 主线程上复刻同一条 `CloseGame → LoadGame` 序列、模拟线程并发）在 **QPainter 视频后端 + 非原生对话框**下**不复现**卡死 | `Research_only/w205/probe/close_open_probe.cpp` + `close_open_build.bat`（实测：stage1→6 全绿、`PROBE_EXIT=0`）；⚠️ **原生对话框分支尚未跑通**（自动化未能确认对话框被关闭，见 §9.14 ②） |
+| E1 | 真复现成功：业主在**有交互桌面 + 正常 GL**（NVIDIA 582.28 / GL 3.3.0）的机器上手动操作 ⇒ 卡死 | `launch_watch.py` 输出：`HANG at t+128.6s`；app `Responding=False` |
+| E2 | 第二次 ROM 装载**已完成**（不是装载卡住） | app stdout：`Loading ...mapper21/格拉米世界2.nes` → `Power on` → `Initializing video...` → `NTSC mode set`（共 2 次 `Loading`） |
+| E3 | 对话框工作线程卡在 `SendMessage` 给 GUI 线程 | 等待链：`tid=8512 nodes=3` → `[1] SendMessage status=6` → `[2] Thread tid=4380` |
+| E4 | 该线程**就是文件对话框的 COM 工作线程** | 栈：`USER32+0x20f1b` → `COMDLG32+0x13620` → `windows.storage+0x4c2bb0` → `combase+0x1c1c8` → `RPCRT4+0xd2b00` |
+| E5 | 它卡的具体调用是 `EnableWindow` | RIP = `win32u.dll+0x9604` ⇒ `NtUserEnableWindow`（导出表比对） |
+| E6 | GUI 线程卡在 **COM/RPC 等待**，不泵 Win32 消息 | RIP = `ntdll+0x166f34` ⇒ `ZwWaitForMultipleObjects`；栈：`KERNELBASE+0x1ab53` → `ntdll` → **`combase+0xc6259` → `RPCRT4+0xd2b00`** |
+| E7 | GUI 线程**没有**在等任何 FCEUX 自己的锁 | 等待链里 tid=4380 的节点只有 `Thread`，**无 CriticalSection / Mutex** ⇒ **推翻「包装锁失衡」假设** |
+| E8 | 「打开 ROM 文件」窗口**仍存在但已隐藏** ⇒ `dialog.exec()` 永不返回 | 窗口枚举：`41067c Qt6110QWindowIcon '打开 ROM 文件' vis=False` |
+| E9 | 死锁状态**稳定**（不是瞬态） | 连续 6 次快照（间隔 10 s）等待链逐字一致；GUI 线程 `ctxSwitches` 冻结在 205128 不再增长 |
+| E10 | 包装锁协议差异（D1–D4）**确实存在**，但与本条卡死无因果 | 源码逐行对照（`fceuWrapper.cpp:1243-1309` vs 上游 `:1443-1606`）；E7 已排除其为死锁点 |
 
-#### 9.14 未实证部分（⚠️ 如实登记，**不得当结论用**）
+#### 9.14 ⚠️ 未实证部分（如实登记）
 
-- **「卡死瞬间是哪把锁、被谁永久持有」尚未钉死**：需要业主机（有交互桌面）在真机上复现时抓 **Windows 等待链（WCT）**。本仓已备好工具链（见 §9.19），但本机执行会话**无交互桌面**、且 **OpenGL 后端在本机会崩**（`Qt6OpenGL.dll!glGenTextures` ⇒ `0xC0000005`，探针已实测），故真机复现未能在本轮完成。
-- **本轮 GUI 自动化未能可靠触发「关闭 ROM」**：UIA 能精确命中菜单项（可访问名 `关闭 ROM(C)	Ctrl+C`）并返回 `INVOKED`，但**观测量不成立**：
-  - 存档时间戳不变 ⇒ `CloseGame()` 的自动存档没跑；
-  - **进程总 CPU 不能用来判「ROM 是否还开着」**——本仓有一个**已知的常驻满载线程**（r5 ⑦ 登记的观察项），改用线程级 CPU 仍未能可靠判定（见 `thread_cpu.py`）。
-  ⇒ **「本轮自动化是否真的执行了关闭」未证实**；因此**本轮没有拿到一次可确认的「关→开」真复现**，§9.12 的机制推演**未经实测验证**。
-- **排除掉的两类工件**（避免下轮重复踩）：
-  ① **OpenGL 后端在本机崩溃/挂起**——探针实测 `glGenTextures` 段错误；真机有正常 GL 上下文 ⇒ 属环境工件，非本条缺陷；
-  ② **自动化自身的对话框驱动**——跨线程 `SendMessage` 给原生对话框的控件会**死等**（等待链实测：驱动线程 `SendMessage` → GUI 线程，且 GUI 线程在模态循环里空转 9000+ 次上下文切换）；改用 `SendInput` 键盘输入后正常。**这不是被测程序的问题。**
-- **「原生模态对话框」是否参与死锁链**未证实：Windows 通用对话框在现代 Windows 上**由 Shell 宿主进程承载**，其窗口与本进程的消息循环交互复杂，**不能假设「模态循环里 Qt 定时器不转」在所有 Windows 版本上成立**。
+- **「为什么必须先关闭 ROM」尚未做对照实验**：需要在同一环境跑「**不关闭、直接打开**」，
+  看是否同样死锁（⇒ 若同样死锁，则「关闭」不是必要条件，本条应改名为
+  「打开 ROM 文件对话框 ⇒ 可能永久卡死」）。**这决定修复面的大小，务必先做。**
+- **是否与 Windows 版本 / 文件对话框实现强相关**：本轮只在 Win11（26100）的
+  **现代 IFileDialog**（`windows.storage` + `combase`）上复现；经典 `GetOpenFileName`
+  路径是否也有此问题**未验证**。
+- **上游 2.8.0 是否同病**：上游 `openROMFile()` 也用原生 `QFileDialog` + 同步 `LoadGame`
+  （`ConsoleWindow.cpp` 同款结构）⇒ **疑似上游共有缺陷**，但**未逐行核对上游、也未实测**。
+- **线程级 CPU 仍缺**：本轮 `GetThreadTimes` 对**别的权限级别进程**返回 `ACCESS_DENIED`，
+  对本进程也未取到有效值（见 §9.19 的工具说明）⇒ **「哪个线程在空转」这一项仍缺**。
 
-#### 9.15 影响面
+#### 9.15 修复方向（下次立项；按「先钉死、再动刀」）
 
-- **触发面**：任何「先关 ROM 再开 ROM」的正常使用路径（换游戏）⇒ 用户侧**必现卡死**，且**无自愈**（只能杀进程）。
-- **危险面**：GUI 线程被永久阻塞 ⇒ 菜单/热键/退出全部失效 ⇒ **未保存的进度可能丢失**（本仓 `SDL.AutoSaveState = 99` 的业主配置下**连自动存档都不会发生** ⇒ 关 ROM 前的手工存档是唯一保险）。
-- **扩散面**：D2/D3/D4 是**协议层缺陷**，不限于本条路径——任何「GUI 线程长时间持锁 + 模拟线程反复抢锁」的组合（如长时间打开某个配置对话框、调试器断点）都可能被同一机制绊倒 ⇒ **建议按协议缺陷整体修，而不是只堵这个序列**。
+1. **先做对照实验**（§9.14 第一条）：同一环境跑「不关闭、直接打开」，确认触发面。
+2. **规避（零代码）**：把 `SDL.UseNativeFileDialog` 的**默认值从 1 改成 0**（改用 Qt 自带对话框
+   ⇒ 不进 COM ⇒ 无此死锁路径）。⚠️ 这会改变所有用户的「打开 ROM」观感，**属产品决定**，
+   应由业主拍板（可只作为「已知问题时的临时开关」）。
+3. **主修（推荐）· 不要在文件对话框的 COM 回调里做重活**：把「装载 ROM」从对话框回调里
+   **推迟到对话框完全关闭之后**（例如 `QFileDialog` 拿到文件名后用 `QTimer::singleShot(0, ...)`
+   装载，或改用 Qt 版对话框 + 事件循环），使 GUI 线程在 `Show()` 返回前始终能泵消息。
+4. **根治备选**：**在打开原生对话框期间让 GUI 线程继续泵消息**——需要确认 Qt 6 的
+   `QFileDialog::exec()` 是否提供该能力（**未验证**）；若没有，则退回第 3 条。
+5. **兜底**：GUI 线程取包装锁改带超时（§9.16 原建议，保留）⇒ 即使将来别的路径再失衡，
+   也只是「一次操作失败」而不是「整个应用变砖」。
+6. **顺手修 D1–D4**（§9.13 E10）：本仓包装锁协议与上游 2.8.0 的四处差异**独立存在**，
+   建议在同一条线里对齐上游（`thread_local` 深度 + 无条件解锁 + preempt 让位 + 自旋取锁），
+   但**不要**把它当成 BUG-V205-03 的修复。
 
-#### 9.16 修复方向（下次立项；**按「先钉死、再动刀」的顺序**）
+#### 9.16 验收
 
-1. **先补「可判定的挂起判据」**：把 §9.19 的工具链（见下）接成**一条可重跑的复现脚本**，并在**业主机（有交互桌面）**上跑出**一次带等待链快照的真复现** ⇒ 把 §9.12 的推演升级为实证，再动代码。
-2. **主修 · 把包装锁协议对齐上游 2.8.0**（一次性解决 D1–D4，四处一起改，**不要只改一处**）：
-   - 用 `thread_local` 的锁深度替代全局 `mutexLocks`（对齐上游 `:1443`）；
-   - `fceuWrapperUnLock()` **无条件解锁**（对齐上游 `:1549-1558`），不再有「计数为 0 ⇒ 跳过解锁」的分支；
-   - 引入上游的 **preempt 让位协议**（`reqEmuLock` + `emuThreadPreemptEntry/ExitLogic`，对齐上游 `:1442-1481`）⇒ GUI 线程宣告要锁时，模拟线程主动让位；
-   - 模拟线程取锁改为**自旋直到拿到**（对齐上游 `:1601-1606`），并**与上游一样把 `signalFrameFinished()` 挪到解锁之后**（对齐上游 `:1637-1641`）。
-   - ⚠️ **改公共锁语义要全量重建**（`Config` 类布局那次的教训，见 r5 ⑤：改布局 ⇒ 部分 TU 未重编 ⇒ 行为异常）。
-3. **兜底 · 让 GUI 线程永不被永久锁死**（与 2 并行、低成本）：GUI 侧取锁改为**带超时**（例如 `tryLock(2000)`），超时后**打印诊断 + 继续**（而不是无限等待），保证「最坏是操作失败」而不是「整个应用变砖」。
-4. **可选 · 对话框期不让模拟线程空转抢锁**：`GameInfo==NULL` 时模拟线程本可**完全不动锁**（上游的 `else` 分支也是先解锁再睡）——核对是否需要把「空转期」改为**完全不取锁**，以消除与 GUI 的争锁面。
-
-#### 9.17 验收
-
-- **新锁测试**（落在 `tests/f11qa/`，须能离线跑）：构造「GUI 持锁 → 模拟线程反复抢锁 → GUI 再取锁」的三方时序，断言
-  ① 每轮结束后**锁深度归零**且 **QMutex 处于未锁状态**；
-  ② **变异腿**：把 `fceuWrapperUnLock()` 改回「计数为 0 ⇒ 跳过解锁」⇒ 该锁**必须转红**（否则锁无牙）。
-- **回归**：库级探针（`close_open_probe.cpp`）在**非原生对话框**分支下跑通 stage1→6、`PROBE_EXIT=0`（已达成），并**新增原生对话框分支的跑通判据**（自动化需能确认对话框被关闭 ⇒ 探针才能走到 stage5）；业主机端到端：**关 ROM → 立刻开 ROM** 不再卡死（窗口持续应答 `WM_NULL`）。
+- **对照实验**：同环境下「不关闭 → 直接打开」的行为被记录（死锁 / 不死锁），并写进本条；
+- **复现脚本**：`launch_watch.py` 在修复后跑完 20 分钟**不再出现 HANG**；
+- **回归**：「关闭 ROM → 立刻打开 ROM」能正常装载并继续模拟（stdout 出现**第三次** `Loading`
+  之后仍有帧输出、窗口持续应答 `WM_NULL`）；
+- **可选锁测试**（若顺手修 D1–D4）：构造「GUI 持锁 → 模拟线程反复抢锁 → GUI 再取锁」的时序，
+  断言每轮后**锁深度归零且 QMutex 未锁**；变异腿（把 `fceuWrapperUnLock()` 改回「计数为 0 ⇒
+  跳过解锁」）必须转红；
 - `ctest -LE perf` **41/41** 全绿（不变式 1）；Rust 八条全绿。
 
-#### 9.18 非目标
+#### 9.17 非目标
 
 - 不改 NES 核心 / Rust / mapper 逻辑（本条纯 driver 层）；
 - 不动 GBA 线（`decoupling.rs` 三条守卫照旧）；
-- 不借本条改「自动存档」策略（`SDL.AutoSaveState` 的语义保持）；
-- **不把 §9.12 的推演当成已证实的根因写进代码注释**（纪律 3）。
+- 不借本条改「自动存档」策略（`SDL.AutoSaveState` 语义保持）；
+- **不把 §9.11 的机制解释（为什么必须先关闭）当成已证实的根因写进代码注释**（纪律 3）。
 
-#### 9.19 本轮已建成的复现装置（`Research_only/w205/probe/`，gitignored）
+#### 9.18 本轮已建成的复现 / 取证装置（`Research_only/w205/probe/`，gitignored）
 
 | 文件 | 作用 |
 |---|---|
-| `close_open_probe.cpp` + `close_open_build.bat` + `close_open_run.bat` | **库级探针**：链**真实驱动库**，在 Qt 主线程复刻「装载 → 关闭 → （原生对话框）→ 打开」全序列；带 **崩溃栈捕获**（dbghelp `StackWalk64`）与 **看门狗**（45 s 判定挂起） |
-| `wct_dump.cpp` + `wct_dump_build.bat` | **等待链转储器**：`wct_dump.exe <pid>` 打印每个线程在等什么（互斥体 / SendMessage / 另一个线程），**死锁取证用**；⚠️ `OpenThreadWaitChainSession` 的 Flags **必须传 0**（传 `WCTP_OPEN_ALL_FLAGS` 会以 `ERROR_INVALID_PARAMETER` 失败） |
-| `gui_repro2.py` + `uia_menu.ps1` + `uia_dump.ps1` | **端到端 GUI 自动化**：用 **UI Automation** 精确点击「文件 > 关闭 ROM(C) / 打开 ROM(O)」（Qt 菜单的可访问名带 `&`/`\t` 后缀 ⇒ **必须子串匹配**），用 Win32 消息驱动原生「打开 ROM 文件」对话框，用 `SendMessageTimeout(WM_NULL)` 判挂起 |
-| `thread_cpu.py` | 线程级 CPU 统计（**进程总 CPU 不可用**：本仓有已知的常驻满载线程，r5 ⑦） |
+| `launch_watch.py` | **主装置**：用指定 ROM 启动发布包（stdout/stderr 实时落盘）→ 每 250 ms 探窗口是否应答 → 卡死瞬间自动抓等待链 + 线程 CPU + 截图 + stdout 尾部 → 写 `hang_report_*.txt`；**进程保持存活**供继续观察 |
+| `stack_scan.cpp` | 线程栈扫描：读目标进程栈内存，列出所有指向模块的指针（**module+offset**），**不依赖展开器**（x64 展开器在符号处理器配置不对时会静默产出垃圾） |
+| `pe_export.py` | 把地址解析成最近的导出符号（如 `ntdll+0x166f34` ⇒ `ZwWaitForMultipleObjects`）；同一 DLL 在各进程 RVA 相同 ⇒ 可用本进程副本解析 |
+| `wct_dump.cpp` | 等待链转储器：`wct_dump.exe <pid>`；⚠️ `OpenThreadWaitChainSession` 的 Flags **必须传 0**（传 `WCTP_OPEN_ALL_FLAGS` 报 `ERROR_INVALID_PARAMETER`） |
+| `shot.ps1` | 截屏（整桌面 / 指定进程主窗口）⇒ 用于「画面停在最后一帧」与「对话框窗口仍存在但隐藏」的取证 |
+| `close_open_probe.cpp` + `close_open_build.bat` + `close_open_run.bat` | **库级探针**：链真实驱动库，在 Qt 主线程复刻「装载 → 关闭 → 打开」全序列，带崩溃栈捕获与看门狗；⚠️ 其原生对话框分支因自动化无法确认对话框关闭而**未跑通**（见 §9.14） |
+| `uia_menu.ps1` / `uia_dump.ps1` / `gui_repro2.py` / `gui_repro3.py` | UI Automation 精确点击 Qt 菜单（可访问名带 `&`/`\t` 后缀 ⇒ **必须子串匹配**）+ 驱动原生对话框；**本轮最终改为人手操作、机器记录**（更可靠） |
+| `thread_cpu.py` | 线程级 CPU 统计；⚠️ 两处坑：① `OpenThread` 的掩码**不能带 `THREAD_GET_CONTEXT`**（否则对别进程线程一律失败 ⇒ 静默空表）；② `GetThreadTimes` 对**更高权限级别的进程**返回 `ACCESS_DENIED`（本轮对本进程也未取到值 ⇒ 该项仍缺） |
 
-> **下轮第一步**：把这套装置拿到**业主机（有交互桌面 + 正常 GL 上下文）**上跑 `gui_repro2.py`，在卡住时执行 `wct_dump.exe <pid>` ⇒ **一次真复现 + 一张等待链快照** = §9.12 从推演升级为实证的依据。
-
+> **本轮真复现的原始件**：`waitchain_8136_213323.txt`（等待链）、`shot_hang_213323.png` + `hang_desktop.png`（现场）、`app_stdout_213323.txt`（app 全程日志）。
+> **下一步**：先做 §9.15 第 1 条的对照实验，再动代码。
