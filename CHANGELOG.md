@@ -7,6 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — 加载 ROM 卡顿（音频设备探测）
+
+- **加载一个 ROM 要卡住约 8~10 秒**（业主 2026-11-16 实测报告，v2.0.4_hotfix1）：
+  每次加载 ROM 都会走 `DriverInitialize()` → `InitSound()` → `SDL_OpenAudio()`，
+  而本机 **WASAPI 后端找不到音频端点**，`SDL_OpenAudio()` 要**整整 8 秒**才返回失败。
+  这 8 秒发生在 **GUI 线程持有 `FCEU_WRAPPER_LOCK` 期间** ⇒ 模拟线程被挡在锁外、
+  窗口无响应 ⇒ 用户体感就是「加载 ROM 卡十秒」。
+
+  实测读数（同一台机器、同一份 v2.0.4_hotfix1 包，stderr 为无缓冲输出 ⇒ 时间戳可靠）：
+
+  ```
+  t=  0.70s  Initializing video... Video Mode: 256 x 224 x 32 bpp
+  t=  8.70s  WASAPI can't find requested audio endpoint
+  ```
+
+  修法（`src/drivers/Qt/sdl-sound.cpp`）：
+
+  1. **设备打开搬到后台线程** —— 调用方不再等待设备探测，这是本条的核心修复；
+  2. **已打开且采样率一致则复用** —— 旧代码每次加载都重开一次设备（必失败），
+     且重开会把音频回调线程与环形缓冲一起拆掉重建；
+  3. **打开失败后退避 60 秒** —— 坏掉的端点不再每加载一次 ROM 就重付一次探测代价；
+  4. **驱动回退** —— WASAPI 失败后依次试 `directsound` / `winmm`，
+     两者在本机是毫秒级打开的（同样的机器上换驱动后，8 秒空档完全消失）。
+
+  修复后同一场景：**加载完成标志（`Initializing video`）从 8.70 s 降到 0.40 s**。
+  ⚠️ 该机所有 SDL 音频后端都打不开 ⇒ **本仓 FCEUX11 在这台机器上没有声音**，
+  这一点与本条修复无关（音频失败只影响声音，不再影响加载）。
+
+- **命令行加载中文名 ROM 必然失败**（计划外，与上一条同批实测发现）：
+  Windows 的 `main()` 拿到的是**本地 ANSI 代码页**（本机 936/GBK）的参数，
+  而 FCEUX 的文件层一律按 **UTF-8** 处理（`FCEUD_UTF8_fopen` 等在入口处
+  把 UTF-8 转成本地代码页）⇒ 命令行传入的中文路径根本打不开。
+  实测对照（同一台机器、同一份包）：
+
+  ```
+  Joust (J).nes  -> cfg 的 SDL.LastOpenFile 被更新  => 加载成功
+  打氣球.nes     -> cfg 的 SDL.LastOpenFile 不变    => 加载失败
+  ```
+
+  修法（`src/drivers/Qt/main.cpp`）：在 `QApplication` 建好之后，用
+  `QApplication::arguments()`（Windows 上从**宽字符命令行**解析）重建一份
+  **UTF-8** 的 `argv` 再交给驱动解析。
+  ⚠️ 常见的中文 ROM 合集几乎全是中文文件名 ⇒ 在修好之前，
+  **双击 ROM 打开（走命令行）这条路径基本不可用**；GUI 文件对话框不受影响
+  （Qt 给的是 Unicode 路径）。
+
+### Known limitations — 命令行参数
+
+- **`--no-console` 会让命令行 ROM 被静默忽略**（**未修复**，登记待办）：
+  `Config::parse()` 遇到不认识的参数直接返回 -1，而 `--no-console` 是驱动自己
+  消费的开关、不在配置项表里 ⇒ `--no-console <rom>` 的 ROM 路径被解析失败吞掉，
+  游戏根本没加载（配置项 `SDL.LastOpenFile` 也不会被更新，可据此判定）。
+  ⚠️ 这是本仓**原有**行为（`--no-console` 是 v0.3.15.x PHASE-3 引入的开关），
+  本轮尝试过两种修法并**都未采用**：
+  - 在解析器里注册「无值开关」⇒ 改 `Config` 类布局后 exe 在参数解析前异常退出，
+    原因未查明，**已回退**（不把未查清的改动带进发布）；
+  - 把该开关从 `argv` 里剔除 ⇒ `parse()` 返回的是**下标**、`argv[romIndex]`
+    取的却是原数组 ⇒ 下标错位，会加载错文件，**已回退**。
+  ⇒ 正确的修法应是给配置解析器加一个**不改变 `Config` 布局**的开关注册接口
+  （例如把开关集合放在类外），需单独一轮处理。
+  ⚠️ 不影响正常用法：直接 `fceux11.exe <rom>`（不带 `--no-console`）工作正常。
+
 ### Fixed — 内存安全
 
 - **SFORMAT 短标签的定长 `memcpy` 越界**（计划外 E / 长尾 LT-17）：`src/state.cpp` 的

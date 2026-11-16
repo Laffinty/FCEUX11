@@ -748,6 +748,12 @@ int  fceuWrapperInit( int argc, char *argv[] )
 	// initialize the infrastructure
 	error = fceu11::Initialize();
 
+	// v2.0.5 (PERF-02): initialise the frame pacing here, and not only on a
+	// ROM change.  Until a ROM is loaded the throttle's frame-time constants
+	// were still zero (RefreshThrottleFPS() only ran on a ROM change), so
+	// SpeedThrottle() had no frame time to wait for.
+	RefreshThrottleFPS();
+
 	if (error != 1) 
 	{
 		printf("Error: Initializing FCEUI\n");
@@ -1541,11 +1547,25 @@ int  fceuWrapperUpdate( void )
 #ifdef __FCEU_PROFILER_ENABLE__
 		FCEU_profiler_log_thread_activity();
 #endif
-		while ( SpeedThrottle() )
+		// v2.0.5 (PERF-02): pace only when there is something to pace.
+		// With no game loaded the frame-time constants are still zero
+		// (RefreshThrottleFPS() runs on a ROM change), so SpeedThrottle()
+		// returned immediately and this loop spun as fast as the wrapper
+		// lock allowed -- taking and releasing the lock thousands of times
+		// a second for no work at all.  With a game loaded the pacing is
+		// unchanged.
+		if ( GameInfo )
 		{
-			// Input device processing is in main thread
-			// because to MAC OS X SDL2 requires it.
-			//FCEUD_UpdateInput();
+			while ( SpeedThrottle() )
+			{
+				// Input device processing is in main thread
+				// because to MAC OS X SDL2 requires it.
+				//FCEUD_UpdateInput();
+			}
+		}
+		else
+		{
+			msleep( 16 );
 		}
 	}
 	else

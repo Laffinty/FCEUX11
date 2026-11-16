@@ -23,10 +23,12 @@
 #include <mutex>
 #include <string>
 #include <typeinfo>
+#include <vector>
 #include <SDL.h>
 #include <QApplication>
 #include <QSplashScreen>
 #include <QSettings>
+#include <QStringList>
 #include <QSurfaceFormat>
 #include <QTimer>
 #include <QFile>
@@ -640,6 +642,44 @@ int main( int argc, char *argv[] )
 	//      printf("Warning: Could not open Qt Stylesheet file '%s'\n", styleSheetEnv );
 	//   }
 	//}
+
+	{
+		// v2.0.5 (PERF-04): rebuild the argument vector as UTF-8 before the
+		// driver parses it.
+		//
+		// Windows hands a `main()` the arguments in the **local ANSI code
+		// page** (936/GBK on this machine), while every path in the FCEUX
+		// file layer is treated as UTF-8 (FCEUD_UTF8_fopen and friends
+		// convert UTF-8 to the local code page on the way in).  A ROM whose
+		// file name contains non-ASCII characters therefore could not be
+		// opened at all when it was named on the command line -- and the ROM
+		// collections in the wild are mostly Chinese file names.
+		// QApplication::arguments() is parsed from the wide-character
+		// command line, so it yields the same arguments in a form that can
+		// be converted to UTF-8.
+		//
+		// The buffers are static on purpose: the driver keeps the pointers
+		// for the lifetime of the process.
+		const QStringList qargs = app.arguments();
+		static std::vector<std::string> utf8Args;
+		static std::vector<char*>       utf8Argv;
+
+		utf8Args.clear();
+		utf8Argv.clear();
+		utf8Args.reserve(static_cast<size_t>(qargs.size()));
+		for (const QString& q : qargs)
+			utf8Args.push_back(q.toUtf8().toStdString());
+
+		utf8Argv.reserve(utf8Args.size());
+		for (size_t i = 0; i < utf8Args.size(); i++)
+			utf8Argv.push_back(const_cast<char*>(utf8Args[i].c_str()));
+
+		if (!utf8Argv.empty())
+		{
+			argc = static_cast<int>(utf8Argv.size());
+			argv = utf8Argv.data();
+		}
+	}
 
 	fceuWrapperInit( argc, argv );
 
