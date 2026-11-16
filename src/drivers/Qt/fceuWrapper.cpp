@@ -656,6 +656,16 @@ static void ShowUsage(const char *prog)
 	
 }
 
+// BUG-V205-02: Config::_parseArgs() rejects any long argument it does not
+// know with a plain `return -1`, which silently dropped the ROM argument
+// following a driver-consumed flag (`--no-console rom.nes` loaded nothing,
+// no error).  Flags handed to this function are skipped by _parseArgs()
+// instead.  The registry lives in configSys.cpp as a file-scope static --
+// deliberately NOT a Config member, so the Config class layout stays
+// untouched (the first fix attempt in the v2.0.5 line added a member, the
+// exe died before argument parsing, and the attempt was reverted).
+extern void fceux11_config_register_pass_through_flag(const char *flag);
+
 // Pre-GUI initialization.
 int  fceuWrapperPreInit( int argc, char *argv[] )
 {
@@ -680,9 +690,16 @@ int  fceuWrapperPreInit( int argc, char *argv[] )
 		// freopen redirection in main.cpp. Useful when the launcher is
 		// double-clicked from Explorer on a non-pseudo-tty parent (e.g.
 		// cmd.exe) so the existing console window is not hijacked.
+		//
+		// BUG-V205-02: this flag is consumed here and by nobody else, so it
+		// must also be registered as a pass-through flag for
+		// Config::_parseArgs -- otherwise parse() hits it as an unknown
+		// argument, returns -1, and the ROM argument after it is silently
+		// ignored.
 		else if ( strcmp(argv[i], "--no-console") == 0)
 		{
 			g_noConsole = true;
+			fceux11_config_register_pass_through_flag("--no-console");
 		}
 	}
 	return 0;

@@ -45,6 +45,7 @@
 #include <QStyleFactory>
 #include <QApplication>
 #include <QShortcut>
+#include <QTimer>
 #include <QUrl>
 
 #include "../../fceu.h"
@@ -284,10 +285,24 @@ void consoleWin_t::openROMFile(void)
 
 	g_config->setOption ("SDL.LastOpenFile", filename.toStdString().c_str() );
 
-	FCEU_WRAPPER_LOCK();
-	CloseGame ();
-	LoadGame ( filename.toStdString().c_str() );
-	FCEU_WRAPPER_UNLOCK();
+	// BUG-V205-03: do not load the ROM from inside the file-dialog call
+	// stack.  dialog.exec() can return while the native dialog's
+	// IFileDialog::Show() is still unwinding on the GUI thread; running
+	// CloseGame()+LoadGame() inside that window (a heavy, non-pumping
+	// stretch) left the dialog worker's close-time EnableWindow(owner)
+	// SendMessage undelivered, and the GUI thread then re-entered Show()'s
+	// COM-only wait -- mutual deadlock, reproduced twice on Win11 with
+	// identical stacks (v2.0.5 plan §9.11/E13).  A zero-timeout timer
+	// re-enters the main event loop only after this call stack has fully
+	// unwound, so no dialog frame is beneath the load and the GUI thread
+	// pumps normally while it runs.
+	QTimer::singleShot( 0, this, [this, filename](void)
+	{
+		FCEU_WRAPPER_LOCK();
+		CloseGame ();
+		LoadGame ( filename.toStdString().c_str() );
+		FCEU_WRAPPER_UNLOCK();
+	} );
 
    return;
 }
@@ -376,9 +391,14 @@ void consoleWin_t::loadNSF(void)
 
 	g_config->setOption ("SDL.LastOpenNSF", filename.toStdString().c_str() );
 
-	FCEU_WRAPPER_LOCK();
-	LoadGame( filename.toStdString().c_str() );
-	FCEU_WRAPPER_UNLOCK();
+	// BUG-V205-03: same deferral as openROMFile -- LoadGame() must not run
+	// inside the native file-dialog's unwind window (see the comment there).
+	QTimer::singleShot( 0, this, [this, filename](void)
+	{
+		FCEU_WRAPPER_LOCK();
+		LoadGame( filename.toStdString().c_str() );
+		FCEU_WRAPPER_UNLOCK();
+	} );
 }
 
 

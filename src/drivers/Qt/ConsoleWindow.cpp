@@ -746,8 +746,16 @@ void consoleWin_t::updatePeriodic(void)
 
 	if ( errorMsgValid )
 	{
-		showErrorMsgWindow();
+		// BUG-V205-01 (§9.6 方向 2, defensive hardening): clear the flag
+		// BEFORE the modal box, not after it returns.  While the modal runs,
+		// a re-entered update() could see the still-true flag and stack a
+		// second modal box; and an error queued while the box was up was
+		// silently dropped by the post-return clear.  Clearing first gives
+		// exactly one popup per queued error: no stacking, no drop.
+		// showErrorMsgWindow() itself clears the message text under the
+		// wrapper lock before its exec().
 		errorMsgValid = false;
+		showErrorMsgWindow();
 	}
 
 	if ( recentRomMenuReset )

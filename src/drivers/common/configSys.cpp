@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <set>
 
 
 
@@ -481,6 +482,34 @@ Config::getOption(const std::string &name,
 }
 
 /**
+ * BUG-V205-02: command-line flags that the Qt driver consumes itself in
+ * fceuWrapperPreInit() (currently --no-console) must not reach _parseArgs()
+ * as "unknown argument" -- the old code returned -1 there, which silently
+ * dropped the ROM argument that followed the flag:
+ *
+ *     fceux11.exe --no-console rom.nes   ->  nothing loaded, no error
+ *
+ * The registry is a file-scope static on purpose.  The first fix attempt in
+ * the v2.0.5 line stored it as a Config data member; that changed the class
+ * layout and the exe died before argument parsing (cause never identified),
+ * so the attempt was reverted.  A free function with external linkage keeps
+ * the Config class layout untouched; fceuWrapper.cpp declares it extern,
+ * same pattern as `extern bool g_noConsole` in main.cpp.
+ */
+static std::set<std::string> &fceux11_passThroughFlags(void)
+{
+    static std::set<std::string> flags;
+    return flags;
+}
+
+void fceux11_config_register_pass_through_flag(const char *flag)
+{
+    if (flag != NULL) {
+        fceux11_passThroughFlags().insert(flag);
+    }
+}
+
+/**
  * Parses the command line arguments.  Short args are of the form -f
  * <opt>, long args are of the form --foo <opt>.  Returns < 0 on error,
  * or the index of the rom file in argv.
@@ -515,6 +544,17 @@ Config::_parseArgs(int argc,
             // long arg
             long_i = _longArgMap.find(arg.substr(2));
             if(long_i == _longArgMap.end()) {
+                // BUG-V205-02: skip driver-registered flags instead of
+                // rejecting the whole command line.  The flag is consumed by
+                // the driver itself and takes no value, so we must NOT
+                // advance `i` here, and we must NOT remove the argument from
+                // argv either -- the return value is an index into the
+                // original argv (the second reverted attempt in the v2.0.5
+                // line shifted indices and loaded the wrong file).
+                if(fceux11_passThroughFlags().find(arg)
+                   != fceux11_passThroughFlags().end()) {
+                    continue;
+                }
                 // XXX invalid argument
                 return -1;
             }
