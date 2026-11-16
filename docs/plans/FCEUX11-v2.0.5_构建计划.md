@@ -337,7 +337,7 @@ never runs and the ROM comes up grey」，并为 191 / 199 补了注册（issue 
 |---|---|---|---|---|---|---|
 | **C1** | **加载一个 ROM 卡住约 8~10 秒**（音频设备探测在 GUI 持锁期间同步执行） | **本仓缺陷（driver 层）** | **高** | **低** | **高** | ✅ **已落地（r5）**：实测 **9.49 s → 0.29 s** |
 | **C2** | **命令行加载中文名 ROM 必然失败**（`main()` 的 argv 是本地 ANSI(GBK)，文件层按 UTF-8 处理） | **本仓缺陷** | **高** | **低** | **高** | ✅ **已落地（r5）** |
-| **C3** | `--no-console` 让命令行 ROM 被静默忽略 | 本仓缺陷 | 中 | 中 | 中 | ⛔ **本轮未修**（两种修法都引入回归）⇒ 登记 **BUG-V205-02** |
+| **C3** | `--no-console` 让命令行 ROM 被静默忽略 | 本仓缺陷 | 中 | 中 | 中 | ✅ **已修（r7，BUG-V205-02 §9.19）**：登记式跳过，不动 `Config` 类布局 |
 
 ---
 
@@ -725,8 +725,8 @@ GUI 文件对话框不受影响（Qt 给的是 Unicode 路径）。
    FCSX/FM2 版本字段信息性 ⇒ 旧存档/录像仍可读。
 7. **CHANGELOG `[2.0.5]` 段** + Known limitations 草稿（人工验收未闭合项照旧登记）。
 8. **线 C（加载卡顿 / 中文名路径）已落地并经同一门禁覆盖**：C1 实测 **9.49 s → 0.29 s**、
-   C2 中文名 ROM 命令行可加载（提交 `36af048`）；C3（`--no-console`）**未修**，
-   须在 CHANGELOG 的 Known limitations 里留条目（**已留**）。
+   C2 中文名 ROM 命令行可加载（提交 `36af048`）；C3（`--no-console`）**已随 r7 修复**
+   （BUG-V205-02 §9.19，红绿双腿 E2E 实证），CHANGELOG 相应条目已从 Known limitations 改为 Fixed。
 7. **CHANGELOG `[2.0.5]` 段** + Known limitations 草稿（人工验收未闭合项照旧登记）。
 
 ---
@@ -813,6 +813,7 @@ GBA 侧「BIOS SWI 全部实现」—— 详见长尾盘点文档 §四。
 | r4 | 2026-11-16 | **BUG-V205-01 修复落地（v2.0.4_hotfix1）**：① 改法 = **边界检查与拷贝改用头里的原始 CHR 数量**，**分配/映射/哈希仍用舍入值**（上游同款；⚠️ 不是去掉 `uppow2`——映射与 ROM 矫正表的 CRC 键都依赖舍入后的缓冲）；落点 = `cart.rs`（新增 `vrom_size_raw`）+ `ines.rs`（两个 FFI 结构体透传 + 边界检查改 raw + 哈希传 `(raw, padded)`）+ `ines_load.cpp`（CHR 拷贝用 raw 长度，尾部按上游语义补 0xFF）。② 门禁 **3 条新锁**：`fceux11-formats` 基线 **154 → 156**（CHR=6 可装 + 短文件仍被拒）+ `fceux11_mapper_load_test` 端到端（装载成功 + 文件字节在位 + 尾部 0xFF）；**变异验证双向**：边界检查改回舍入值 ⇒ Rust 锁转红（155/1）+ 端到端锁转红 + 「短文件仍被拒」保持绿。③ 实测：三个 Nokoh ROM 全部能装（修复前三个都是 Unknown ROM file format）；`ctest -LE perf` **41/41**；Rust 八条全绿（根 299/0/20 · vendor 249 · debug 94 · media 52 · formats 156 · utils 51 · lua 54 · 两态 check EXIT=0）。④ 版本口径：`FCEU_HOTFIX_TAG = "_hotfix1"` ⇒ `v2.0.4_hotfix1`，⚠️ **`FCEU_VERSION_NUMERIC` 保持 20004**（hotfix 冻结数值）⇒ v2.0.4 的存档/录像仍可读；产物内字符串已回查确认。⑤ **§9.6 方向 2（Qt 弹框防呆）本轮未做**——「反复弹框」机制仍未实证（假设已被最小复现证伪）⇒ 无证据改动不做，降级为观察项。⑥ **本 hotfix 只取 BUG-V205-01 这一项**，A1 属 v2.0.5 线，不并入本次发布 |
 | r5 | 2026-11-16 | **线 C 落地（计划外 · 加载卡顿）**：① **C1 根因**——每次加载 ROM 都走 `DriverInitialize → InitSound → SDL_OpenAudio`，本机 WASAPI 后端**找不到音频端点**，`SDL_OpenAudio` 要**整整 8 秒**才失败，而**这 8 秒在 GUI 线程持有 `FCEU_WRAPPER_LOCK` 期间** ⇒ 模拟线程被挡、窗口无响应；证据 = stderr 时间戳 `0.70s → 8.70s`，交叉验证 = 换 `SDL_AUDIODRIVER=directsound/winmm` 后 8 秒空档**完全消失**。② **改法四条**（`sdl-sound.cpp`）：设备打开**搬到后台线程**（调用方不再等探测）/ 已开且采样率一致则**复用**（旧代码每次加载都重开一次、必失败，还会拆掉重建音频回调线程与环形缓冲）/ 失败后退避 **60 秒** / WASAPI 失败后**回退 directsound、winmm**。③ **实测：ROM 加载完成时刻 9.49 s → 0.29 s**（判据 = cfg 的 `SDL.LastOpenFile` 被更新，不用 stdout——**stdout 重定向时是全缓冲**，进程被 kill 会丢缓冲，本轮据此误判过两次）。④ **C2**：命令行中文名 ROM 此前**必然失败**（`main()` 的 argv 是本地 ANSI(GBK)，文件层按 UTF-8 处理）⇒ 改用 `QApplication::arguments()`（宽字符命令行）重建 UTF-8 `argv`（`main.cpp`）。⑤ **C3 未修**：给配置解析器加「无值开关」注册机制 ⇒ **改 `Config` 类布局后 exe 在参数解析前异常退出（原因未查明）**，已回退；改用「从 argv 剔除该开关」⇒ **下标错位会加载错文件**，已回退 ⇒ 登记 **BUG-V205-02**（本仓原有行为，非本轮引入）。⑥ 门禁：全量重建 EXIT=0、`ctest -LE perf` **41/41**、`cargo check --workspace` EXIT=0；改动**只在 driver 层**，未触碰 core/Rust/mapper 逻辑。⑦ **未实证**：本轮执行会话是**无交互桌面**（`SendKeys` 被拒、截屏失败）⇒ **GUI 点击路径未端到端验证**，待业主机上复核；**本机三个音频后端全失败 ⇒ 本机 FCEUX11 无声**（与改动无关，改动前同样无声）；**启动后仍有一个非主线程满载单核**（旧版同样存在、与加载慢无因果，函数未定位，登记为观察项）。⑧ 提交 `36af048`（**已推送到 `main`**）。 |
 | r6 | 2026-11-16 | **新增 §九 · 缺陷登记：BUG-V205-03（关闭 ROM 后立刻打开 ROM ⇒ GUI 永久卡死）**——业主人工实测 v2.0.4_hotfix1 发布包，触发样本 `mapper21/格拉米世界2.nes`；业主补充触发条件：**先「关闭 ROM」再「立刻打开 ROM」**。① **同日 21:33 完成真复现**（业主机，有交互桌面 + 正常 GL：NVIDIA 582.28 / GL 3.3.0）：业主手动操作、机器全程记录 ⇒ **卡死复现**（`HANG at t+128.6s`，app `Responding=False`，连续 6 次快照等待链逐字一致 ⇒ 死锁稳定非瞬态）。② **根因已实证（等待链 + 双方线程栈 + 窗口枚举 + app 日志四路互证）**：**原生（IFileDialog / COMDLG32）文件对话框的 COM 工作线程 tid=8512 卡在 `EnableWindow` 的 `SendMessage` → GUI 线程**（栈：`COMDLG32 → windows.storage → combase → RPCRT4`），而 **GUI 线程 tid=4380 卡在 `IFileDialog::Show()` 的 COM/RPC 等待**（栈：`KERNELBASE → ntdll!ZwWaitForMultipleObjects → combase → RPCRT4`）⇒ **互等死锁**；物证：**「打开 ROM 文件」窗口仍存在但已隐藏**（`exec()` 永不返回）+ **第二次 ROM 装载已完成**（stdout 有第二次 `Loading … mapper21` → `Power on` → `Initializing video`）⇒ 卡住的是 GUI 线程，不是装载。③ **推翻了本条初版登记的根因**：初版基于静态分析写成「包装锁协议失衡」（全局计数 / 跳过解锁 / 抢锁失败即放弃 / 无 preempt 让位 —— 与上游 2.8.0 的四处差异）——**等待链证明 GUI 线程节点里没有任何锁**（无 CriticalSection / Mutex）⇒ 那四处差异**独立存在但与本条无因果**，已降级为顺带修项。④ **仍缺**：为什么「必须先关闭 ROM」尚未做对照实验（决定修复面大小）；「每线程 CPU」仍缺（`GetThreadTimes` 对更高权限进程 `ACCESS_DENIED`）；上游 2.8.0 是否同病未核。⑤ **本轮建成取证装置**（`Research_only/w205/probe/`，gitignored）：`launch_watch.py`（启动 + 全程记录：等待链 / 线程栈 / 截图 / app 日志）、`stack_scan.cpp`（不依赖展开器的栈扫描）、`pe_export.py`（地址→导出符号）、`wct_dump.exe`、`shot.ps1`。⑥ **修复方向**：先做对照实验 ⇒ 主修 = **不要在文件对话框的 COM 回调里同步装载 ROM**（推迟到对话框完全关闭之后）；规避 = `SDL.UseNativeFileDialog` 默认改 0（属产品决定）；兜底 = GUI 取包装锁带超时。⑦ 本轮**只登记不修** |
+| r7 | 2026-11-16 | **BUG-V205 三条收口（业主指示「完成 BUG-V205 部分收口」）**。① **BUG-V205-02 已修**（§9.19）：`configSys.cpp` 新增**文件级静态登记表** + 自由函数 `fceux11_config_register_pass_through_flag`（**零头文件改动**，规避 r5 类布局翻车），`_parseArgs` 长参数未知分支先查表 `continue`（不吞值、不动下标）；`fceuWrapperPreInit` 的 `--no-console` 分支登记。**E2E 红绿双腿**（探针 `v205_e2e.py`，判据 = 独立 `FCEUX_CONFIG_DIR` 生成 cfg 的 `SDL.LastOpenFile`）：修复后 exe 上 A（`--no-console <rom>` 装载成功）/ B（无 flag 逐字一致）/ C（中文名回归完好）/ D（无 ROM = 默认值，`config.cpp:773` 预期）全绿；**修复前红腿用 v2.0.4_hotfix1 发布包 exe 当场复现**（A 用例 LastOpenFile=默认值 ⇒ ROM 被吞）。② **BUG-V205-03 主修 #3 落地**（§9.20）：`openROMFile` / `loadNSF` 的装载从对话框调用栈内改为 `QTimer::singleShot(0, this, …)`（栈完全出栈后主事件循环执行；调用面核实：全部调用方为 fire-and-forget 槽）；`SDL.UseNativeFileDialog` 默认值不动（业主产品决定）、包装锁超时兜底与 D1–D4 维持登记（E10：与卡死无因果）。⚠️ **死锁场景自动化无法触发（E12）⇒ 修复效果待业主人手复核**（复刻「关闭→立刻打开」鼠标路径）。③ **BUG-V205-01 尾巴（§9.6 方向 2 防呆）落地**：`ConsoleWindow.cpp` `update()` 改为先清 `errorMsgValid` 再弹框（防叠框 / 防丢错；「反复弹框」机制仍未实证，防呆性质不变）。④ **同机制观察项登记**：`loadStateFrom`（对话框后同步 `FCEUSS_Load`）理论上同属暴露面，不在报告路径，未随本次改动。⑤ 门禁：全量构建 EXIT=0（65 步）+ `ctest -LE perf` **41/41**；改动全在 driver 层（`drivers_common` + `drivers_qt`），Rust 八条不在影响面；`git diff --numstat` 无行尾重写。⑥ 未做（超出 BUG-V205 范围）：版本号 / `[2.0.5]` CHANGELOG 段 / push 均待业主指示 |
 
 ---
 
@@ -971,14 +972,12 @@ C++ 端到端锁**转红**（同源变异）⇒ 三条锁都有牙。
   （`FCEUX11 v2.0.4_hotfix1`）。
 
 **未做 / 留尾巴**：
-- **§9.6 方向 2（Qt 弹框防呆）本轮未做** —— 因为「反复弹框」的机制**仍未实证**
-  （§9.5 的假设已被最小复现证伪），贸然改 `ConsoleWindow.cpp` 的弹框时序属于无证据改动；
-  该项**降级为观察项**，等业主提供弹框的确切文字与复现描述后再定。
+- ~~**§9.6 方向 2（Qt 弹框防呆）本轮未做**~~ → **✅ 已随 r7 落地**（BUG-V205 三条收口时一并处理，见 §9.8 末尾的 r7 注）：`ConsoleWindow.cpp` 的 `update()` 改为**先清 `errorMsgValid` 再弹框**——防呆性质不变（「反复弹框」的机制仍未实证），但消除了两类确定的缺陷面：模态框存续期间重入的 `update()` 会看到仍为真的标志而**叠出第二个模态框**；以及模态框存续期间新入队的错误被返回后的清零**静默丢弃**。清零提前后语义变为「每个入队错误恰好弹一次：不叠框、不丢错」（错误文本本身由 `showErrorMsgWindow()` 在包装锁下先行取出并清空，时序不受影响）。
 - **mapper 140 的板级正确性仍未验证**（业主已明确暂不考虑）：本条只保证「能装载」。
 
 ### BUG-V205-02 · `--no-console` 让命令行 ROM 被静默忽略
 
-**状态**：⛔ **本轮未修**（2026-11-16 登记；不把未查清的改动带进发布）
+**状态**：✅ **已修（2026-11-16，r7）** —— 实施记录见下方 §9.19
 **报告来源**：线 C 的 C1 排查过程中顺带实测发现（同批次的 C2 中文名问题已修）
 
 #### 现象
@@ -1014,9 +1013,35 @@ C++ 端到端锁**转红**（同源变异）⇒ 三条锁都有牙。
 - 不带 `--no-console` 的行为**不变**；
 - `ctest -LE perf` **41/41** 全绿。
 
+#### 9.19 ✅ 修复实施记录（2026-11-16 · r7）
+
+**改法**（= 上面「修复方向」的原话落地；两处落点，**零头文件改动**）：
+
+| 落点 | 改动 |
+|---|---|
+| `src/drivers/common/configSys.cpp` | 新增**文件级静态表** `fceux11_passThroughFlags()` + 登记函数 `fceux11_config_register_pass_through_flag(const char*)`（外部链接自由函数）；`_parseArgs` 的长参数分支在 `return -1` 之前先查该表，命中则 `continue`——**不吞下一个参数、不改变任何下标**（`parse()` 返回的是原 argv 的下标） |
+| `src/drivers/Qt/fceuWrapper.cpp` | `fceuWrapperPreInit` 顶部的 `--no-console` 分支补一行登记（外部函数用 `extern` 声明引入，与 `main.cpp` 的 `extern bool g_noConsole` 同款先例） |
+
+⚠️ **为什么不用类成员/头文件**：r5 第一次回退的教训（改 `Config` 类布局 ⇒ exe 在参数解析前异常退出，原因未查明）——本方案**不触碰 `configSys.h`**，`Config` 的对象布局逐字不变，ODR/ABI 面为零。
+⚠️ 只登记 `--no-console`：`--help`/`-h`/`--version`/`--no-gui` 在 `fceuWrapperPreInit` 里**直接 exit**，永远到不了 `parse()`，登记它们是死代码。
+
+**门禁与双向验证**（判据 = 独立 `FCEUX_CONFIG_DIR` 下生成的 `fceux.cfg` 的 `SDL.LastOpenFile` 行；探针 `Research_only/w205/probe/v205_e2e.py`，gitignored）：
+
+| 用例 | 修复后（`build/src/fceux11.exe`） | 修复前（v2.0.4_hotfix1 发布包 exe） | 判定 |
+|---|---|---|---|
+| A `--no-console <ASCII 名 ROM>` | **LastOpenFile = 该 ROM** ⇒ 装载成功 | LastOpenFile = **默认值（配置目录）** ⇒ ROM 被吞 | ✅ 修复生效，**红腿当场实证** |
+| B `<ASCII 名 ROM>`（无 flag） | 装载成功 | 装载成功（值逐字一致） | ✅ 行为不变 |
+| C `<中文名 ROM>`（无 flag） | 装载成功 | 装载成功 | ✅ C2 回归完好 |
+| D `--no-console`（无 ROM） | LastOpenFile = 默认值（`config.cpp:773` 的缺省就是基准目录，**预期行为**） | 同左 | ✅ 无假装载 |
+
+⇒ A 用例**修复前红 / 修复后绿，双腿齐**（纪律 3）；B/C/D 修复前后逐字一致 ⇒ 无行为回归。
+⇒ 全量构建 EXIT=0（65 步）+ `ctest -LE perf` **41/41** 全绿；改动全部在 driver 层（`drivers_common` + `drivers_qt`），Rust 八条不在影响面。
+
+**验收残留**：无。本条验收命令三行全部当场实测通过。
+
 ### BUG-V205-03 · 「关闭 ROM」后立刻「打开 ROM」⇒ GUI 永久卡死（**原生文件对话框 × COM 回调死锁**）
 
-**状态**：⛔ **本轮只登记不修**（2026-11-16 登记 → **同日 21:33 已在业主机上完成真复现，根因已实证**）
+**状态**：✅ **已修（2026-11-16，r7）—— 主修 #3（装载推迟出对话框栈）已落地**，实施记录见 §9.20；**GUI 对话框路径的死锁场景无法自动化触发（E12），待业主人手复核**
 **报告来源**：业主人工实测 —— 发布包 `C:\Users\ikrx2\Desktop\fceux11-v2.0.4_hotfix1-windows-amd64\fceux11.exe`（= 本仓 `main` @ `ba35b0f` 之后）
 **业主补充的触发条件**：**先「关闭 ROM」，再「立刻打开 ROM」**；触发样本 = `C:\Users\ikrx2\Desktop\roms\mapper21\格拉米世界2.nes`（mapper 21 = Konami VRC2/VRC4 A）。
 
@@ -1175,4 +1200,26 @@ C++ 端到端锁**转红**（同源变异）⇒ 三条锁都有牙。
 | `thread_cpu.py` | 线程级 CPU 统计；⚠️ 两处坑：① `OpenThread` 的掩码**不能带 `THREAD_GET_CONTEXT`**（否则对别进程线程一律失败 ⇒ 静默空表）；② `GetThreadTimes` 对**更高权限级别的进程**返回 `ACCESS_DENIED`（本轮对本进程也未取到值 ⇒ 该项仍缺） |
 
 > **本轮真复现的原始件**：`waitchain_8136_213323.txt`（等待链）、`shot_hang_213323.png` + `hang_desktop.png`（现场）、`app_stdout_213323.txt`（app 全程日志）。
-> **下一步**：先做 §9.15 第 1 条的对照实验，再动代码。
+
+#### 9.20 ✅ 修复实施记录（2026-11-16 · r7）
+
+**改法**（= §9.15 第 3 条「主修（推荐）」原话落地；§9.15 第 1 条对照实验已由 E11/E12 完成，不重复）：
+
+| 落点 | 改动 |
+|---|---|
+| `src/drivers/Qt/ConsoleFile.cpp` `openROMFile()` | `dialog.exec()` 返回并取到文件名之后，**不再在当前调用栈里同步跑 `CloseGame()+LoadGame()`**，改为 `QTimer::singleShot(0, this, lambda)` —— 装载推迟到本调用栈完全出栈、GUI 线程回到主事件循环之后执行。`SDL.LastOpenFile` 的写入时机不变（对话框关闭即写） |
+| `src/drivers/Qt/ConsoleFile.cpp` `loadNSF()` | 同款改法（`LoadGame` 同属重活，且走同一个原生对话框路径）——同机制顺手加固 |
+| `src/drivers/Qt/ConsoleFile.cpp` | 补 `#include <QTimer>`（此前 `singleShot` 靠传递包含） |
+
+**为什么这样能断环（对应 §9.11 的死锁环）**：环的两条边是「对话框 COM 工作线程等 GUI 线程处理关闭期的 `EnableWindow(owner)`（普通 Win32 消息）」与「GUI 线程卡在 `Show()` 的 `CoWaitForMultipleHandles`（只泵 COM/RPC 消息）」。装载不再发生在对话框调用栈内 ⇒ GUI 线程在对话框收尾窗口内**始终处于正常泵消息的状态**（`exec()` 返回处直接出栈回主事件循环，`EnableWindow` 正常送达）⇒ 两条边都断开。装载与对话框关闭不再重叠，与触发概率/触发面（§9.14 的剩余变量）无关。
+
+**调用面核实**：`openROMFile` 与 `loadNSF` 的全部调用方（菜单动作 + 热键槽，`ConsoleMenuBar.cpp:172/175/202`、`ConsoleWindow.cpp:622`）都是 fire-and-forget 的 Qt 槽，**无任何调用方依赖「函数返回时装载已完成」** ⇒ 推迟装载不改变调用契约。lambda 以 `this` 为上下文对象（主窗口为进程级单例，销毁即失效，无悬垂）。
+
+**同机制观察项（不在本次范围，登记）**：`loadStateFrom`（`ConsoleEmuControl.cpp:113`，对话框后同步 `FCEUSS_Load`）理论上同属「Show() 收尾窗口内做重活」的暴露面——但它不在本条报告路径上、工作量远小于 `CloseGame()+LoadGame()`，**未随本次改动**；若业主人手复核时在该路径也复现卡死，按同款改法单独立项。`saveStateAs` / `fdsLoadBiosFile` 工作量更小，仅记录。
+
+**门禁**：全量构建 EXIT=0 + `ctest -LE perf` **41/41** 全绿（改动全在 driver 层，Rust 八条不在影响面）；命令行装载路径（B/C 用例）修复前后逐字一致 ⇒ 无回归。
+
+**验收残留（如实登记）**：
+1. **死锁场景无法自动化触发**——E12 已证自动化（键盘 Enter 关对话框）不触发、业主人手（鼠标）触发 ⇒ **修复效果只能由业主人手复核**：在业主机上复刻「关闭 ROM → 立刻打开 ROM → 选同一个 ROM → 打开」（鼠标操作），确认不再卡死、stdout 出现第三次 `Loading` 且窗口持续应答。
+2. **§9.15 第 2 条（`SDL.UseNativeFileDialog` 默认改 0）未做**——业主明确属产品决定，维持默认值不动；主修落地后它不再是必要规避，仅作已知问题时的临时开关保留。
+3. **§9.15 第 5 条兜底（包装锁带超时）与第 6 条（D1–D4 对齐上游）未做**——独立于本条，保持登记状态（E10：与本次卡死无因果）。
