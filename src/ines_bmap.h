@@ -307,6 +307,7 @@ BMAPPINGLocal bmap[] = {
 
 	{"Impact Soft MMC3 Flash Board",	406, Mapper406_Init },
 	{"INX_007T_V01",		470, INX_007T_Init },
+	{"Impact Soft IM1",		471, Mapper471_Init },
 
 	{"KONAMI QTAi Board",	547, QTAi_Init },
 

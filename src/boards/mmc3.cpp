@@ -416,11 +416,20 @@ static void M4Power(void) {
 	setmirror(hackm4);
 }
 
+// v2.0.5 A5: NES 2.0 PRG-RAM sizing (upstream 2.8.0 src/boards/mmc3.cpp:363-375).
+// The NES 2.0 header carries the PRG-RAM sizes as shift nibbles, each
+// "64 << shift" bytes (NESdev NES 2.0 header spec, bytes 10/11); the loader
+// already converted them into CartInfo byte counts (ines.rs:563-571 ->
+// ines_load.cpp:176-183, cart.h:85-88).  GenMMC3_Init() wants KiB, hence
+// the / 1024.  The iNES 1.0 path keeps the historical 8 KiB default and the
+// CRC32 Low-G-Man workaround untouched (reverse guard).
 void Mapper4_Init(CartInfo *info) {
 	int ws = 8;
 
-	if ((info->CRC32 == 0x93991433 || info->CRC32 == 0xaf65aa84)) {
-		FCEU_printf("Low-G-Man can not work normally in the iNES format.\nThis game has been recognized by its CRC32 value, and the appropriate changes will be made so it will run.\nIf you wish to hack this game, you should use the UNIF format for your hack.\n\n");
+	if (info->ines2) {
+		ws = (info->wram_size + info->battery_wram_size) / 1024;
+	} else if ((info->CRC32 == 0x93991433 || info->CRC32 == 0xaf65aa84)) {
+		FCEU_printf("Low-G-Man can not work normally in the iNES format.\nThis game has been recognized by its CRC32 value, and the appropriate changes will be made so it will run.\nIf you wish to hack this game, you should use the NES 2.0 format for your hack.\n\n");
 		ws = 0;
 	}
 	GenMMC3_Init(info, 512, 256, ws, info->battery);

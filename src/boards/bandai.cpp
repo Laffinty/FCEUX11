@@ -186,7 +186,16 @@ static void x24c02_write(uint8 data) {
 				x24c02_addr <<= 1;
 				x24c02_addr |= sda;
 			} else {
-				if (sda)					// READ COMMAND
+				// v2.0.5 A7-2: reject a wrong device address (upstream 2.8.0
+				// src/boards/bandai.cpp:181-187).  The x24c02 answers only to
+				// the 7-bit device address 1010xxx, i.e. (addr & 0x78) == 0x50;
+				// anything else must release SDA (out = 1, no ACK) and drop
+				// back to STANDBY instead of latching a bogus READ/WRITE
+				// transaction.
+				if ((x24c02_addr & 0x78) != 0x50) {	// WRONG DEVICE ADDRESS
+					x24c02_out = 1;
+					x24c02_state = X24C0X_STANDBY;
+				} else if (sda)				// READ COMMAND
 					x24c02_state = X24C0X_READ;
 				else						// WRITE COMMAND
 					x24c02_state = X24C0X_WORD;

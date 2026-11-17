@@ -483,7 +483,9 @@ Select-String -Path src\rust\crates\fceux11-formats\src\ines\ines_data.rs `
 
 ---
 
-### A5 · mapper 4 的 NES 2.0 PRG-RAM（U3）
+### A5 · mapper 4 的 NES 2.0 PRG-RAM（U3）—— ✅ **已落地（r13）**
+
+**r13 落地**：`Mapper4_Init` 插 `if (info->ines2) ws = (wram+battery)/1024`（Low-G-Man 分支降为 `else if`，上游 2.8.0 形状）+ 顺带采纳上游的提示文案（iNES→NES 2.0，无行为意义）。锁 = `mapper_load_test` A5 段三腿（NES 2.0 shift=4 ⇒ WRAMSIZE 1024 / iNES 1.0 对照 8192 钉反向守卫 / 双 nibble 求和），变异 A5-M1（删分支）红点 ①③红②绿 逐字对上。
 
 **做法**：`src/boards/mmc3.cpp:419-429` 加 `info->ines2` 分支
 （`ws = (info->wram_size + info->battery_wram_size) / 1024`）。
@@ -493,7 +495,19 @@ Select-String -Path src\rust\crates\fceux11-formats\src\ines\ines_data.rs `
 
 ---
 
-### A6 · mapper 210 的 Namco 175 / 340（U2）
+### A6 · mapper 210 的 Namco 175 / 340（U2）—— ✅ **已落地（r13）**
+
+**r13 落地 + 证据档位升级**：实施期取证发现**计划的前提已失效**——NESdev wiki《INES Mapper 210》
+（Wayback 最新快照 2026-03-04 = 现行文本）的 N340 镜像表与**上游 2.8.0 逐字一致**
+（0→MI_0 / 1→MI_V / 2→MI_1 / 3→MI_H）⇒ 本仓旧表 case3=MI_0（与 case0 重复）确认为坏表并已修。
+**Mesen v2.2.0 的 2/3 互换未被现行 wiki 证实**（其 changelog 声称修 Dream Master，但 wiki 现行文本
+未改）⇒ 采用 wiki=上游表，Mesen 冲突登记为观察项（`n106.cpp` 注释与 §9.22 同区）；附带发现
+wiki 把 Dream Master 列为 N340 而上游 CRC 表判 N175 ⇒ 上游 CRC 兜底表至少一条存疑（同样登记）。
+锁 = 新增 `mapper210_mirror_test`（六腿：N340 四档布局 / N175 不切镜像 / mapper 19 对照 /
+default 判型 / CRC→N175 / **存档往返镜像恢复**——CRC 腿用 GF(2) 线性求解器强制 CRC，自带唯一性自检）。
+变异：M1 表回退 7 红点 / M2 删恢复钩单腿外科红，均逐字对上。mapper 19 行为不变性七点核验链
+（gorko 消费者 / `$E000` PRG 路径逐位一致 / Power 真值表 / FixNTAR 覆写死代码 / 金标零风险）。
+**A7-4（mapper 19 setchr1r）维持只登记**（红线：需真 N163 ROM + 权威取证；重构刻意保持禁用现状）。
 
 **做法**（只改 `src/boards/n106.cpp` 一个文件）：把二值 `is210` 换成
 上游的三态 `NamcoType { N163, N175, N340 }` + `Mapper210_DetectType()`
@@ -512,7 +526,17 @@ Select-String -Path src\rust\crates\fceux11-formats\src\ines\ines_data.rs `
 
 ---
 
-### A7 · MMC5 / bandai / mapper 72 / mapper 19 四项小修（U6）
+### A7 · MMC5 / bandai / mapper 72 / mapper 19 四项小修（U6）—— ✅ **3/4 已落地（r13）+ mapper 19 只登记**
+
+**r13 落地**：① **MMC5**（`GenMMC5Power` 三处 0xFF→0）+ 新锁 `mmc5_power_defaults_test`（15/15，
+savestate 扫描通道——五个目标符号全 static，CHRA/CHRB/NTAM/NTFL/ATFL 标签逐字核实），
+**金标裁决 = 零漂移**（ppu_frame_diff mmc5 90 帧 + mapper_byte_diff 全过 ⇒ 行为变更保留，无需基线评审；
+kgmqa-070/071/090 的权威矩阵由推送后 CI 承担——⚠️ 本地 `f11qa_direct_smoke` 实测为**空洞门禁**：
+runner 只执行 `input.rom` 非空的项，而 tests.json 123 项全为子进程式条目 ⇒ 直接模式 0 项执行、退出 0
+（r13 实测，独立观察项待立项，纪律 10/13 活例））。② **bandai x24c02**（设备地址校验）+
+协议级锁（mapper 16 板 + I2C 逐边仿真驱动，STANDBY+NAK / READ 放行双腿，savestate 扫描读数器
+带唯一性守卫）。③ **mapper 72**（写窗口 → $8000）+ handler 身份双腿。④ **mapper 19 setchr1r 红线
+维持只登记**（见 A6 段）。
 
 | 子项 | 做法 | 注意 |
 |---|---|---|
@@ -523,7 +547,14 @@ Select-String -Path src\rust\crates\fceux11-formats\src\ines\ines_data.rs `
 
 ---
 
-### A8 · 上游新增 mapper 471 / 451 / 413（U7）
+### A8 · 上游新增 mapper 471 / 451 / 413（U7）—— ✅ **471 已落地（r13）+ 451/413 转长尾（既定）**
+
+**r13 落地**：471（Impact Soft IM1 = mapper 201 + 扫描线 IRQ）六点接线全落（新 `471.cpp` 80 行 +
+`simple_carts.h` Cart 类 + `ines.h` 声明 + `ines_bmap.h` + `SRC_BOARDS`；latch 走上游同款
+`LATC` SFMDATA 存档块，**S1 自维护锁机械强制双路径登记**）。锁四腿：S1 分类 + 装载 +
+handler 身份 + **「地址即数据」LATC 锚**（savestring level 0 不压缩扫描，三值腿 0x8003/0x8041/0xFFFF）。
+变异：M1b 删 MapperEntry ⇒ S1+A8-S1/S2 三红；M2 `latch=A`→`latch=V` ⇒ 三值腿全红（读数精确显示
+吃了数据值）。IRQ 锚登记待真 ROM（Haratyler/Haraforce）。
 
 | 号 | 板子 | 代价 | 建议 |
 |---|---|---|---|
@@ -828,6 +859,7 @@ GBA 侧「BIOS SWI 全部实现」—— 详见长尾盘点文档 §四。
 | r10 | 2026-11-17 | **A3 落地（矫正活表补 22 条 + 修 2 条）**。① **取数**：上游快照 `src/ines-correct.h`（2.8.0）**278 行**；本仓活表 `src/rust/crates/fceux11-formats/src/ines/ines_data.rs::ROM_CORRECTIONS` 实为 **256 条** ⇒ 差 **22 条**。② **根因确认（计划 §三 A3 的判断成立）**：v0.2.19 的 Python 抽取器**解析不了 C 表达式** ⇒ 带表达式的行被**整行丢掉**。新写抽取器（`Research_only/w205/a3_regen.py`，gitignored）能求值 `\|` 表达式，`256\|0x1000 → 4352`、`51\|0x800 → 2099`、`0x10\|4 → 20`；并带**安全门**：只允许「+22 行 / 改 2 个值 / 挪 1 行」三种差异，其余差异一律中止写文件。③ **计划未预见的三点（如实更正）**：**(a) 上游的表达式行是 23 条不是 22**——21 条在 **mapper** 字段（`mapper\|0x1000`）+ 1 条在 **mapper** 字段（`51\|0x800`）+ **1 条在 mirror 字段**（`0x243a8735` 的 `0x10\|4`）；后者**不是被整行丢掉，而是表达式被静默截断成 0** ⇒ Major League 的单屏镜像退化成水平（这才是「修 2 条」里的第 2 条的真正来源）；**(b) 上游把 Urusei Yatsura 那条从 mapper-101 区块挪到了 mapper-87 区块**（因为它把 mapper 从 101 纠正成 87）⇒ 活表里该行**位置**随之更新（查找是按 CRC 线性查 ⇒ **行为中性**，只让未来与上游的 diff 变简单）；**(c) 本仓活表与上游 2.8.0 的**其余** 256 行**逐字相同、且顺序相同** ⇒ 本仓活表是上游的严格子集，无第三方私货。④ **两侧既有语义已核对，不需改逻辑**：Rust 侧 `ines.rs:309-326` 已认 `0x1000`（mask 取 `0xFFF`）与 `0x800`（`clear_vrom`）；C++ 侧 `src/ines_load.cpp:306-307` 的 `Mirroring >= 0x10 ⇒ SetupCartMirroring(2 + (Mirroring & 1), 1, 0)` 与**上游 2.8.0 `src/ines.cpp:1060-1061` 逐字一致** ⇒ mirror 写 20 即可生效。⑤ **门禁**：`fceux11-formats` 新增 **2 条锁**——`the_c_expression_correction_rows_reach_the_loader`（22 条逐条断言**查找结果**：mapper 号 / mask / clear_vrom / mirror，期望值**手抄自上游**、不由同一套表达式推导）+ `the_two_corrected_correction_rows_match_upstream`（Major League mirror=20、Urusei mapper=87+mirror=1，外加**负向守卫** `0xF3C85DC3`（整文件 CRC，不是表键）必须继续查不中）。⑥ **变异验证双向**：**M1**（删掉 `0x1d75fd35` 一行）⇒ 第一条锁红（`crc 0x1d75fd35: mapper left -1 right 256`）；**M2**（把两条被修正的值改回旧值）⇒ **第二条**锁红（`Major League: mirror left 0 right 20`）⇒ **两条锁互相独立**。还原走备份 + **显式刷新 mtime**（cargo 按 mtime 指纹，不刷新会跑变异版二进制）。⑦ **⚠️ 行尾事故与新坑**：第一次重生成把新片段写成 LF ⇒ 整个文件变成**混合行尾**（CRLF 1055 + LF 1391）——**git 看不出来**（`core.autocrlf` 规范化，`git diff --numstat` 仍是 +116/−6）⇒ 已修正为**全 CRLF**（2446/0）并把备份挪出源码树 ⇒ **登记为坑 11 的新变体：脚本改仓库文件必须沿用原文件行尾，且改完立刻回查 CRLF/LF 计数**。⑧ **业主 ROM 合集的端到端核对（新增，非计划要求）**：按 loader 的哈希规则（PRG+CHR，**补 0xFF 到 2 幂**后算 CRC32）扫 `Desktop\roms` 的 **3903 个 .nes**（跳过 3 个非 iNES + 1 个 NES 2.0）⇒ **22 条新键里命中 1 条、2 条被修正的里命中 1 条，且两处都精确对上上游注释里的游戏名**：**`mapper51\球类11合1.nes`**（CRC `0xa912b064` = 上游的 “11-in-1 Ball Games”）⇒ 现在按 mapper 51 + **清掉本不该存在的 CHR ROM**（`clear_vrom` ⇒ `vrom_size_8kb = 0`）装载；**`mapper32\职棒大联盟.nes`**（CRC `0x243a8735` = 上游的 “Major League”）⇒ **单屏镜像**（20）取代水平（0）。⇒ **这两张卡在修复前后画面应当不同，是业主可立即手工复核的两个样本**。⑨ **读数**：`fceux11-formats` **158/0**（156 → 158）；Rust 八条全绿（根 **299/0/20** · vendor **249** · debug **94** · media **52** · **formats 158** · utils **51** · lua **54** · 两态 `cargo check` EXIT=0）；`ctest -LE perf` **41/41**。 |
 | r11 | 2026-11-17 | **线 B 四条并行落地（LT-08 / LT-09 / LT-10 / LT-16，四个 agent 并行切分，按文件独占）**。① **B1 · LT-08 DMC 计费范围界定 ⇒ 已界定 + 已落锁**：判定句「**DMC 的一次 sample fetch ⇒ 占 4 个 CPU 周期**」（口径 = CPU 周期非 master；不含 DMA 抢占仲裁——本仓无仲裁模型故恒为 4；扣账时点 = `$4015`(bit4=1) 写之后的**下一条指令 opcode fetch 之后**）；**三方交叉全部达成**——权威（NESdev `APU_DMC`「The CPU is stalled for 1-4 CPU cycles to read a sample byte」+ `DMA`「…taking 3 or 4 cycles」；⚠️ 直连+代理 5 条路径全被 Cloudflare 403、Wayback 0 字节 ⇒ **正文经检索索引转录，已如实降档**）／参照实现（上游 **2.8.0 与 2.6.6 的 6 个 DMC 区域逐字相同** ⇒ 上游无 DMC 改动；本仓与上游仅 2 处差异且**均不在计费路径**）／实测（blargg `dmc_tests/latency.nes` PASS，**blargg 自己的测例源码写死 `; 4 DMC wait-states`**（`sync_dmc.s:44`）⇒ 与权威数字对上；来源＝本仓 `scripts/download_blargg_roms.ps1:24` 同一镜像）。**本仓已符合**（4 项主口径全符合），5 处亚周期差异按 LT-08 非目标**登记不改**（恒 4 而非 3-or-4／取样晚 0–6 周期／无 RDY halt／无 DMC-OAM DMA 仲裁重叠／page-cross 惩罚晚一条指令计入）；**未借用 042 用例的 DMA 仲裁结论**（反向守卫守住）。**门禁** = `tests/f11qa/core/apu_test.cpp` 新增 **12 条断言**（19 → **31**，**纯插入 +112/−0**），用 `cpu_instance().timestamp()` **实测差值**断言。**变异双向**：腿 A（`==4`→`==3`）红 `FAIL one DMC sample fetch steals exactly 4 CPU cycles`（30/1）、腿 B（`==per`→`==per+1`）红 `FAIL DMCacc wraps forward by exactly one DMC`（30/1）、还原 31/0 绿；**父 agent 另补子 agent 因文件归属没做的「强变异腿」**（改**模拟器**而非锁：`src/sound.cpp:745-748` 的 DMC 取样 4 读 → 3 读 ⇒ 锁**转红** 30/1 ⇒ 证明锁读的是模拟器真实路径，不是空转断言）。② **B2 · LT-09 人工验收 7 项 ⇒ 部分闭合 + 挖出一个真缺陷**：**V14**（CDL 一致性）已给读数（6 fixture × 120 帧）但**计划字面等式 6/6 不成立**（差值恰为 `code_and_data`）⇒ **并集式** `code+data-both+undef==size` 6/6 **精确成立** ⇒ **只登记判据口径更正、不改基线**（§9.24）；**V11**（VRC7 跨进程读档）机器侧全闭合（读档后 60 帧音频 47917 样本逐字节相同、60 行帧哈希全同、OPLL 指针重建经变异证明 `OPLL_forceRefresh` 在跑）⇒ 只剩「音色」需业主人耳；**V15 movie 回放 ⇒ 🔴 实测不通过**（录出的 `.fm2` **长度对但全 0**、回放 180/180 帧不一致）⇒ **父 agent 逐行核实根因并另立缺陷条目（§9.23）**：`src/movie_fm2.cpp:414` 写完就 `fread`，而 Rust `EmuFileMem::read_into` 是**位置读** ⇒ 读回 0 字节、零初始化的 `tmp` 被整段写出 ⇒ **修法一行**（`fceux11_rust_emufile_mem_fseek(mem,0,0)`，该 API 已存在且 Rust 侧自带测试即此范式）⇒ **本轮只登记不修**（影响面：所有用户录制的 movie 都不可用 ⇒ 建议优先于批 2/3）；**V13** 校验器已备好并正反自测（36000 帧合成 AVI → PASS；尾部截 40 字节 → FAIL）；**V7 / V25+V22 / V6** 需业主在有桌面的机器上做（步骤/判据/误判排除已写全）。③ **B3 · LT-10 GBA 三卡 ⇒ 流程就绪，待业主出卡**：用 **3 张合成夹具卡 + 否定性对照** 自证探针链（执行了 ROM 机器码／读数随 ROM 变化／SWI 按 ARM 约定解码 93972 calls NOT SERVED／走了 stub BIOS 向量 281914 次／记录器非无条件打印／两次运行读数一致）⇒ **六条断言全过**；**挖出两个真坑**：① `steps/frame` **不是**预算上限（帧边界由 LCD 决定，判 wedge 要看 `frames that exhausted the budget`）② **`GBA_PROBE_ONLY` 是子串匹配**（`src/rust/src/gba/cartprobe.rs:80-81` 原文）⇒ 脚本改为**每卡独立工作目录**；**更正派工书一处**：`waitprobe.rs` 是 AGS 等待态测量工具，与卡带分诊无关 ⇒ 未使用；**本机两次全盘搜索 0 实体卡** ⇒ 本条不能闭合，交付「一键脚本 + 读数模板 + 自证报告」。④ **B4 · LT-16 `start_delay = 2` ⇒ 待裁决（低优先、不阻塞）**：GBATEK 当前版**零覆盖**（定时器章只写 reload 语义，全文 412 万字符关键词穷举无一条讲使能→计数延迟；仓内快照 `.zcode/gbatek_plain.txt:4782-4865` 与当前版逐字一致 ⇒ 缺口是「GBATEK 没写」不是「我们没抄」）+ **四套独立参照实现全部「无延迟」**（mGBA master `190a68d6` `src/gba/timer.c:134-151`、`timer.h:22-27` 无延迟字段；VBA-M `GBA.cpp:83 timerOnOffDelay` 推迟使能沿但无「空 N 周期」常量；neser `gba/bus/timer.rs:100-104`；rustboyadvance-ng `core/src/timer.rs:143,195`）⇒ 参照实现层信号**与 AGS 方向相反** ⇒ 按 LT-16 反向守卫**记为待裁决、不做静默取舍**；**未改实现、未改任何 AGS 期望值**；并钉死「若裁决为无延迟会变红的三个 AGS 锚点」（`TIMER PRESCALER` 的 `timers.rs:432-445`／`WAIT STATE WAIT CONTROL` `bus.rs:1893-1905`／`CARTRIDGE RAM WAIT CONTROL` `bus.rs:1888-1891`；`TIMER CONNECT` 不受影响）⇒ **建议路径 = 真机/FPGA 最小测量**（唯一能把档位提到「硬件规格级」的路），次优 = 给 GBATEK 作者提缺口反馈。⑤ **重新盘点（代码复核）**：**线 A 4/8**（A1/A2/A3/A4 ✅；A5/A6/A7/A8 ⬜ —— 逐项 0 命中复核）、**线 B 4 条 = 1 条收口 + 1 条部分闭合 + 2 条待外部条件**、**线 C 3/3 ✅**、**裁决项 D1/D2/D3 全未决**、**§九 BUG-V205 3/3 ✅** ⇒ 计划内 15 项完成 **7 项 ≈ 47%**。⑥ **读数**：`fceux11-apu_test` **31/31**、Rust 八条全绿（根 299/0/20 · vendor 249 · debug 94 · media 52 · formats **158** · utils 51 · lua 54 · 两态 check EXIT=0）、`ctest -LE perf` **41/41**。 |
 | r12 | 2026-11-18 | **§9.23（V15 · movie 全 0）修复落地**。① **修复 = `src/movie_fm2.cpp` 读回前补一行 `fceux11_rust_emufile_mem_fseek(mem, 0, 0)`**（读回游标问题见 §9.23 根因；固定 seek 到 0 的理由：`seekToCurrFramePos` 命中时 Rust dump 把游标留在帧记录处，只有 0 是确定起点）。一行治愈 `MovieData::dump` 汇聚的全部 4 个调用方（SaveMovie / RedumpWholeMovieFile / savestate 内嵌 movie / TAS 编辑器）；**Rust 侧零改动**（其自带测试本就是正确范式）。② **r11 的两处口径更正**：本仓 FM2 是纯文本格式、无 `FCEUXM` 魔数（实测零命中）⇒ 验收判据改为「文件以 `version ` 开头」（纪律 4）；`RedumpWholeMovieFile()` 澄清为非缺陷（先截断再整体重写自洽）。③ **门禁 = 新增 `movie_roundtrip_test`（ctest 41 → 42 项）**：tier1 无 ROM 双编码 dump 落盘断言 + tier2 真实录制入口 120 帧 → 文件有效性 → `LoadMovie` 解析记录数 → 两次回放自洽；**变异两腿**：腿 A 13/13 绿，腿 B（注释 fseek）8 条按预登记预期全红、还原复绿 13/13。④ **🔴 新观察项（§9.23 内登记，只登记不修）**：「回放与实时推进逐帧一致」当前不成立——四种 setup 序列实测四种帧 1 哈希、各自可复现 ⇒ savestate dump/还原的帧精确等价性有缺口，引擎级既有属性，与 V15 无关，另立 RE 才动。⑤ `tests/tests.json` 与生成器未触碰（坑 15）；`fceu11::LoadGame` 对已加载 ROM 会经 `ResetGameLoaded()` 全量重载（r12 实读确认）。⑥ **读数**：全量串行构建 EXIT=0（零 FAILED）；`ctest -LE perf` **42/42**（41 → 42，`movie_roundtrip_test` = Test #8 Passed）；`fceux11-formats` **158/0**（防呆：EmuFileMem 所在 crate，本改动未触 Rust）；行尾回查六文件全纯 CRLF（坑 11 判据满足）。 |
+| r13 | 2026-11-18 | **线 A 收尾：A5 / A6 / A7(3/4) / A8-471 一次做完（两批 4 agent 文件独占并行，父会话串行构建与变异）**。① **A5**：`Mapper4_Init` 插 ines2 分支（`ws=(wram+battery)/1024`，Low-G-Man 降 else-if）+ 顺带采纳上游提示文案；锁 = mapper_load_test A5 段三腿，变异 A5-M1 红 ①③绿② 逐字对上。② **A6**：`n106.cpp` 三态重构（NamcoType + DetectType submapper 优先 + N340SyncMirror wiki 表 + StateRestore 镜像恢复 + `N106_Power` 严格 `type==N163` 反向守卫 + 去掉 Mapper19_StateRestore 的死代码 SyncMirror）；**实施期证据升级**——wiki 现行文本（Wayback 2026-03-04）= 上游表，计划「上游无权威出处」前提失效，本仓 case3=MI_0 确认坏表；**Mesen 2/3 互换与 Dream Master 归类冲突登记为观察项**（未采纳）；锁 = 新增 `mapper210_mirror_test` 六腿（含 GF(2) CRC 强制与存档往返），变异 M1 七红 / M2 单腿外科红；mapper 19 行为不变性七点核验；**A7-4（mapper 19 setchr1r）红线维持只登记**。③ **A7**：MMC5 三处 0xFF→0 + 新锁 `mmc5_power_defaults_test` 15/15（savestate 扫描通道，五符号全 static 逐标签核实），**金标零漂移**（ppu_frame_diff mmc5 90 帧 + mapper_byte_diff 全过 ⇒ 保留，无需基线评审）；bandai x24c02 设备地址校验 + 协议级锁（mapper 16 板 + I2C 逐边仿真 + 存档扫描唯一性守卫）；mapper 72 写窗口 → $8000 + handler 身份双腿。④ **A8**：471 移植六点接线（LATC SFMDATA 走上游同款；S1 自维护锁强制双路径）+ 四腿锁；变异 M1b 三红 / M2 三红；451/413 转长尾（既定）。⑤ **变异腿总账**：批次 1+2 共 **8 条全红**（A6-M1/M2、A8-M1b/M2、A5-M1、72-M1、bandai-M1、MMC5-M1）且还原复绿，红点全部与变异机制逐字对应。⑥ **🔴 新观察项（纪律 10/13 活例）**：`f11qa_direct_smoke` 实测为**空洞门禁**——`run_direct_rom_tests` 只执行 `input.rom` 非空的项，tests.json 123 项全为子进程式条目 ⇒ 直接模式 0 项执行、退出 0、ctest 判 Passed（matrix JSON total=0 实证）；修 runner 或修 manifest 属独立工作项，本轮只登记。⑦ **读数**：全量串行构建 EXIT=0；`ctest -LE perf` **44/44**（42 → 44：+mapper210_mirror_test +mmc5_power_defaults_test）；`fceux11-formats` **158/0** 防呆；行尾九文件全纯 CRLF；tests.json 与生成器未触碰（坑 15）。⑧ A 线自此 **8/8**（A7 记 3/4 子项 + mapper 19 按自身前置登记）。 |
 
 ---
 

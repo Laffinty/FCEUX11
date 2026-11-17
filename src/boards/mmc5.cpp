@@ -919,14 +919,19 @@ static void GenMMC5Power(void) {
 
 	PRGBanks.fill(0xFF);
 	WRAMPage = 0;
-	CHRBanksA.fill(0xFF);
-	CHRBanksB.fill(0xFF);
+	// A7-1 (v2.0.5): the CHR bank registers power up at 0, not 0xFF —
+	// upstream FCEUX 2.8.0 mmc5.cpp GenMMC5Power fills CHRBanksA/CHRBanksB
+	// with 0 at this exact spot. Behavior change registered in plan A7-1 and
+	// locked by fceux11_mmc5_power_defaults_test. PRGBanks and
+	// WRAMMaskEnable deliberately keep 0xFF (upstream agrees there).
+	CHRBanksA.fill(0);
+	CHRBanksB.fill(0);
 	WRAMMaskEnable.fill(0xFF);
 	mmc5ABMode = 0;
 	IRQScanline = 0;
 	IRQEnable = 0;
 	CHRMode = 0;
-	NTAMirroring = NTFill = ATFill = 0xFF;
+	NTAMirroring = NTFill = ATFill = 0;  // A7-1: was 0xFF; upstream 2.8.0 has 0
 	MMC5IRQR = 0;
 	MMC5LineCounter = 0;
 	mmc5psize = mmc5vsize = 3;

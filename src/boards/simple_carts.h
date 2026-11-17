@@ -164,6 +164,11 @@ class Mapper30Cart  : public MapperStrategyA { public: explicit Mapper30Cart(Bus
 class Mapper31Cart  : public MapperStrategyA { public: explicit Mapper31Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
 class Mapper35Cart  : public MapperStrategyA { public: explicit Mapper35Cart(Bus& bus) noexcept  : MapperStrategyA(bus) {} };
 
+// v2.0.5 A8: NES 2.0 mapper 471 (Impact Soft IM1; upstream 2.8.0 471.cpp).
+// The board's whole state is one 4-byte latch ("LATC"); registration lives
+// in src/boards/471.cpp.
+class Mapper471Cart : public MapperStrategyA { public: explicit Mapper471Cart(Bus& bus) noexcept : MapperStrategyA(bus) {} };
+
 } // namespace fceu11
 
 #endif // FCEU11_BOARDS_SIMPLE_CARTS_H

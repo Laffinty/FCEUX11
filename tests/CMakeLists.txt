@@ -93,6 +93,17 @@ if(FCEUX11_BUILD_TESTS)
              COMMAND fceux11_mapper_load_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
+    # v2.0.5 A6 — mapper 210 Namco 175/340 mirroring semantics
+    # ($E000 bits 6-7 switch only on N340, with the wiki-verified table;
+    # N175 hardwired; mapper 19 untouched; savestate restore hook).
+    fceux11_add_test_executable(fceux11_mapper210_mirror_test
+        f11qa/boards/mapper210_mirror_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME mapper210_mirror_test
+             COMMAND fceux11_mapper210_mirror_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
     fceux11_add_test_executable(fceux11_mapper_reset_test
         f11qa/boards/mapper_reset_test.cpp
         git_info_stub.cpp
@@ -169,6 +180,21 @@ if(FCEUX11_BUILD_TESTS)
     )
     add_test(NAME movie_roundtrip_test
              COMMAND fceux11_movie_roundtrip_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+    # v2.0.5 A7-1 - MMC5 power-on defaults lock (plan section 3, A7-1).
+    # GenMMC5Power must start CHRBanksA / CHRBanksB / NTAMirroring / NTFill /
+    # ATFill at 0 (upstream FCEUX 2.8.0 agreement; this fork used 0xFF). The
+    # five symbols are file-static in src/boards/mmc5.cpp, so the test reads
+    # them through the uncompressed level-0 savestate stream (SFMDATA tags
+    # CHRA / CHRB / NTAM / NTFL / ATFL) right after load_rom triggers
+    # PowerNES, with zero emulated frames.
+    fceux11_add_test_executable(fceux11_mmc5_power_defaults_test
+        core/mmc5_power_defaults_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME mmc5_power_defaults_test
+             COMMAND fceux11_mmc5_power_defaults_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
     # -------------------------------------------------------------------------
@@ -523,7 +549,8 @@ if(FCEUX11_BUILD_TESTS)
         endif()
 
         set_tests_properties(
-            smoke_test mapper_load_test mapper_reset_test
+            smoke_test mapper_load_test mapper210_mirror_test mapper_reset_test
+            mmc5_power_defaults_test
             expected_api_test
             enum_class_bitflags_test config_store_test
             core_state_test

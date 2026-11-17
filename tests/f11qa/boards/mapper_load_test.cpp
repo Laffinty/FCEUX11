@@ -866,6 +866,588 @@ static bool check_mapper45_window(const std::filesystem::path& dir) {
     return ok;
 }
 
+// ==================== v2.0.5 A8: mapper 471 (Impact Soft IM1) port ====================
+//
+// Upstream 2.8.0 src/boards/471.cpp, ported verbatim (v2.0.5 plan §三 A8):
+// NES 2.0 mapper 471 is iNES mapper 201 plus a scanline IRQ (Haratyler /
+// Haraforce).  The board's whole state is one uint32 latch, and the write
+// handler latches the WRITE ADDRESS, not the data bus value (`latch = A`).
+//
+// Three legs:
+//   * A8-S1 dual registration: 471 must be in bmap[] (loader dispatch) AND
+//     in the MapperEntry registry.  The A1-S1 bmap classification above
+//     enforces exactly this pairing for every bmap number, so a bmap-only
+//     add would turn the S1 sweep red; this check pins 471's side of it.
+//   * A8-S2 handler identity: the board's Power installs CartBR at $8000
+//     and its own write handler (not the generic CartBW), and the load goes
+//     through the strategy cart (the A1-a forwarder wiring).
+//   * A8-S3 the "address is data" anchor: the latch is read out of a
+//     savestate dump through its "LATC" SFORMAT tag, so the lock exercises
+//     the real AddExState("LATC") path.  SubWrite (src/state.cpp:147)
+//     serialises each field as [4-byte tag][u32 LE size][raw data], and
+//     FCEUSS_SaveMS level 0 stores chunk payloads uncompressed
+//     (fceux11-core/src/state_file.rs: compress_payload level 0 -> raw), so
+//     the tag's bytes appear verbatim in the buffer.  A write-then-read-back
+//     at $8000-$FFFF would be TOOTHLESS here (the A1-S3 comment above): the
+//     latch has no CPU-visible read port, PRG reads come from mapped ROM /
+//     open bus and can never echo the latch.
+//
+// Mutation legs this section guards (each is verified two-way red):
+//   M1a: drop the bmap[] line      -> A8-S1 red + the 471 load fails
+//   M1b: drop kMapper471Register   -> A8-S1 red + the A1-S1 classification
+//       sweep goes red (471 in bmap, unregistered, not in the 75-list)
+//   M2 : `latch = A` -> `latch = V` -> every A8-S3 value leg red
+//   M3 : drop `latch = 0` in Reset -> the A8-S3 reset leg red
+//
+// The scanline IRQ hook (GameHBIRQHook = HBHook) is wired but NOT locked
+// here: firing it needs ScreenON/SpriteON rendering with PPU[0]&0x38 !=
+// 0x18, for which there is no cheap headless precondition.  Register an IRQ
+// lock when a real 471 ROM (Haratyler / Haraforce) is available.
+
+#include "emufile.h"     // EMUFILE_MEMORY (A8-S3 savestate dump)
+#include "state.h"       // FCEUSS_SaveMS
+#include <cstddef>       // std::byte
+
+// Reads the 471 latch out of a fresh savestate dump via its "LATC" tag.
+// Returns false when the save failed or the tag is missing / ambiguous --
+// never silently "skips", so a broken AddExState cannot pass vacuously.
+static bool read_mapper471_latch_via_savestate(uint32_t* out) {
+    std::vector<std::byte> buf;
+    EMUFILE_MEMORY f(&buf);
+    if (!FCEUSS_SaveMS(&f, 0)) return false;
+    const uint8_t* p = reinterpret_cast<const uint8_t*>(buf.data());
+    const size_t n = buf.size();
+    static const uint8_t kTag[4] = { 'L', 'A', 'T', 'C' };
+    int hits = 0;
+    bool ok = false;
+    for (size_t i = 0; i + 12 <= n; ++i) {
+        if (memcmp(p + i, kTag, 4) != 0) continue;
+        const uint32_t size = static_cast<uint32_t>(p[i + 4]) |
+                              (static_cast<uint32_t>(p[i + 5]) << 8) |
+                              (static_cast<uint32_t>(p[i + 6]) << 16) |
+                              (static_cast<uint32_t>(p[i + 7]) << 24);
+        if (size != 4) continue;      // only the 4-byte latch entry matches
+        if (++hits > 1) return false; // the tag must identify exactly one field
+        *out = static_cast<uint32_t>(p[i + 8]) |
+               (static_cast<uint32_t>(p[i + 9]) << 8) |
+               (static_cast<uint32_t>(p[i + 10]) << 16) |
+               (static_cast<uint32_t>(p[i + 11]) << 24);
+        ok = true;
+    }
+    return ok;
+}
+
+// A8-S1: 471 is in bmap[] with a non-null init AND registered in the
+// MapperEntry registry (as "Impact Soft IM1", matching upstream's bmap name).
+static bool check_mapper471_registered() {
+    bool in_bmap = false;
+    for (const BMAPPINGLocal* e = bmap; e->init; ++e) {
+        if (e->number == 471) { in_bmap = true; break; }
+    }
+    if (!in_bmap) {
+        printf("FAIL: mapper 471 is not in bmap[] -- the loader cannot "
+               "dispatch it\n");
+        return false;
+    }
+    const fceu11::MapperEntry* entry = fceu11::find_mapper(471);
+    if (!entry) {
+        printf("FAIL: mapper 471 has no registry entry -- the A1-S1 bmap "
+               "classification requires the pairing\n");
+        return false;
+    }
+    if (entry->mapper_number != 471 || !entry->name ||
+        strcmp(entry->name, "Impact Soft IM1") != 0 || !entry->factory) {
+        printf("FAIL: mapper 471 registry entry is { %u, \"%s\", factory:%d }\n",
+               entry->mapper_number, entry->name ? entry->name : "",
+               entry->factory ? 1 : 0);
+        return false;
+    }
+    printf("      bmap + registry both carry 471 as \"%s\"\n", entry->name);
+    return true;
+}
+
+// A8-S2 + A8-S3: one real load, then the board behaviour.
+static bool check_mapper471_latch(const std::filesystem::path& dir) {
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);  // the sweep may have removed it
+    const std::filesystem::path rom = dir / "a8_mapper_471.nes";
+    if (!write_minimal_ines_rom(rom, 471)) {
+        printf("FAIL: cannot write the mapper 471 ROM\n");
+        return false;
+    }
+    FCEUGI* gi = fceu11::LoadGame(rom.string().c_str(), 1, true);
+    if (!gi) {
+        printf("FAIL: the mapper 471 ROM did not load\n");
+        return false;
+    }
+    bool ok = true;
+    if (gi->mappernum != 471) {
+        printf("FAIL: loaded as mapper %d (expected 471)\n", gi->mappernum);
+        ok = false;
+    }
+    // Registered mappers load through the strategy cart: the A1-a wiring
+    // installs the forwarders (the contract the A1-S4 controls pin).
+    const bool forwarder = (iNESCart.Power == &CartInfo_PowerForward);
+    printf("      iNESCart.Power is the forwarder: %d\n", forwarder ? 1 : 0);
+    if (!forwarder) {
+        printf("FAIL: mapper 471 is registered but the Power forwarder was "
+               "not installed\n");
+        ok = false;
+    }
+    // Handler identity: Power maps $8000-$FFFF reads onto CartBR and installs
+    // the board's own write handler (the generic CartBW is the WRAM handler,
+    // which no 471 path would install over PRG).
+    const bool rd = (GetReadHandler(0x8000) == &CartBR);
+    const bool wr = (GetWriteHandler(0x8000) != &CartBW);
+    printf("      read handler $8000 == CartBR: %d, write handler != CartBW: %d\n",
+           rd ? 1 : 0, wr ? 1 : 0);
+    if (!rd) {
+        printf("FAIL: $8000 is not CartBR -- the board's Power did not run\n");
+        ok = false;
+    }
+    if (!wr) {
+        printf("FAIL: $8000 still has the generic CartBW write handler\n");
+        ok = false;
+    }
+
+    uint32_t latch_value = 0;
+    // Power -> Reset: the latch starts at 0.
+    latch_value = 0xFFFFFFFFu;
+    if (!read_mapper471_latch_via_savestate(&latch_value) || latch_value != 0) {
+        printf("FAIL: after power the LATC latch reads 0x%08X (expected 0)\n",
+               latch_value);
+        ok = false;
+    }
+    // The "address is data" anchor: each write lands the ADDRESS in the
+    // latch.  Non-trivial addresses only -- every expected value differs from
+    // both 0 and the written data byte, so the M2 mutation (`latch = V`)
+    // turns every leg red.
+    struct LatcStep { uint32_t addr; uint8_t v; };
+    const LatcStep steps[] = {
+        { 0x8003, 0x00 }, { 0x8041, 0x5A }, { 0xFFFF, 0x12 },
+    };
+    for (const LatcStep& s : steps) {
+        X6502_DMW(s.addr, s.v);
+        const uint32_t expect = s.addr;
+        latch_value = 0xFFFFFFFFu;
+        if (!read_mapper471_latch_via_savestate(&latch_value) ||
+            latch_value != expect) {
+            printf("FAIL: write $%04X <- 0x%02X: LATC latch reads 0x%08X "
+                   "(expected the ADDRESS 0x%08X -- `latch = A` did not run)\n",
+                   s.addr, s.v, latch_value, expect);
+            ok = false;
+        } else {
+            printf("      write $%04X <- 0x%02X: LATC = 0x%08X\n",
+                   s.addr, s.v, latch_value);
+        }
+    }
+    // Reset semantics: the board's Reset zeroes the latch and re-Syncs.
+    fceu11::ResetNES();
+    latch_value = 0xFFFFFFFFu;
+    if (!read_mapper471_latch_via_savestate(&latch_value) || latch_value != 0) {
+        printf("FAIL: after Reset the LATC latch reads 0x%08X (expected 0)\n",
+               latch_value);
+        ok = false;
+    } else {
+        printf("      reset: LATC = 0x%08X\n", latch_value);
+    }
+    fceu11::CloseGame();
+    return ok;
+}
+
+// ==================== v2.0.5 A5: mapper 4 NES 2.0 PRG-RAM ====================
+//
+// Mapper4_Init sized the MMC3 WRAM from a hardcoded default (8 KiB) plus the
+// CRC32 Low-G-Man workaround, ignoring the NES 2.0 header's PRG-RAM shift
+// nibbles.  The fix (upstream 2.8.0 src/boards/mmc3.cpp:363-375) converts the
+// CartInfo byte counts -- wram_size + battery_wram_size, each "64 << shift"
+// bytes per the NESdev NES 2.0 header spec (bytes 10/11), already decoded by
+// the loader (ines.rs:563-571 -> ines_load.cpp:176-183, cart.h:85-88) -- into
+// the KiB unit GenMMC3_Init() expects, and demotes the Low-G-Man CRC branch to
+// `else if` so it cannot override a real NES 2.0 declaration.
+//
+// The observable is WRAMSIZE (src/boards/mmc3.cpp:73, `uint32 WRAMSIZE`, set
+// by GenMMC3_Init as `wram << 10`), read straight after each load:
+//   * leg 1  NES 2.0 mapper 4, byte-10 LOW nibble shift = 4 -> 64<<4 = 1024
+//            bytes -> ws = 1 -> WRAMSIZE == 1024.  (In this repo's loader the
+//            LOW nibble of byte 10 is wram_size and the HIGH nibble is
+//            battery_wram_size -- ines.rs:564-565.)
+//   * leg 2  control: the iNES 1.0 fixture mapper_mmc3.nes must keep the
+//            hardcoded default, WRAMSIZE == 8192 -- pins the reverse guard
+//            (the non-NES 2.0 path is untouched).
+//   * leg 3  both nibbles (shift 3 + shift 3 -> 512 + 512 = 1024 bytes) ->
+//            ws = 1 -> WRAMSIZE == 1024: pins the SUM, so a mutation that
+//            drops battery_wram_size from it goes red (leg 1 cannot see that
+//            mutation: its battery nibble is 0).
+//
+// Mutation legs this section guards:
+//   M1: delete the `if (info->ines2)` branch        -> leg 1 + leg 3 red
+//   M2: `int ws = 8;` -> `int ws = 1;`              -> leg 2 red
+//   M3: the sum -> `info->wram_size / 1024`         -> leg 3 red (legs 1/2
+//       stay green)
+
+extern uint32 WRAMSIZE;  // src/boards/mmc3.cpp:73 (GenMMC3_Init: WRAMSIZE = wram << 10)
+
+// NES 2.0 variant of write_minimal_ines_rom: the same 1 x 16 KiB PRG recipe,
+// with the byte-10 PRG-RAM shift nibbles set.  Hardcoded to mapper 4; the
+// NES 2.0 marker (byte 7 bits 2-3 = 0b10) is always written, unlike
+// write_minimal_ines_rom which only writes NES 2.0 headers for mapper >= 256.
+static bool write_nes2_mapper4_rom(const std::filesystem::path& path,
+                                   uint8_t wram_shift,
+                                   uint8_t battery_wram_shift) {
+    uint8_t hdr[16] = {0};
+    hdr[0] = 'N';
+    hdr[1] = 'E';
+    hdr[2] = 'S';
+    hdr[3] = 0x1A;
+    hdr[4] = 1;     // 1 x 16 KiB PRG
+    hdr[5] = 0;     // 0 x 8 KiB CHR banks -> CHR-RAM
+    hdr[6] = 0x40;  // mapper 4 low nibble (bits 4-7)
+    hdr[7] = 0x08;  // NES 2.0 marker: bits 2-3 = 0b10 ((rom[7] & 0x0C) == 0x08);
+                    // mapper mid nibble (bits 4-7) = 0 for mapper 4
+    hdr[8] = 0x00;  // mapper MSB nibble (bits 0-3) = 0, submapper (bits 4-7) = 0
+    // byte 10 PRG-RAM shift nibbles: size = 64 << shift bytes, 0 = none.
+    // LOW nibble -> wram_size, HIGH nibble -> battery_wram_size (ines.rs:564-565).
+    hdr[10] = static_cast<uint8_t>(((battery_wram_shift & 0x0F) << 4) |
+                                   (wram_shift & 0x0F));
+    std::ofstream f(path, std::ios::binary | std::ios::trunc);
+    if (!f) return false;
+    f.write(reinterpret_cast<const char*>(hdr), sizeof(hdr));
+    // exactly 16384 PRG bytes: 2-byte mapper tag prefix, rest NOP sled
+    uint8_t prg[16384];
+    prg[0] = 4;
+    prg[1] = 0;
+    memset(prg + 2, 0xEA, sizeof(prg) - 2);
+    f.write(reinterpret_cast<const char*>(prg), sizeof(prg));
+    return static_cast<bool>(f);
+}
+
+static bool check_a5_mapper4_nes2_wram(const std::filesystem::path& dir) {
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);  // the sweep may have removed it
+    bool ok = true;
+
+    // Leg 1: NES 2.0, wram shift nibble = 4 -> 64<<4 = 1024 bytes -> ws = 1.
+    const std::filesystem::path rom = dir / "a5_mapper4_nes2.nes";
+    if (!write_nes2_mapper4_rom(rom, 4, 0)) {
+        printf("FAIL: cannot write the NES 2.0 mapper 4 ROM\n");
+        return false;
+    }
+    FCEUGI* gi = fceu11::LoadGame(rom.string().c_str(), 1, true);
+    if (!gi) {
+        printf("FAIL: the NES 2.0 mapper 4 ROM did not load\n");
+        return false;
+    }
+    if (gi->mappernum != 4) {
+        printf("FAIL: the NES 2.0 ROM loaded as mapper %d (expected 4)\n",
+               gi->mappernum);
+        fceu11::CloseGame();
+        return false;
+    }
+    printf("      NES 2.0 shift=4 (64<<4 = 1024 bytes): WRAMSIZE = %u "
+           "(expected 1024)\n", static_cast<unsigned>(WRAMSIZE));
+    if (WRAMSIZE != 1024) {
+        printf("FAIL: NES 2.0 mapper 4 with PRG-RAM shift 4 gave WRAMSIZE %u, "
+               "expected 1024 -- the ines2 branch did not run\n",
+               static_cast<unsigned>(WRAMSIZE));
+        ok = false;
+    }
+    fceu11::CloseGame();
+
+    // Leg 2 (control): iNES 1.0 must keep the hardcoded default ws = 8.
+    gi = fceu11::LoadGame("fixtures/mapper_mmc3.nes", 1, true);
+    if (!gi) {
+        printf("FAIL: the iNES 1.0 mapper 4 fixture did not load\n");
+        return false;
+    }
+    printf("      iNES 1.0 control: WRAMSIZE = %u (expected 8192)\n",
+           static_cast<unsigned>(WRAMSIZE));
+    if (WRAMSIZE != 8192) {
+        printf("FAIL: iNES 1.0 mapper 4 gave WRAMSIZE %u, expected 8192 -- "
+               "the hardcoded default must stay for non-NES 2.0 ROMs\n",
+               static_cast<unsigned>(WRAMSIZE));
+        ok = false;
+    }
+    fceu11::CloseGame();
+
+    // Leg 3: both nibbles (shift 3 + shift 3) sum to 512 + 512 = 1024 bytes.
+    const std::filesystem::path rom2 = dir / "a5_mapper4_nes2_sum.nes";
+    if (!write_nes2_mapper4_rom(rom2, 3, 3)) {
+        printf("FAIL: cannot write the NES 2.0 mapper 4 sum ROM\n");
+        return false;
+    }
+    gi = fceu11::LoadGame(rom2.string().c_str(), 1, true);
+    if (!gi) {
+        printf("FAIL: the NES 2.0 mapper 4 sum ROM did not load\n");
+        return false;
+    }
+    printf("      NES 2.0 shifts 3+3 (512+512 = 1024 bytes): WRAMSIZE = %u "
+           "(expected 1024)\n", static_cast<unsigned>(WRAMSIZE));
+    if (WRAMSIZE != 1024) {
+        printf("FAIL: NES 2.0 mapper 4 with PRG-RAM shifts 3+3 gave WRAMSIZE "
+               "%u, expected 1024 -- wram_size and battery_wram_size must be "
+               "summed\n", static_cast<unsigned>(WRAMSIZE));
+        ok = false;
+    }
+    fceu11::CloseGame();
+
+    return ok;
+}
+
+// ==================== v2.0.5 A7-3: mapper 72 write window ====================
+//
+// M72Power installed the board's write handler over $6000-$FFFF; upstream
+// 2.8.0 (src/boards/72.cpp:59) uses $8000-$FFFF.  M72Write latches
+// preg = V & 0xF / creg = V & 0xF from EVERY byte written into its window,
+// and mapper 72 has no WRAM at $6000-$7FFF, so the $6000 window re-banked
+// PRG/CHR on ordinary writes into that range.
+//
+// M72Write is static in src/boards/72.cpp, so the identity is asserted by
+// handler-pointer structure (the A2 HANDLER_NOT_MMC3 pattern), NOT by a
+// write-then-read-back (the A1-S3 comment: that lock is toothless -- the
+// open-bus echo answers instead of the board):
+//   * leg 1  $6000's write handler equals $5000's (both fall back to the
+//            same unmapped default) -- with the $6000 window restored,
+//            $6000 carries M72Write while $5000 stays default -> red;
+//   * leg 2  $6000's write handler differs from $8000's (the board's own
+//            handler over PRG) -- with the $6000 window restored, one
+//            handler spans both halves -> red.
+static bool check_mapper72_window(const std::filesystem::path& dir) {
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);
+    const std::filesystem::path rom = dir / "a7_mapper_72.nes";
+    if (!write_minimal_ines_rom(rom, 72)) {
+        printf("FAIL: cannot write the mapper 72 ROM\n");
+        return false;
+    }
+    FCEUGI* gi = fceu11::LoadGame(rom.string().c_str(), 1, true);
+    if (!gi) {
+        printf("FAIL: the mapper 72 ROM did not load\n");
+        return false;
+    }
+    bool ok = true;
+    if (gi->mappernum != 72) {
+        printf("FAIL: loaded as mapper %d (expected 72)\n", gi->mappernum);
+        ok = false;
+    }
+    // The board's power ran: PRG reads go through CartBR (M72Power).
+    const bool rd = (GetReadHandler(0x8000) == &CartBR);
+    const bool unmapped_lo = (GetWriteHandler(0x6000) == GetWriteHandler(0x5000));
+    const bool split = (GetWriteHandler(0x6000) != GetWriteHandler(0x8000));
+    const bool not_cartbw = (GetWriteHandler(0x8000) != &CartBW);
+    printf("      read handler $8000 == CartBR: %d, write handler $6000 == "
+           "$5000 (unmapped): %d, write handlers $6000 != $8000: %d, write "
+           "handler $8000 != CartBW: %d\n",
+           rd ? 1 : 0, unmapped_lo ? 1 : 0, split ? 1 : 0,
+           not_cartbw ? 1 : 0);
+    if (!rd) {
+        printf("FAIL: mapper 72: $8000 is not CartBR -- the board's power "
+               "function did not run\n");
+        ok = false;
+    }
+    if (!unmapped_lo) {
+        printf("FAIL: mapper 72: $6000 carries a mapped write handler that "
+               "$5000 does not have -- the write window still starts at "
+               "$6000 (must be $8000-$FFFF, upstream 2.8.0 72.cpp:59)\n");
+        ok = false;
+    }
+    if (!split) {
+        printf("FAIL: mapper 72: $6000 and $8000 share the same write "
+               "handler -- the write window was not narrowed to $8000\n");
+        ok = false;
+    }
+    if (!not_cartbw) {
+        printf("FAIL: mapper 72: the generic CartBW is installed at $8000 -- "
+               "the board's own write handler was lost\n");
+        ok = false;
+    }
+    fceu11::CloseGame();
+    return ok;
+}
+
+// ==================== v2.0.5 A7-2: bandai x24c02 device-address check ====================
+//
+// x24c02_write() (src/boards/bandai.cpp) accepted EVERY 7-bit address shifted
+// in after START and latched the READ/WRITE state from the 8th bit; upstream
+// 2.8.0 (bandai.cpp:181-187) rejects an address whose device bits are not
+// 1010xxx, i.e. (addr & 0x78) != 0x50: SDA is released (out = 1, no ACK) and
+// the state machine drops back to STANDBY.
+//
+// The lock drives the REAL protocol through the board's write handler --
+// mapper 16 ("BANDAI 24C02", the only bandai board whose BandaiWrite routes
+// case 0x0D to x24c02_write via x24c02 = 1 AND registers ONLY the x24c02
+// state block: mapper 157 would add the x24c01 set with the SAME 4-char
+// tags, making a tag scan ambiguous) -- then reads the device's private
+// state out of a savestate dump through its SFORMAT tags "ADDR"/"STAT"/
+// "OUT" (x24c02StateRegs, bandai.cpp:82-93; 1 byte each).  The symbols are
+// static, so the savestate is the only non-invasive window; the A8-S3
+// comment documents the serialisation ([4-byte tag][u32 LE size][raw data],
+// level 0 = uncompressed) and ResetExState (state.cpp:882, called per load
+// from ines_load.cpp:265) guarantees no earlier board's tags are still
+// registered.  No core SFORMAT uses those tags (354.cpp's "ADDR" is 2 bytes
+// and only registered while mapper 354 is loaded).
+//
+// Protocol encoding (x24c02_write): scl = (V >> 5) & 1, sda = (V >> 6) & 1.
+// START = SDA falling while SCL stays high; address bits shift in on SCL
+// RISING edges, MSB first.  Two loads, one transaction each:
+//   * leg 1  wrong device address 0x70 (0b1110000, R/W = 1): with the check
+//            -> STANDBY (0), out = 1, addr = 0x70; with the check removed
+//            -> READ state, out stays 0.
+//   * leg 2  polarity control: correct device address 0x50 (0b1010000,
+//            R/W = 1) must still proceed to READ (3); one extra edge
+//            consumes the READ ACK, which ASSIGNS out = 0 (robust against
+//            a stale out from earlier process state).
+//
+// Mutation leg: delete the `if ((x24c02_addr & 0x78) != 0x50)` branch ->
+// leg 1 goes red (state READ != STANDBY, out 0 != 1); leg 2 stays green.
+
+// Reads ONE 1-byte SFORMAT field out of a fresh savestate dump via its
+// 4-byte tag (the A8-S3 paradigm with a 1-byte payload).  Returns false when
+// the save failed or the tag is missing / ambiguous -- never silently skips.
+static bool read_x24c02_field_via_savestate(const char* tag4, uint8_t* out) {
+    std::vector<std::byte> buf;
+    EMUFILE_MEMORY f(&buf);
+    if (!FCEUSS_SaveMS(&f, 0)) return false;
+    const uint8_t* p = reinterpret_cast<const uint8_t*>(buf.data());
+    const size_t n = buf.size();
+    int hits = 0;
+    bool ok = false;
+    for (size_t i = 0; i + 9 <= n; ++i) {
+        if (memcmp(p + i, tag4, 4) != 0) continue;
+        const uint32_t size = static_cast<uint32_t>(p[i + 4]) |
+                              (static_cast<uint32_t>(p[i + 5]) << 8) |
+                              (static_cast<uint32_t>(p[i + 6]) << 16) |
+                              (static_cast<uint32_t>(p[i + 7]) << 24);
+        if (size != 1) continue;      // only the 1-byte field entries match
+        if (++hits > 1) return false; // the tag must identify exactly one field
+        *out = p[i + 8];
+        ok = true;
+    }
+    return ok;
+}
+
+// Drives one x24c02 I2C transaction through the board's write handler:
+// START, then eight SCL rising edges carrying the 7-bit device address
+// MSB-first plus the R/W bit, each followed by an SCL falling edge.  Write
+// address $600D: BandaiWrite masks A & 0x0F -> case 0x0D -> x24c02_write.
+// With with_ack, one more rising edge after the 8th bit consumes the READ
+// ACK (which assigns out = 0).
+static void x24c02_transaction(uint8_t addr7, uint8_t rw, bool with_ack) {
+    // preamble: SDA high while SCL low, then SCL high -- SDA can now fall
+    // while SCL is high, which is the START condition
+    X6502_DMW(0x600D, 0x40);  // sda=1, scl=0
+    X6502_DMW(0x600D, 0x60);  // sda=1, scl=1 (rising; STANDBY ignores it)
+    X6502_DMW(0x600D, 0x20);  // sda 1->0 while scl high -> START
+    X6502_DMW(0x600D, 0x00);  // scl falling, arm the first bit edge
+    for (int i = 7; i >= 0; --i) {
+        const uint8_t bit =
+            static_cast<uint8_t>((i > 0) ? ((addr7 >> (i - 1)) & 1) : (rw & 1));
+        X6502_DMW(0x600D, bit ? 0x60 : 0x20);  // SCL rising with SDA = bit
+        X6502_DMW(0x600D, 0x00);               // SCL falling
+    }
+    if (with_ack) {
+        // the loop's last falling write already has scl low; the next rise
+        // is the ACK position of the READ state (bitcount == 8 -> out = 0)
+        X6502_DMW(0x600D, 0x00);  // no-op bus state
+        X6502_DMW(0x600D, 0x60);  // scl rising -> READ ACK: out = 0
+        X6502_DMW(0x600D, 0x00);  // scl falling
+    }
+}
+
+static bool check_bandai_x24c02_address(const std::filesystem::path& dir) {
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);
+    const std::filesystem::path rom = dir / "a7_mapper_16.nes";
+    if (!write_minimal_ines_rom(rom, 16)) {
+        printf("FAIL: cannot write the mapper 16 ROM\n");
+        return false;
+    }
+    bool ok = true;
+
+    // Leg 1: a transaction addressed to 0x70 (device bits 1110, not 1010)
+    // must be rejected -- STANDBY + SDA released (out = 1) -- while the
+    // shifted-in bits still prove the ADDRESS state machine ran.
+    FCEUGI* gi = fceu11::LoadGame(rom.string().c_str(), 1, true);
+    if (!gi) {
+        printf("FAIL: the mapper 16 ROM did not load\n");
+        return false;
+    }
+    if (gi->mappernum != 16) {
+        printf("FAIL: loaded as mapper %d (expected 16)\n", gi->mappernum);
+        fceu11::CloseGame();
+        return false;
+    }
+    x24c02_transaction(0x70, 1, false);
+    uint8_t state = 0xFF, out = 0xFF, addr = 0xFF;
+    if (!read_x24c02_field_via_savestate("STAT", &state) ||
+        !read_x24c02_field_via_savestate("OUT", &out) ||
+        !read_x24c02_field_via_savestate("ADDR", &addr)) {
+        printf("FAIL: the x24c02 STAT/OUT/ADDR savestate fields are missing "
+               "or ambiguous -- AddExState(x24c02StateRegs) did not run\n");
+        fceu11::CloseGame();
+        return false;
+    }
+    printf("      wrong address 0x70: STAT=%u (X24C0X_STANDBY=0) OUT=%u "
+           "(NAK=1) ADDR=0x%02X\n", state, out, addr);
+    if (addr != 0x70) {
+        printf("FAIL: x24c02 ADDR is 0x%02X, expected 0x70 -- the 7 address "
+               "bits did not reach the device (write handler or protocol "
+               "sequence broken)\n", addr);
+        ok = false;
+    }
+    if (state != 0) {  // 0 = X24C0X_STANDBY (bandai.cpp:53)
+        printf("FAIL: x24c02 state is %u after a wrong device address, "
+               "expected STANDBY (0) -- the device-address check did not "
+               "reject the transaction\n", state);
+        ok = false;
+    }
+    if (out != 1) {
+        printf("FAIL: x24c02 out is %u after a wrong device address, "
+               "expected 1 (SDA released, no ACK)\n", out);
+        ok = false;
+    }
+    fceu11::CloseGame();
+
+    // Leg 2 (polarity control): the correct device address 0x50 must still
+    // proceed to READ -- a check that rejects everything would fail here.
+    // A fresh load starts the device in STANDBY with clear registers.
+    gi = fceu11::LoadGame(rom.string().c_str(), 1, true);
+    if (!gi) {
+        printf("FAIL: the mapper 16 ROM did not load (second pass)\n");
+        return false;
+    }
+    x24c02_transaction(0x50, 1, true);
+    state = 0xFF; out = 0xFF; addr = 0xFF;
+    if (!read_x24c02_field_via_savestate("STAT", &state) ||
+        !read_x24c02_field_via_savestate("OUT", &out) ||
+        !read_x24c02_field_via_savestate("ADDR", &addr)) {
+        printf("FAIL: the x24c02 STAT/OUT/ADDR savestate fields are missing "
+               "or ambiguous (second pass)\n");
+        fceu11::CloseGame();
+        return false;
+    }
+    printf("      correct address 0x50: STAT=%u (X24C0X_READ=3) OUT=%u "
+           "(ACK=0) ADDR=0x%02X\n", state, out, addr);
+    if (addr != 0x50) {
+        printf("FAIL: x24c02 ADDR is 0x%02X, expected 0x50\n", addr);
+        ok = false;
+    }
+    if (state != 3) {  // 3 = X24C0X_READ (bandai.cpp:56)
+        printf("FAIL: x24c02 state is %u after the correct device address "
+               "0x50 with R/W = 1, expected READ (3) -- the check rejected "
+               "an address it must accept\n", state);
+        ok = false;
+    }
+    if (out != 0) {
+        printf("FAIL: x24c02 out is %u after the READ ACK, expected 0\n",
+               out);
+        ok = false;
+    }
+    fceu11::CloseGame();
+
+    return ok;
+}
+
 int main() {
     setvbuf(stdout, NULL, _IONBF, 0);
     printf("=== Mapper Load Test ===\n\n");
@@ -1032,6 +1614,42 @@ int main() {
     } else {
         failed = true;
     }
+
+    // ==================== v2.0.5 A8 ====================
+    // Mapper 471 (Impact Soft IM1): upstream 2.8.0 port, iNES 201 + scanline
+    // IRQ.  See the A8 section above for the leg structure and mutations.
+    printf("\n--- v2.0.5 A8: mapper 471 (Impact Soft IM1) port ---\n");
+    printf("[A8-S1] bmap + registry dual registration ... ");
+    if (check_mapper471_registered()) {
+        printf("OK\n");
+    } else {
+        failed = true;
+    }
+    printf("[A8-S2] power/handler identity + address-as-data latch + reset ...\n");
+    if (!check_mapper471_latch(sweep_dir)) failed = true;
+
+    // ==================== v2.0.5 A5 ====================
+    // Mapper 4 NES 2.0 PRG-RAM sizing (upstream 2.8.0 mmc3.cpp:363-375).
+    // See the A5 section above for the leg structure and mutations.
+    printf("\n--- v2.0.5 A5: mapper 4 NES 2.0 PRG-RAM ---\n");
+    printf("[A5] NES 2.0 shift nibbles -> GenMMC3 ws + iNES 1.0 control ...\n");
+    if (!check_a5_mapper4_nes2_wram(sweep_dir)) failed = true;
+
+    // ==================== v2.0.5 A7-3 ====================
+    // Mapper 72 write window must start at $8000 (upstream 2.8.0 72.cpp:59).
+    printf("\n--- v2.0.5 A7-3: mapper 72 write window ---\n");
+    printf("[A7-72] $6000 must not carry the board write handler ... ");
+    if (check_mapper72_window(sweep_dir)) {
+        printf("OK\n");
+    } else {
+        failed = true;
+    }
+
+    // ==================== v2.0.5 A7-2 ====================
+    // x24c02 rejects a wrong device address (upstream 2.8.0 bandai.cpp:181-187).
+    printf("\n--- v2.0.5 A7-2: bandai x24c02 device-address check ---\n");
+    printf("[A7-bandai] wrong device address -> STANDBY+NAK; 0x50 -> READ ...\n");
+    if (!check_bandai_x24c02_address(sweep_dir)) failed = true;
 
     // v2.0.5 BUG-V205-01: a ROM whose CHR bank count is not a power of two
     // must load, with the file's CHR bytes in place and 0xFF padding after

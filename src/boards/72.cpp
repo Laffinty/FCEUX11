@@ -50,7 +50,11 @@ static DECLFW(M72Write) {
 static void M72Power(void) {
 	Sync();
 	SetReadHandler(0x8000, 0xFFFF, CartBR);
-	SetWriteHandler(0x6000, 0xFFFF, M72Write);
+	// v2.0.5 A7-3: the write window starts at $8000, not $6000 (upstream 2.8.0
+	// src/boards/72.cpp:59).  M72Write latches preg/creg from EVERY byte written
+	// into its window, and mapper 72 has no WRAM at $6000-$7FFF, so a $6000
+	// window would let ordinary writes into that range re-bank the PRG/CHR.
+	SetWriteHandler(0x8000, 0xFFFF, M72Write);
 }
 
 static void StateRestore(int version) {

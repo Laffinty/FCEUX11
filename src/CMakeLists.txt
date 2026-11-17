@@ -283,6 +283,7 @@ set(SRC_BOARDS
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/42.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/43.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/46.cpp
+  	${CMAKE_CURRENT_SOURCE_DIR}/boards/471.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/50.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/51.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/boards/57.cpp

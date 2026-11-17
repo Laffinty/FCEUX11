@@ -51,7 +51,13 @@ static void DoNamcoSound(int32 *Wave, int Count);
 static void DoNamcoSoundHQ(void);
 static void SyncHQ(int32 ts);
 
-static int is210;        /* Lesser mapper. */
+/* v2.0.5 A6: the two cost-reduced Namco 163 variants on mapper 210 need
+ * separate treatment -- N175 has hardwired mirroring and must ignore the
+ * $E000 bits 6-7, N340 switches mirroring through them with its own table
+ * (N340SyncMirror below).  Replaces the old is210 int flag, which conflated
+ * both variants with each other and gave N340 the wrong mirroring table.
+ * Shape follows upstream 2.8.0 n106.cpp:51. */
+static enum NamcoType { N163, N175, N340 } type;
 
 static uint8 PRG[3];
 static uint8 CHR[8];
@@ -66,15 +72,24 @@ static SFORMAT N106_StateRegs[] = {
 	{ 0 }
 };
 
-static void SyncMirror()
+/* v2.0.5 A6: Namco 340 only.  $E000 bits 6-7 select the nametable layout.
+ * Table per the NESdev wiki "INES Mapper 210" (newest Wayback capture
+ * 20260304042007, 2026-03-04): 0=One-screen A, 1=Vertical, 2=One-screen B,
+ * 3=Horizontal -- identical to upstream 2.8.0 n106.cpp:66-73.  The old
+ * shared SyncMirror had case 3 aliased to case 0 (a duplicated MI_0 entry),
+ * which also gave this table the wrong shape for N340.
+ * OBSERVATION (registered, not adopted): Mesen v2.2.0 claims the 2/3
+ * entries are swapped (2=Horizontal, 3=One-screen B) and credits a
+ * Dream Master fix; the current wiki text does not corroborate that swap,
+ * so the wiki/upstream table is kept. */
+static void N340SyncMirror()
 {
 	switch(gorko) {
 	case 0: setmirror(MI_0); break;
 	case 1: setmirror(MI_V); break;
-	case 2: setmirror(MI_H); break;
-	case 3: setmirror(MI_0); break;
+	case 2: setmirror(MI_1); break;
+	case 3: setmirror(MI_H); break;
 	}
-	
 }
 
 static void SyncPRG(void) {
@@ -132,7 +147,10 @@ static void FixNTAR(void) {
 
 static void DoCHRRAMROM(int x, uint8 V) {
 	CHR[x] = V;
-	if (!is210 && !((gorfus >> ((x >> 2) + 6)) & 1) && (V >= 0xE0)) {
+	/* v2.0.5 A6: mechanical rename only (!is210 -> type == N163); the
+	 * setchr1r body below stays DISABLED exactly as before (A7-4 red line,
+	 * keep the disabled state). */
+	if (type == N163 && !((gorfus >> ((x >> 2) + 6)) & 1) && (V >= 0xE0)) {
 //		printf("BLAHAHA: %d, %02x\n",x,V);
 //		setchr1r(0x10,x<<10,V&7);
 	} else
@@ -200,10 +218,15 @@ static DECLFW(Mapper19_write) {
 			break;
 		case 0xE000:
 			PRG[0] = V & 0x3F;
-			if(is210) {
-				gorko = V>>6;
-				SyncMirror();
-			}
+			/* v2.0.5 A6: bits 6-7 are stored on every variant (they sit in
+			 * the savestate as "GORK"), but only N340 applies them as
+			 * mirroring.  N175 has hardwired mirroring (wiki: "H or V
+			 * fixed"), and N163's mirroring goes through the
+			 * FixNTAR/DoNTARAMROM path, never through gorko -- so mapper 19
+			 * behavior is unchanged.  Upstream 2.8.0 n106.cpp:195-203. */
+			gorko = V>>6;
+			if (type == N340)
+				N340SyncMirror();
 			SyncPRG();
 			break;
 		case 0xE800:
@@ -354,7 +377,11 @@ static void DoNamcoSound(int32 *Wave, int Count) {
 
 static void Mapper19_StateRestore(int version) {
 	SyncPRG();
-	SyncMirror();
+	/* v2.0.5 A6: the old SyncMirror() call here was dead weight -- the
+	 * FixNTAR() right below re-points all four nametable pages from
+	 * NTAPage[] (the "NTA" savestate regs), overwriting whatever
+	 * SyncMirror laid down.  Behavior-neutral to drop; matches upstream
+	 * 2.8.0 (no mirror sync in Mapper19_StateRestore). */
 	FixNTAR();
 	FixCRR();
 	int x;
@@ -388,7 +415,7 @@ static void N106_Power(void) {
 	SetReadHandler(0x8000, 0xFFFF, CartBR);
 	SetWriteHandler(0x8000, 0xffff, Mapper19_write);
 	SetWriteHandler(0x4020, 0x5fff, Mapper19_write);
-	if (!is210) {
+	if (type == N163) {
 		SetWriteHandler(0xc000, 0xdfff, Mapper19C0D8_write);
 		SetReadHandler(0x4800, 0x4fff, Namco_Read4800);
 		SetReadHandler(0x5000, 0x57ff, Namco_Read5000);
@@ -414,7 +441,7 @@ static void N106_Power(void) {
 }
 
 void Mapper19_Init(CartInfo *info) {
-	is210 = 0;
+	type = N163;
 	battery = info->battery;
 	info->Power = N106_Power;
 
@@ -440,10 +467,51 @@ void Mapper19_Init(CartInfo *info) {
 static void Mapper210_StateRestore(int version) {
 	SyncPRG();
 	FixCRR();
+	/* v2.0.5 A6: vnapage[] is NOT part of the savestate -- the mapper hook
+	 * is the only thing that re-derives mapper-controlled mirroring after
+	 * a state load.  Without this, an N340 cart comes back from a
+	 * savestate with whatever mirroring the base system left behind
+	 * instead of the gorko-selected layout. */
+	if (type == N340)
+		N340SyncMirror();
+}
+
+/* v2.0.5 A6: Namco 175 vs Namco 340 detection.  The NES 2.0 submapper wins
+ * (submapper 1 = N175, submapper 2 = N340 per the wiki page); otherwise the
+ * five known commercial N175 carts are recognized by CRC32 and everything
+ * else defaults to N340.  CRC32 constants verbatim from upstream 2.8.0
+ * n106.cpp:441-457 + NESdev wiki Mapper 210.
+ * OBSERVATION (registered, not adopted): the wiki's game list puts Dream
+ * Master under the Namco 340 board (Mesen v2.2.0 touched this area too),
+ * while upstream maps its CRC to N175.  v2.0.5 A6 scope is upstream
+ * alignment, so the upstream constants stand; revisit on real-cart
+ * evidence only. */
+static NamcoType Mapper210_DetectType(CartInfo *info) {
+	if (info->ines2 && info->submapper == 1)
+		return N175;
+	if (info->ines2 && info->submapper == 2)
+		return N340;
+	FCEU_printf("Submapper detected by CRC32. Use NES 2.0 if you hack the ROM image.\n");
+	switch (info->CRC32) {
+	case 0x0c47946d:	// Chibi Maruko Chan
+	case 0xbd523011:	// Dream Master
+	case 0xc247cc80:	// Family Circuit '91
+	case 0x808606f0:	// Famista '91
+	case 0x81b7f1a8:	// Heisei Tensai Bakabon
+		return N175;
+	default:
+		return N340;
+	}
 }
 
 void Mapper210_Init(CartInfo *info) {
-	is210 = 1;
+	type = Mapper210_DetectType(info);
+	/* v2.0.5 A6 scope note: the battery save path (addSaveGameBuf for WRAM)
+	 * is explicitly NOT done here -- it stays a registered long-tail item
+	 * (v2.0.5 plan long-tail table).  battery is reset to 0 so a mapper-19
+	 * battery cart loaded earlier in the same process cannot leak its flag
+	 * into N106_Power's MemoryRand decision (stale WRAM/IRAM otherwise). */
+	battery = 0;
 	GameStateRestore = Mapper210_StateRestore;
 	info->Power = N106_Power;
 	FCEU_MemoryRand(WRAM, sizeof(WRAM), true);
