@@ -411,6 +411,10 @@ int MovieData::dump(EMUFILE *os, bool binary, bool seekToCurrFramePos)
 	size_t memSize = fceux11_rust_emufile_mem_size(mem);
 	if (memSize > 0) {
 		std::vector<uint8> tmp(memSize);
+		// Read back from the start: the Rust dump leaves the mem cursor at
+		// the end (or at the frame-record position with seekToCurrFramePos),
+		// and EmuFileMem reads are positional (plan S9.23 / V15).
+		fceux11_rust_emufile_mem_fseek(mem, 0, 0);
 		fceux11_rust_emufile_mem_fread(mem, tmp.data(), memSize);
 		os->fwrite(std::span<const std::byte>(reinterpret_cast<const std::byte*>(tmp.data()), memSize));
 	}

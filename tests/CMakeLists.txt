@@ -157,6 +157,20 @@ if(FCEUX11_BUILD_TESTS)
              COMMAND fceux11_core_state_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
+    # v2.0.5 r12 (S9.23 V15) - movie record/playback round-trip regression.
+    # Tier 1: a minimal MovieData dumped to a temp file must start with the
+    # FM2 text header and contain non-zero bytes (locks the fseek(mem,0,0)
+    # read-back fix in MovieData::dump, src/movie_fm2.cpp). Tier 2: record
+    # N frames from power-on on a fixture ROM, stop, replay, and compare
+    # per-frame XBuf hashes against a live run.
+    fceux11_add_test_executable(fceux11_movie_roundtrip_test
+        core/movie_roundtrip_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME movie_roundtrip_test
+             COMMAND fceux11_movie_roundtrip_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
     # -------------------------------------------------------------------------
     # v1.1 Sentinel — core unit-test skeleton (§1.1).
     # Each test file has ≥ 10 cases; together they constitute the

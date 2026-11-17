@@ -151,14 +151,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ⚠️ **是否把 PGO 设为默认 ON 尚未决策**（属发布策略：需要「插桩 → 训练 → 重建」三步流程，
   且训练用 ROM / `.pgc` 必须入库或可复现）——**在业主裁决前默认保持 OFF**。
 
+### Fixed — movie 录制 / 回放（`.fm2` 全 0）
+
+- **录制的 `.fm2` movie 此前是「长度正确但全 0」的废文件 ⇒ 录制 / 回放功能整体不可用**（r11 的
+  LT-09 V15 机器侧实测发现，计划 §9.23）：`MovieData::dump()` 把 movie 数据写进 Rust 内存文件后
+  **读回前没有 seek 回起点**，而 `EmuFileMem::read_into` 是位置读 ⇒ 读回 0 字节、零初始化缓冲被整段
+  写出。**修法一行**：读回前补 `fceux11_rust_emufile_mem_fseek(mem, 0, 0)`——Rust 侧自带的单元测试
+  本就是「fwrite → fseek(0,0) → fread」范式，属 C++ 调用方移植时漏掉的一次 seek。一行同时治愈
+  dump 汇聚的全部 4 个调用方（`SaveMovie` 录制入口 / `RedumpWholeMovieFile` / savestate 内嵌 movie /
+  TAS 编辑器存项目）。新增 `movie_roundtrip_test` 回归锁（无 ROM 双编码 dump 断言 + 真实录制入口
+  120 帧端到端 + 解析自洽；变异可红：去掉 seek ⇒ 8 条断言全红）。
+  ⚠️ 口径更正：本仓 FM2 是纯文本格式（首行 `version N`），无二进制魔数——r11 登记的「`FCEUXM` 头」
+  措辞按代码事实更正（计划 §9.23）。
+
 ### Known limitations（v2.0.5 线在途登记）
 
-- ⚠️ **录制的 `.fm2` movie 全 0 ⇒ 录制 / 回放不可用**（LT-09 的 V15 机器侧实测发现）：
-  `src/movie_fm2.cpp:414` 把 movie 数据 dump 进 Rust 内存文件后**直接 `fread`**，
-  而 Rust 的 `EmuFileMem::read_into` 是**位置读**（`emufile.rs:84-92`）⇒ 读回 **0 字节**，
-  零初始化的缓冲被整段写出 ⇒ 录出来是**长度正确但全 0** 的文件（实测 6197 字节全 `0x00`、无 `FCEUXM` 头），
-  回放 180/180 帧不一致。**修法一行**（`fceux11_rust_emufile_mem_fseek(mem, 0, 0)`，该 API 已存在）
-  ⇒ **本轮只登记不修**（计划 §9.23），建议优先于批 2/3 的 mapper 项。
 - **V14 的 CDL 一致性判据口径更正**（LT-09）：计划写的
   `codecount + datacount + undefinedcount == cdloggerdataSize` 在 6/6 个 fixture 上**不成立**
   （差值恰为 `code_and_data`）；真正成立的是**并集式**
@@ -167,7 +174,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **人工验收未闭合**（LT-09，机器侧已给读数、仍缺人证）：**V11** 跨进程读档（机器侧全闭合，只剩音色需人耳）·
   **V13** 录 AVI ≥10 分钟（校验器已备好并正反自测，录制动作需 GUI）· **V7** profiler 点击 ·
   **V25+V22** 真机 Lua 与鼠标 · **V6** 真机吹气（`$4016` bit2 需连读 10 次看是否交替）·
-  **V15** 已升级为上面的缺陷条目。
+  **V15** 已修复（见上方 Fixed 段；回归锁 `movie_roundtrip_test` 入门禁）。
 - **GBA 侧 LT-10**：探针链已自证通过（合成夹具 + 否定性对照，六条断言），
   **但本机无实体 `.gba` 卡** ⇒ 3 张卡（Mario Kart SC / Dragon Ball AA / Minish Cap）待业主出卡后一键跑完（计划 r11）。
 - **GBA 侧 LT-16 的 `start_delay = 2`**：GBATEK 对「使能沿 → 计数开始」**零覆盖**，
