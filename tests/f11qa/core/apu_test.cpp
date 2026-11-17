@@ -6,6 +6,7 @@
 //   * After 60 frames, GetSoundBuffer returns a non-empty buffer
 //   * soundtsinc is positive (sample rate above 0)
 //   * FCEU_SoundCPUHook can be called per-cycle without crashing
+//   * DMC sample fetch charges exactly 4 CPU cycles (LT-08 DMC accounting)
 //   * FrameSoundUpdate completes a full frame
 //   * SetSoundVariables doesn't crash
 //   * FCEUSND_SaveState/LoadState is callable
@@ -80,6 +81,115 @@ void test_dmc_acc_negation_overflow(TestContext& ctx) {
     FCEU11_EXPECT(ctx, DMCacc != sentinel, "DMCacc advances past INT32_MIN boundary");
 }
 
+
+// LT-08 (v2.0.5 B1) -- DMC cycle accounting, part 1: the sample fetch.
+//
+// Authoritative bounds (NESdev wiki; full quotes + retrieval log in
+// Research_only/w205/lt08_dmc.md):
+//   APU_DMC (rev. 2024-03-21): "The CPU is stalled for 1-4 CPU cycles to
+//   read a sample byte."  The DMC memory reader fetches one sample byte
+//   whenever the sample buffer is empty and bytes-remaining is not zero --
+//   "including just after a write to $4015 that enables the channel".
+//   DMA article: "DMC DMA halts the CPU, performs a dummy cycle and an
+//   optional alignment cycle, and then gets once, taking 3 or 4 cycles."
+//   blargg's own dmc_dma_during_read4 test source spells the cost out:
+//   "; 4 DMC wait-states".
+//
+// This repo's model (src/sound.cpp:741-765, DMCDMA): one fetch == four
+// X6502_DMR calls, and each X6502_DMR charges ADDCYC(1)
+// (src/x6502.cpp:111-114), i.e. exactly 4 CPU cycles per sample fetch.
+// Same shape as upstream FCEUX 2.8.0 / 2.6.6 (byte-identical DMC code).
+//
+// This lock pins:
+//   (1) the $4015 enable is followed by a fetch on the very next
+//       FCEU_SoundCPUHook (the hook runs at the start of the next
+//       instruction, src/x6502.cpp:1083),
+//   (2) that fetch costs exactly 4 CPU cycles (CPU-cycle unit, not master
+//       cycle; no DMA arbitration is modelled by this repo),
+//   (3) one fetch per sample byte: bytes-remaining -1, address +1,
+//   (4) a second hook with a full sample buffer steals nothing.
+void test_dmc_fetch_cycle_accounting(TestContext& ctx) {
+    // Push the DMC timer far away so this test measures the fetch
+    // accounting only, not the timer accounting (part 2 below).
+    DMCacc = 1 << 20;
+    DMCHaveSample = 0;
+    DMCBitCount = 0;
+
+    // Drive the DMC through the real bus, exactly like a game would.
+    // X6502_DMW itself charges 1 CPU cycle, so the snapshot below is
+    // taken after the register writes.
+    X6502_DMW(0x4010, 0x0F);   // rate index $F (no loop, no DMC IRQ)
+    X6502_DMW(0x4012, 0x00);   // sample address latch -> $C000
+    X6502_DMW(0x4013, 0x00);   // sample size latch  -> 1 byte
+    X6502_DMW(0x4015, 0x10);   // bit4 = enable DMC -> PrepDPCM()
+
+    const int32_t  size_before = DMCSize;        // 1 byte
+    const uint32_t addr_before = DMCAddress;      // 0x4000
+    FCEU11_EXPECT(ctx, size_before == 1, "DMC armed with exactly 1 sample byte");
+    FCEU11_EXPECT(ctx, addr_before == 0x4000, "DMC sample address latched to $C000");
+
+    const int32_t ts_before = fceu11::cpu_instance().timestamp();
+    FCEU_SoundCPUHook(1);
+    const int32_t ts_after = fceu11::cpu_instance().timestamp();
+
+    FCEU11_EXPECT(ctx, ts_after - ts_before == 4,
+                  "one DMC sample fetch steals exactly 4 CPU cycles");
+    FCEU11_EXPECT(ctx, DMCSize == size_before - 1,
+                  "DMC bytes-remaining decremented by exactly 1 per fetch");
+    FCEU11_EXPECT(ctx, DMCAddress == ((addr_before + 1) & 0x7fff),
+                  "DMC address counter advanced by exactly 1 per fetch");
+    FCEU11_EXPECT(ctx, DMCHaveDMA != 0,
+                  "fetched sample byte is held in the DMC sample buffer");
+
+    // Second hook: the sample buffer already holds a byte, so no further
+    // fetch happens and no further CPU cycles are stolen.
+    const int32_t ts2_before = fceu11::cpu_instance().timestamp();
+    FCEU_SoundCPUHook(1);
+    const int32_t ts2_after = fceu11::cpu_instance().timestamp();
+    FCEU11_EXPECT(ctx, ts2_after - ts2_before == 0,
+                  "no CPU cycles stolen while the DMC sample buffer is full");
+}
+
+// LT-08 (v2.0.5 B1) -- DMC cycle accounting, part 2: the timer.
+//
+// NESdev wiki APU_DMC (pitch table): the rate index selects "for how many
+// CPU cycles happen between changes in the output level". NTSC periods are
+// {428,380,340,320,286,254,226,214,190,160,142,128,106,84,72,54} and PAL
+// periods are {398,354,316,298,276,236,210,198,176,148,132,118,98,78,66,50}
+// -- byte-identical to NTSCDMCTable / PALDMCTable in src/sound.cpp:117-133.
+//
+// This repo advances the timer in FCEU_SoundCPUHook (src/sound.cpp:870-897):
+//     DMCacc -= cycles;
+//     while (DMCacc <= 0) { ...; DMCacc += DMCPeriod;
+//                           DMCBitCount = (DMCBitCount + 1) & 7; ... }
+//
+// This lock pins the rate table and the accumulator's advance/tick rule.
+void test_dmc_timer_accounting(TestContext& ctx) {
+    // Rate table: the low nibble of $4010 is the rate index.
+    X6502_DMW(0x4010, 0x00);
+    FCEU11_EXPECT(ctx, DMCPeriod == (PAL ? 398 : 428),
+                  "DMC rate $0 period matches the NESdev pitch table");
+    X6502_DMW(0x4010, 0x0F);
+    FCEU11_EXPECT(ctx, DMCPeriod == (PAL ? 50 : 54),
+                  "DMC rate $F period matches the NESdev pitch table");
+
+    // Keep part 1's fetch out of the way: no sample bytes pending.
+    DMCSize = 0;
+    DMCHaveSample = 0;
+    DMCBitCount = 0;
+    DMCacc = 1000;
+
+    FCEU_SoundCPUHook(100);
+    FCEU11_EXPECT(ctx, DMCacc == 900,
+                  "DMCacc advances by exactly the CPU cycles consumed");
+
+    const int32_t per = DMCPeriod;
+    FCEU_SoundCPUHook(900);
+    FCEU11_EXPECT(ctx, DMCacc == per,
+                  "DMCacc wraps forward by exactly one DMC period");
+    FCEU11_EXPECT(ctx, DMCBitCount == 1,
+                  "one DMC timer tick advances the bit counter by exactly 1");
+}
 void test_cycles_scaling_overflow(TestContext& ctx) {
     // hotfix3 C-3: pre-fix, X6502_RunDebug did `cycles *= 16` (NTSC) on a
     // signed int32 — UB at cycles == 2^27 and poisoning _count for any
@@ -200,6 +310,8 @@ int main() {
     test_wave_buffer_writable(ctx);
     test_sound_cpu_hook(ctx);
     test_dmc_acc_negation_overflow(ctx);
+    test_dmc_fetch_cycle_accounting(ctx);
+    test_dmc_timer_accounting(ctx);
     test_cycles_scaling_overflow(ctx);
     test_get_sound_buffer(ctx);
     test_flush_emulate_sound(ctx);

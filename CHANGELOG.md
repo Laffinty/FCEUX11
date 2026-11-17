@@ -151,6 +151,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ⚠️ **是否把 PGO 设为默认 ON 尚未决策**（属发布策略：需要「插桩 → 训练 → 重建」三步流程，
   且训练用 ROM / `.pgc` 必须入库或可复现）——**在业主裁决前默认保持 OFF**。
 
+### Known limitations（v2.0.5 线在途登记）
+
+- ⚠️ **录制的 `.fm2` movie 全 0 ⇒ 录制 / 回放不可用**（LT-09 的 V15 机器侧实测发现）：
+  `src/movie_fm2.cpp:414` 把 movie 数据 dump 进 Rust 内存文件后**直接 `fread`**，
+  而 Rust 的 `EmuFileMem::read_into` 是**位置读**（`emufile.rs:84-92`）⇒ 读回 **0 字节**，
+  零初始化的缓冲被整段写出 ⇒ 录出来是**长度正确但全 0** 的文件（实测 6197 字节全 `0x00`、无 `FCEUXM` 头），
+  回放 180/180 帧不一致。**修法一行**（`fceux11_rust_emufile_mem_fseek(mem, 0, 0)`，该 API 已存在）
+  ⇒ **本轮只登记不修**（计划 §9.23），建议优先于批 2/3 的 mapper 项。
+- **V14 的 CDL 一致性判据口径更正**（LT-09）：计划写的
+  `codecount + datacount + undefinedcount == cdloggerdataSize` 在 6/6 个 fixture 上**不成立**
+  （差值恰为 `code_and_data`）；真正成立的是**并集式**
+  `code + data - both + undefined == size`（6/6 精确成立）⇒ 照字面等式做人工验收会误报 FAIL
+  ⇒ 判据改口径，**不改任何基线**（计划 §9.24）。
+- **人工验收未闭合**（LT-09，机器侧已给读数、仍缺人证）：**V11** 跨进程读档（机器侧全闭合，只剩音色需人耳）·
+  **V13** 录 AVI ≥10 分钟（校验器已备好并正反自测，录制动作需 GUI）· **V7** profiler 点击 ·
+  **V25+V22** 真机 Lua 与鼠标 · **V6** 真机吹气（`$4016` bit2 需连读 10 次看是否交替）·
+  **V15** 已升级为上面的缺陷条目。
+- **GBA 侧 LT-10**：探针链已自证通过（合成夹具 + 否定性对照，六条断言），
+  **但本机无实体 `.gba` 卡** ⇒ 3 张卡（Mario Kart SC / Dragon Ball AA / Minish Cap）待业主出卡后一键跑完（计划 r11）。
+- **GBA 侧 LT-16 的 `start_delay = 2`**：GBATEK 对「使能沿 → 计数开始」**零覆盖**，
+  而 mGBA / VBA-M / neser / rustboyadvance-ng **四套独立参照实现都按「使能沿即开始计」建模**
+  ⇒ 该常数仍是**以 AGS 为准绳的标定值**，且参照实现层信号**与 AGS 方向相反**
+  ⇒ 记为**待裁决**（低优先、不阻塞），**未改实现、未改任何 AGS 期望值**（计划 r11）。
+- **DMC 亚周期差异 5 处**（LT-08 已界定并落锁）：本仓的 DMC 计费路径与上游 FCEUX **逐行同构**，
+  主口径（一次取样 4 CPU 周期 / 周期表 / 取样时机 / 取样副作用）**已符合**；
+  5 处亚周期差异（恒 4 而非 3-or-4 / 取样晚 0–6 周期 / 无 RDY halt / 无 DMC-OAM DMA 仲裁重叠 /
+  page-cross 惩罚晚一条指令计入）按 LT-08 非目标**登记不改**。
+
 ## [2.0.4_hotfix2] - 2026-11-17
 
 > **v2.0.4 的第二个 hotfix 发布**：内容 = v2.0.4_hotfix1 的全部成果 +
