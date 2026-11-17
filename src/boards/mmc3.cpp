@@ -443,7 +443,7 @@ static DECLFR(M12Read) {
 	return EXPREGS[2];
 }
 
-static void M12Power(void) {
+void M12Power(void) {
 	EXPREGS[0] = EXPREGS[1] = 0;
 	EXPREGS[2] = 1; // chinese is default
 	GenMMC3Power();
@@ -496,7 +496,7 @@ static void M37Reset(void) {
 	MMC3RegReset();
 }
 
-static void M37Power(void) {
+void M37Power(void) {
 	EXPREGS[0] = 0;
 	GenMMC3Power();
 	SetWriteHandler(0x6000, 0x7FFF, M37Write);
@@ -537,7 +537,7 @@ static DECLFW(M44Write) {
 		MMC3_CMDWrite(A, V);
 }
 
-static void M44Power(void) {
+void M44Power(void) {
 	EXPREGS[0] = 0;
 	GenMMC3Power();
 	SetWriteHandler(0xA000, 0xBFFF, M44Write);
@@ -606,7 +606,14 @@ static void M45Reset(void) {
 static void M45Power(void) {
 	GenMMC3Power();
 	EXPREGS[0] = EXPREGS[1] = EXPREGS[2] = EXPREGS[3] = EXPREGS[4] = EXPREGS[5] = 0;
-	SetWriteHandler(0x5000, 0x7FFF, M45Write);
+	// v2.0.5 A4: the write window is $6000-$7FFF, NOT $5000-$7FFF.
+	// M45Write executes `WRAM[A - 0x6000]`, so a write into $5000-$5FFF
+	// was a NEGATIVE index into WRAM.  That was unreachable while the
+	// board power never ran (A2); wiring the power without narrowing the
+	// window would turn the dormant defect into a live out-of-bounds
+	// write.  Upstream 2.8.0 uses the same $6000-$7FFF window
+	// (src/boards/mmc3.cpp:555 in the upstream snapshot).
+	SetWriteHandler(0x6000, 0x7FFF, M45Write);
 	SetReadHandler(0x5000, 0x5FFF, M45Read);
 }
 
@@ -640,7 +647,7 @@ static DECLFW(M47Write) {
 	FixMMC3CHR(MMC3_cmd);
 }
 
-static void M47Power(void) {
+void M47Power(void) {
 	EXPREGS[0] = 0;
 	GenMMC3Power();
 	SetWriteHandler(0x6000, 0x7FFF, M47Write);
@@ -686,7 +693,7 @@ static void M49Reset(void) {
 	MMC3RegReset();
 }
 
-static void M49Power(void) {
+void M49Power(void) {
 	M49Reset();
 	GenMMC3Power();
 	SetWriteHandler(0x6000, 0x7FFF, M49Write);
@@ -732,7 +739,7 @@ static void M52Reset(void) {
 	MMC3RegReset();
 }
 
-static void M52Power(void) {
+void M52Power(void) {
 	M52Reset();
 	GenMMC3Power();
 	SetWriteHandler(0x6000, 0x7FFF, M52Write);
@@ -813,7 +820,7 @@ static DECLFW(M114ExWrite) {
 	}
 }
 
-static void M114Power(void) {
+void M114Power(void) {
 	GenMMC3Power();
 	SetWriteHandler(0x8000, 0xFFFF, M114Write);
 	SetWriteHandler(0x5000, 0x7FFF, M114ExWrite);
@@ -866,7 +873,7 @@ static DECLFR(M115Read) {
 	return EXPREGS[2];
 }
 
-static void M115Power(void) {
+void M115Power(void) {
 	GenMMC3Power();
 	SetWriteHandler(0x4100, 0x7FFF, M115Write);
 	SetReadHandler(0x5000, 0x5FFF, M115Read);
@@ -991,7 +998,7 @@ static void M165PPU(uint32 A) {
 	}
 }
 
-static void M165Power(void) {
+void M165Power(void) {
 	EXPREGS[0] = 0xFD;
 	GenMMC3Power();
 }
@@ -1249,7 +1256,7 @@ static void M205Reset(void) {
 	MMC3RegReset();
 }
 
-static void M205Power(void) {
+void M205Power(void) {
 	EXPREGS[0] = EXPREGS[1] = 0;
 	GenMMC3Power();
 	SetWriteHandler(0x6000, 0x7FFF, M205Write);
@@ -1327,7 +1334,7 @@ static void M245PW(uint32 A, uint8 V) {
 	setprg8(A, (V & 0x3F) | ((EXPREGS[0] & 2) << 5));
 }
 
-static void M245Power(void) {
+void M245Power(void) {
 	EXPREGS[0] = 0;
 	GenMMC3Power();
 }
@@ -1366,7 +1373,7 @@ static DECLFW(M249Write) {
 	FixMMC3CHR(MMC3_cmd);
 }
 
-static void M249Power(void) {
+void M249Power(void) {
 	EXPREGS[0] = 0;
 	GenMMC3Power();
 	SetWriteHandler(0x5000, 0x5000, M249Write);
@@ -1390,7 +1397,7 @@ static DECLFW(M250IRQWrite) {
 	MMC3_IRQWrite((A & 0xE000) | ((A & 0x400) >> 10), A & 0xFF);
 }
 
-static void M250_Power(void) {
+void M250_Power(void) {
 	GenMMC3Power();
 	SetWriteHandler(0x8000, 0xBFFF, M250Write);
 	SetWriteHandler(0xC000, 0xFFFF, M250IRQWrite);
@@ -1418,7 +1425,7 @@ static DECLFW(M254Write) {
 	MMC3_CMDWrite(A, V);
 }
 
-static void M254_Power(void) {
+void M254_Power(void) {
 	GenMMC3Power();
 	SetWriteHandler(0x8000, 0xBFFF, M254Write);
 	SetReadHandler(0x6000, 0x7FFF, MR254WRAM);
@@ -1506,7 +1513,7 @@ FCEU_MAYBE_UNUSED
 static DECLFW(M406Write) {
 }
 
-static void M406_Power(void) {
+void M406_Power(void) {
 	GenMMC3Power();
 	// TODO : FLASH
 	SetWriteHandler(0x8000, 0xBFFF, M406CMDWrite);
@@ -1547,6 +1554,13 @@ extern void M199Power(void);
 // Mapper 198 shares mapper 195's power function (see boards/mmc3.cpp's
 // M195Power comment): it restores the WRAM window at $5000.
 extern void M195Power(void);
+
+// v2.0.5 A2: mapper 116's board power function lives in boards/116.cpp
+// (UNLSL12Power -- the VRC2 / MMC1 / MMC3 multiplexer board).  It is
+// declared here because the loader routes the power cycle through
+// CartInfo_PowerForward -> cart_obj->on_power(), so the legacy
+// `info->Power = UNLSL12Power` assignment inside UNLSL12_Init never runs.
+extern void UNLSL12Power(void);
 
 namespace fceu11 {
 
@@ -1618,6 +1632,50 @@ void Mapper199Cart::on_power() noexcept {
 void Mapper198Cart::on_power() noexcept {
 	M195Power();
 }
+
+// ---------------------------------------------------------------------------
+// v2.0.5 A2: wire the 18 MMC3-family boards' own power functions.
+//
+// The loader overwrites info->Power with CartInfo_PowerForward whenever the
+// registry produced a Cart object (src/ines.cpp), so for every REGISTERED
+// mapper the board's `info->Power = MxxPower` assignment never runs.
+// Mmc3BaseCart::on_power() hardcodes GenMMC3Power(), which installs only the
+// generic MMC3 command / IRQ handlers -- the per-board write and read
+// windows, the EXPREGS seeds and the extra IRQ wiring of these boards were
+// therefore NEVER installed and the boards could not work.
+//
+// Each override calls its own board power function directly -- the same
+// pattern as the pre-existing Mapper198Cart / Mapper199Cart overrides.
+// The board power functions lost their `static` for exactly this reason
+// (the same precedent as M195Power / M199Power above).
+//
+// The 18 numbers: 12 37 44 45 47 49 52 114 115 116 165 195 205 245 249
+// 250 254 406.  The v2.0.5 plan §1.4(B) listed 17 -- mapper 165 was missing
+// from that list (Mapper165_Init sets info->Power = M165Power and mapper 165
+// IS registered, so M165Power was swallowed as well).
+//
+// Boards whose Init leaves info->Power at GenMMC3Power (74, 118, 119, 191,
+// 192, 194) must NOT get an override -- the base class is right for them.
+// ---------------------------------------------------------------------------
+
+void Mapper12Cart::on_power() noexcept  { M12Power(); }
+void Mapper37Cart::on_power() noexcept  { M37Power(); }
+void Mapper44Cart::on_power() noexcept  { M44Power(); }
+void Mapper45Cart::on_power() noexcept  { M45Power(); }
+void Mapper47Cart::on_power() noexcept  { M47Power(); }
+void Mapper49Cart::on_power() noexcept  { M49Power(); }
+void Mapper52Cart::on_power() noexcept  { M52Power(); }
+void Mapper114Cart::on_power() noexcept { M114Power(); }
+void Mapper115Cart::on_power() noexcept { M115Power(); }
+void Mapper116Cart::on_power() noexcept { UNLSL12Power(); }
+void Mapper165Cart::on_power() noexcept { M165Power(); }
+void Mapper195Cart::on_power() noexcept { M195Power(); }
+void Mapper205Cart::on_power() noexcept { M205Power(); }
+void Mapper245Cart::on_power() noexcept { M245Power(); }
+void Mapper249Cart::on_power() noexcept { M249Power(); }
+void Mapper250Cart::on_power() noexcept { M250_Power(); }
+void Mapper254Cart::on_power() noexcept { M254_Power(); }
+void Mapper406Cart::on_power() noexcept { M406_Power(); }
 
 namespace {
 

@@ -53,6 +53,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **双击 ROM 打开（走命令行）这条路径基本不可用**；GUI 文件对话框不受影响
   （Qt 给的是 Unicode 路径）。
 
+### Fixed — MMC3 家族 mapper 的板级接线
+
+- **18 个 MMC3 家族 mapper 的板级 Power 从不执行**（v2.0.5 A2）：装载器在注册表命中时
+  会把 `info->Power` 覆盖成 `CartInfo_PowerForward` ⇒ 各板自己的
+  `info->Power = MxxPower` 永远不跑；而 `Mmc3BaseCart::on_power()` 写死调
+  `GenMMC3Power()` ⇒ 这些板的**专属写 / 读窗口、EXPREGS 初值、IRQ 接线全都没装上**
+  ⇒ 板子根本不能工作。受影响号：
+  `12 37 44 45 47 49 52 114 115 116 165 195 205 245 249 250 254 406`
+  （v2.0.5 计划 §1.4(B) 的原名单漏了 **165**，实施期已更正为 18 个）。
+  修法：18 个 Cart 类各加一个 `on_power()` override，直调自己的板级 Power 函数
+  （与既有的 mapper 198 / 199 同款写法），板级 Power 函数相应去掉 `static`。
+  ⚠️ `74 / 118 / 119 / 191 / 192 / 194` **刻意不加**——它们的 `info->Power`
+  本来就是 `GenMMC3Power`，基类行为正好正确。
+  门禁：`fceux11_mapper_load_test` 新增 A2 段，**逐号一条板专属行为锁**
+  （装载前投毒 `EXPREGS` / `MMC3_cmd` / `DRegBuf`、对比 handler 身份、
+  mapper 195 的 WRAM 窗口用「写-读之间毒化开总线锁存」避开回声陷阱），
+  外加一条「普通 MMC3 的 `$8000` 仍必须是 `MMC3_CMDWrite`」的对照断言。
+  变异验证双向：接线还原 ⇒ **17 条锁 + A4 锁全部转红**；只还原 A4 窗口 ⇒
+  **只有 A4 锁转红**（两类锁互相独立）。
+  ⚠️ 已知未闭合（同族，只登记不修）：这些板的**板级 Reset** 同样被
+  `CartInfo_ResetForward` 顶掉 ⇒ 复位时板的私有语义（mapper 12 的中英语言位、
+  mapper 45 的锁位、mapper 205 的焊盘位）不会按上游走。
+  ⚠️ mapper 245 的板级 Power 与基类**可观测状态完全相同**（它种的 `EXPREGS[0]`
+  会被自己的 CHR 包装函数立刻覆盖）⇒ 写不出有牙的锁 ⇒ 如实登记为**无锁覆盖**。
+
+- **mapper 45 的写窗口越界**（v2.0.5 A4，与上一条同批）：本仓 `M45Write` 执行
+  `WRAM[A - 0x6000]`，而写窗口是 `$5000-$7FFF` ⇒ 写进 `$5000-$5FFF` 是
+  **负下标越界写**。该缺陷此前因板级 Power 不跑而休眠；A2 接线会把它唤醒
+  ⇒ 同批把窗口收窄到 `$6000-$7FFF`（与上游 2.8.0 一致），并加一条越界锁。
+  ⚠️ 上游的 CHR / PRG 掩码重写与奇地址锁位复位分支**本轮未取**（证据档位只有
+  「上游这么写」，且需真 mapper 45 ROM + 基线评审才能定）。
+
 ### Fixed — 内存安全
 
 - **SFORMAT 短标签的定长 `memcpy` 越界**（计划外 E / 长尾 LT-17）：`src/state.cpp` 的

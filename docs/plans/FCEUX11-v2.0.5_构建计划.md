@@ -219,18 +219,26 @@ spot checks:
 never runs and the ROM comes up grey」，并为 191 / 199 补了注册（issue #12）。
 **其余 42 个号从未被登记进任何门禁** ⇒ 门禁盲区成立。
 
-#### (B) 17 个 MMC3 家族 mapper：已注册，但板级 Power 被基类顶掉
+#### (B) 18 个 MMC3 家族 mapper：已注册，但板级 Power 被基类顶掉
+
+> ⚠️ **r9 更正：17 → 18**。本节原名单**漏了 mapper 165**：r9 实施期逐个核对
+> `info->Power` 的赋值点时发现 `Mapper165_Init` 设了 `info->Power = M165Power`，
+> 且 **165 是已注册的**（`kMapper165Register`）⇒ 它的板级 Power 同样被 forwarder
+> 吞掉。名单由 17 更正为 **18**。
 
 `src/boards/mmc3_base_cart.cpp:20-26` 的 `Mmc3BaseCart::on_power()` **只调
 `GenMMC3Power()`**；其注释声称「Each MMC3 variant subclass overrides on_power()」，
 但 `src/boards/mmc3_variants_carts.h` 里 **26 个 MMC3 家族 Cart 类只有
 `Mapper198Cart` 与 `Mapper199Cart` 真的 override 了**（外加 mapper 4 的 `Mmc3Cart`）。
 
-⇒ **17 个已注册、但板级 Power 不执行的 MMC3 家族 mapper**：
+⇒ **18 个已注册、但板级 Power 不执行的 MMC3 家族 mapper**：
 
 ```
-12 37 44 45 47 49 52 114 115 116 195 205 245 249 250 254 406
+12 37 44 45 47 49 52 114 115 116 165 195 205 245 249 250 254 406
 ```
+
+（其余 6 个 `74 / 118 / 119 / 191 / 192 / 194` 的 Init 把 `info->Power` 留在
+`GenMMC3Power` ⇒ 基类行为**正好正确**，**不得**给它们加 override。）
 
 各被顶掉的实质内容（`src/boards/mmc3.cpp`）：
 
@@ -246,6 +254,7 @@ never runs and the ROM comes up grey」，并为 191 / 199 补了注册（issue 
 | 114 | `$8000-$FFFF` 写 + `$5000-$7FFF` 写 handler | 同上 |
 | 115 | `$4100-$7FFF` 写 + `$5000-$5FFF` 读 handler | 同上 |
 | 116 | `UNLSL12Power`：`mode = 0` + `vrc2_chr[0..3]` 初值 | VRC2 变体行为不对 |
+| **165** | `M165Power`：`EXPREGS[0] = 0xFD`（CHR-RAM 模式的种子） | CHR-RAM 模式永不启用（**r9 补进名单**） |
 | 195 | `M195Power` | WRAM 窗口不对 |
 | 205 | `$6000-$7FFF` 写 handler | 同上 |
 | 245 | `EXPREGS[0] = 0` | 寄存器初值不对 |
@@ -290,9 +299,9 @@ never runs and the ROM comes up grey」，并为 191 / 199 补了注册（issue 
 | # | 任务 | 类型 | 重要性 | 难度 | 性价比 | 建议动作 |
 |---|---|---|---|---|---|---|
 | **A1** | 补 42 个 mapper 的注册，恢复板级 Power（**r2 更正为 75 个号**） | **本仓缺陷** | **高** | 中 | **高** | ✅ **已完成（r2，A1-a）**：修复 + 门禁 S1–S4 + 变异验证 + `ctest 41/41`；`f09e284` 已推送 |
-| **A2** | MMC3 家族 17 个变体的 `on_power` 接线 | **本仓缺陷** | **高** | 中 | **高** | ✅ 立即做 |
+| **A2** | MMC3 家族 17 个变体的 `on_power` 接线 | **本仓缺陷** | **高** | 中 | **高** | ✅ **已完成（r9）**——**实际是 18 个号**（计划漏了 165，见 §1.4(B) 更正）：18 个 `on_power` override + 17 条板专属行为锁 + 双向变异验证 |
 | **A3** | 矫正活表补 22 条 + 修 2 条 | 上游优势 U1 | 中 | 低 | **高** | ✅ 立即做（纯数据） |
-| **A4** | mapper 45 取上游窗口（与 A2 同批，防越界） | 上游优势 U4 | 中 | 低 | **高** | ✅ 与 A2 同批 |
+| **A4** | mapper 45 取上游窗口（与 A2 同批，防越界） | 上游优势 U4 | 中 | 低 | **高** | ✅ **已完成（r9，与 A2 同批）**：写窗口 `$5000-$7FFF` → `$6000-$7FFF`（上游 2.8.0 同款）+ 越界锁；上游的 CHR/PRG mask 重写**本轮未取**（证据档位只有「上游这么写」，见 r9 ⑤） |
 | **A5** | mapper 4 的 NES 2.0 PRG-RAM | 上游优势 U3 | 中 | 低 | 中 | ✅ 插队做（一处改动） |
 | **A6** | mapper 210 Namco 175/340 | 上游优势 U2 | 中 | 中 | 中 | ✅ 做（证据档位见 §三） |
 | **A7** | MMC5 / bandai / mapper 72 / mapper 19 四项小修 | 上游优势 U6 | 中 | 低～中 | 中 | ✅ 做 |
@@ -815,6 +824,7 @@ GBA 侧「BIOS SWI 全部实现」—— 详见长尾盘点文档 §四。
 | r6 | 2026-11-16 | **新增 §九 · 缺陷登记：BUG-V205-03（关闭 ROM 后立刻打开 ROM ⇒ GUI 永久卡死）**——业主人工实测 v2.0.4_hotfix1 发布包，触发样本 `mapper21/格拉米世界2.nes`；业主补充触发条件：**先「关闭 ROM」再「立刻打开 ROM」**。① **同日 21:33 完成真复现**（业主机，有交互桌面 + 正常 GL：NVIDIA 582.28 / GL 3.3.0）：业主手动操作、机器全程记录 ⇒ **卡死复现**（`HANG at t+128.6s`，app `Responding=False`，连续 6 次快照等待链逐字一致 ⇒ 死锁稳定非瞬态）。② **根因已实证（等待链 + 双方线程栈 + 窗口枚举 + app 日志四路互证）**：**原生（IFileDialog / COMDLG32）文件对话框的 COM 工作线程 tid=8512 卡在 `EnableWindow` 的 `SendMessage` → GUI 线程**（栈：`COMDLG32 → windows.storage → combase → RPCRT4`），而 **GUI 线程 tid=4380 卡在 `IFileDialog::Show()` 的 COM/RPC 等待**（栈：`KERNELBASE → ntdll!ZwWaitForMultipleObjects → combase → RPCRT4`）⇒ **互等死锁**；物证：**「打开 ROM 文件」窗口仍存在但已隐藏**（`exec()` 永不返回）+ **第二次 ROM 装载已完成**（stdout 有第二次 `Loading … mapper21` → `Power on` → `Initializing video`）⇒ 卡住的是 GUI 线程，不是装载。③ **推翻了本条初版登记的根因**：初版基于静态分析写成「包装锁协议失衡」（全局计数 / 跳过解锁 / 抢锁失败即放弃 / 无 preempt 让位 —— 与上游 2.8.0 的四处差异）——**等待链证明 GUI 线程节点里没有任何锁**（无 CriticalSection / Mutex）⇒ 那四处差异**独立存在但与本条无因果**，已降级为顺带修项。④ **仍缺**：为什么「必须先关闭 ROM」尚未做对照实验（决定修复面大小）；「每线程 CPU」仍缺（`GetThreadTimes` 对更高权限进程 `ACCESS_DENIED`）；上游 2.8.0 是否同病未核。⑤ **本轮建成取证装置**（`Research_only/w205/probe/`，gitignored）：`launch_watch.py`（启动 + 全程记录：等待链 / 线程栈 / 截图 / app 日志）、`stack_scan.cpp`（不依赖展开器的栈扫描）、`pe_export.py`（地址→导出符号）、`wct_dump.exe`、`shot.ps1`。⑥ **修复方向**：先做对照实验 ⇒ 主修 = **不要在文件对话框的 COM 回调里同步装载 ROM**（推迟到对话框完全关闭之后）；规避 = `SDL.UseNativeFileDialog` 默认改 0（属产品决定）；兜底 = GUI 取包装锁带超时。⑦ 本轮**只登记不修** |
 | r7 | 2026-11-16 | **BUG-V205 三条收口（业主指示「完成 BUG-V205 部分收口」）**。① **BUG-V205-02 已修**（§9.19）：`configSys.cpp` 新增**文件级静态登记表** + 自由函数 `fceux11_config_register_pass_through_flag`（**零头文件改动**，规避 r5 类布局翻车），`_parseArgs` 长参数未知分支先查表 `continue`（不吞值、不动下标）；`fceuWrapperPreInit` 的 `--no-console` 分支登记。**E2E 红绿双腿**（探针 `v205_e2e.py`，判据 = 独立 `FCEUX_CONFIG_DIR` 生成 cfg 的 `SDL.LastOpenFile`）：修复后 exe 上 A（`--no-console <rom>` 装载成功）/ B（无 flag 逐字一致）/ C（中文名回归完好）/ D（无 ROM = 默认值，`config.cpp:773` 预期）全绿；**修复前红腿用 v2.0.4_hotfix1 发布包 exe 当场复现**（A 用例 LastOpenFile=默认值 ⇒ ROM 被吞）。② **BUG-V205-03 主修 #3 落地**（§9.20）：`openROMFile` / `loadNSF` 的装载从对话框调用栈内改为 `QTimer::singleShot(0, this, …)`（栈完全出栈后主事件循环执行；调用面核实：全部调用方为 fire-and-forget 槽）；`SDL.UseNativeFileDialog` 默认值不动（业主产品决定）、包装锁超时兜底与 D1–D4 维持登记（E10：与卡死无因果）。⚠️ **死锁场景自动化无法触发（E12）⇒ 修复效果待业主人手复核**（复刻「关闭→立刻打开」鼠标路径）。③ **BUG-V205-01 尾巴（§9.6 方向 2 防呆）落地**：`ConsoleWindow.cpp` `update()` 改为先清 `errorMsgValid` 再弹框（防叠框 / 防丢错；「反复弹框」机制仍未实证，防呆性质不变）。④ **同机制观察项登记**：`loadStateFrom`（对话框后同步 `FCEUSS_Load`）理论上同属暴露面，不在报告路径，未随本次改动。⑤ 门禁：全量构建 EXIT=0（65 步）+ `ctest -LE perf` **41/41**；改动全在 driver 层（`drivers_common` + `drivers_qt`），Rust 八条不在影响面；`git diff --numstat` 无行尾重写。⑥ 未做（超出 BUG-V205 范围）：版本号 / `[2.0.5]` CHANGELOG 段 / push 均待业主指示 |
 | r8 | 2026-11-17 | **BUG-V205-03 终形态修复（STA 引用垫片）+ v2.0.4_hotfix2 发布**。① r7 落地后业主实测死锁仍在（发布包与修复版哈希一致）——第二轮手操复现 + 升级取证（双栈扫描）证明**环完全在 Windows 侧对话框实现内部**：对话框机制跑在内部宿主线程上（GUI 栈无 COMDLG32 帧），其收尾 `EnableWindow(owner)` 为跨线程 SendMessage，与 GUI 线程在 Show() 转发调用里的 COM-only 等待互等；两栈零本仓帧、零本仓锁。② 套间假说（BeeWare #930 同型）经 APTPROBE 全程实测排除（全程 STA）。③ **意外发现**：探针版不再复现（业主指出）——探针的 S_FALSE 不配对 = 每次对话框打开净 +1 STA 引用。④ **A/B/C/D 对照**：B（无垫片）5 次观察全部 ≤2 轮死锁；A/D（保持 +1）合计 18 开零死锁；C（净 0）>5 轮才死 ⇒ 垫片达工程决策标准（P≈0.1%），同时 C 证伪「泄漏至拆除」最简机制（如实登记为未闭合）。⑤ 正式落地：`openROMFile`/`loadNSF` 在 exec 前 `CoInitializeEx(STA)` 不配对；研究探针移除；`SDL.UseNativeFileDialog` 默认 1 不变（预授权的「改 0」不再需要）。⑥ 版本 `v2.0.4_hotfix2`（NUMERIC 20004 冻结不变，hotfix1 口径）；坑 6 复现并处置（version.h 改后 5 个 TU 未重编致产物残留 hotfix1 字符串，touch 强制后回查干净）。⑦ 门禁：全量构建 EXIT=0 + `ctest -LE perf` **41/41**；业主人手终验（循环多轮）无卡死，确认可发。⑧ 发布产物内容如实口径：本 hotfix2 段只记 BUG-V205-02/03 + V205-01 防呆尾巴；C1/C2（hotfix1 二进制已含、未入发布口径）与 A1（v2.0.5 线）维持原口径不动，由业主定稿时取舍 |
+| r9 | 2026-11-17 | **A2 + A4 落地（18 个 MMC3 家族板级 Power 接线 + mapper 45 写窗口收窄）**。① **实施期更正 §1.4(B)：17 → 18 个号**——`Mapper165_Init` 设了 `info->Power = M165Power` 且 mapper 165 **是已注册的** ⇒ 它的板级 Power 同样被 forwarder 吞掉。② **改法** = `src/boards/mmc3_variants_carts.h` 里 18 个类各加一个 `on_power() noexcept override`（用宏 `FCEUX11_MMC3_VARIANT_CART_WITH_POWER` 展开），实现放在 `src/boards/mmc3.cpp`（与既有的 `Mapper198Cart`/`Mapper199Cart` override 同一位置、同一写法）；16 个板级 Power 函数去掉 `static`（`M12Power`…`M406_Power`），mapper 116 的 `UNLSL12Power` 在 `src/boards/116.cpp` 同样去 `static` + 在 mmc3.cpp 加 `extern` 声明（先例：`M195Power`/`M199Power`）。**`74 / 118 / 119 / 191 / 192 / 194` 明确不加 override**——它们的 Init 把 `info->Power` 留在 `GenMMC3Power`，基类行为正好正确，加了反而跑错 Power。③ **门禁** = `fceux11_mapper_load_test` 新增 A2 段：**18 号逐号断言 + 1 条 mapper 45 的 A4 窗口锁**；断言一律用「板专属可观测」，三种技术并用——`EXPREGS`/`MMC3_cmd`/`DRegBuf`（**装载前投毒 `0xA5`**，只有板级 Power 会复位它们 ⇒ 板级 Power 没跑就留毒）、handler 身份（对比通用 `MMC3_CMDWrite` / `CartBR` / `CartBW`）、以及 mapper 195 的 WRAM 窗口（写-读之间**毒化开总线锁存**，避开 r2 发现的「写-回读无牙」陷阱）。**对照组**：mapper 116 的「通用 handler 已不在」断言配一条「普通 MMC3 的 `$8000` 必须仍是 `MMC3_CMDWrite`」的控制断言，否则该断言会空转。④ **变异验证双向**（纪律 3）：**M1**（18 个 override 改回 `GenMMC3Power()`）⇒ **17 条锁 + A4 锁全部转红**，红点逐条落在毒值 / 通用 handler 上（`EXPREGS` 停在 `0xA5`、116 的 handler 变回 `MMC3_CMDWrite`、195 的 handler 消失且读回 `0x00`、250/406 的 `MMC3_cmd`/`DRegBuf` 落到通用路径的值）；**M2**（A4 窗口改回 `$5000-$7FFF`）⇒ **只有 A4 锁转红**，其余 16 条保持绿 ⇒ 两类锁互相独立。还原走备份 + **显式刷新 mtime**（`Copy-Item` 保留源时间戳 ⇒ 还原腿会假红，AGENTS.md 已登记的坑）。⑤ **A4 的范围收窄（本轮刻意只取一半）**：**取上游的写窗口**（`$5000-$7FFF` → `$6000-$7FFF`，上游 2.8.0 `src/boards/mmc3.cpp:555` 同款；本仓 `M45Write` 执行 `WRAM[A - 0x6000]` ⇒ `$5000-$5FFF` 段是**负下标越界写**，A2 接线会把它从休眠态唤醒，**先接 A2 不取 A4 = 把越界写变成活的**）；**上游的 `M45CW`/`M45PW` mask 重写与奇地址锁位复位分支本轮未取**——证据档位只有「上游这么写」，无权威出处，且会改这些卡的 CHR/PRG 银行规则 ⇒ **登记为待立项项**（需真 mapper 45 ROM + 基线评审，见 §9.22 ②）。⑥ **mapper 245 如实登记为「无锁」**：`M245Power` 只种 `EXPREGS[0]=0` 再调 `GenMMC3Power()`，而 `GenMMC3Power` → `MMC3RegReset` → `FixMMC3CHR` → `cwrap` → `M245CW` **立刻把 `EXPREGS[0]` 覆写成 CHR 银行值（`0x07`）** ⇒ 板级路径与基类路径**可观测状态完全相同**，写不出有牙的锁（写出来的必是空转断言）。override 仍保留（语义正确、无副作用），但**没有锁覆盖** ⇒ 如实登记，不假装覆盖。⑦ **门禁读数**：全量构建 EXIT=0、`ctest -LE perf` **41/41**、A2 段（对照组 + 17 条锁 + A4 锁）全绿。⑧ **新登记的观察项（只登记不修）**：这 18 个板的**板级 Reset** 同样被 `CartInfo_ResetForward` 顶掉（`Mmc3BaseCart::on_reset()` 只调 `MMC3RegReset`）⇒ 复位时板的私有寄存器 / 开关语义（mapper 12 的中英语言位、mapper 45 的 `EXPREGS[5]` 锁位、mapper 205 的焊盘位）不会按上游走 ⇒ **A2 本轮只做 Power**，Reset 侧转下一项（见 §9.22）。 |
 
 ---
 
@@ -1252,3 +1262,39 @@ GUI 线程：ZwWaitForMultipleObjects ← KERNELBASE ← combase+0xc6259 ← RPC
 **正式落地**（`src/drivers/Qt/ConsoleFile.cpp`）：`openROMFile` / `loadNSF` 在 `dialog.exec()` 前执行 `CoInitializeEx(NULL, COINIT_APARTMENTTHREADED)`，**故意不配对**（每次打开一个计数字，无资源对应；进程退出无需归零）；启动期研究探针全部移除。**`SDL.UseNativeFileDialog` 默认值保持 1**（业主预授权的「默认改 0」因机制级修复成立而不再需要；配置项保留，改 0 仍可作为彻底绕开 COM 的备选）。**同机制观察项保留**：`loadStateFrom` 等其余原生对话框路径未实测、未加垫片，若在其他路径复现卡死按同款处理。
 
 **验证**：全量构建 EXIT=0、产物字符串 `v2.0.4_hotfix2`（回查确认，无 hotfix1 残留——坑 6 复现：version.h 改后 5 个嵌版本串 TU 未自动重编，已 touch 强制）、`ctest -LE perf` **41/41**；业主人手终验（循环多轮）**无卡死**。
+### 9.22 · 观察项登记（r9 新发现 · 只登记不修）
+
+> 这两条是 A2 实施期顺带查出来的**同族缺陷**，本轮**只登记**，不在 A2 的范围内动手。
+
+**① 板级 Reset 同样被 forwarder 顶掉**
+
+`info->Reset` 与 `info->Power` 走同一条路：注册表命中 ⇒ `iNESCart.Reset` 被覆盖成
+`CartInfo_ResetForward` ⇒ `cart_obj->on_reset()` ⇒ `Mmc3BaseCart::on_reset()` **只调
+`MMC3RegReset()`** ⇒ 各板自己的 Reset 函数**从不执行**：
+
+| 板 | 被顶掉的 Reset | 上游语义 | 用户可感后果 |
+|---|---|---|---|
+| 12 | `M12Reset` | `EXPREGS[0]=EXPREGS[1]=0`；`EXPREGS[2] ^= 1` | **中英语言位不复位**（上游每次复位切语言） |
+| 37 | `M37Reset` | `EXPREGS[0]=0` | 复位后扩展寄存器残留 |
+| 45 | `M45Reset` | `EXPREGS[0..4]=0`；`EXPREGS[5]++`（锁位计数） | **锁位不复位**（A4 收窄后写入路径仍在） |
+| 49 | `M49Reset` | `EXPREGS[0]=0` | 同 37 |
+| 52 | `M52Reset` | `EXPREGS[0]=EXPREGS[1]=0` | 同 37 |
+| 114 | `M114Reset` | `EXPREGS[0]=0` | 同 37 |
+| 205 | `M205Reset` | `EXPREGS[0]=0`；`EXPREGS[1] ^= 2`（焊盘位） | **焊盘位不复位** |
+
+⇒ **建议**：与 A2 同款做法（各 Cart 类 override `on_reset()` 直调板级 Reset），
+但**必须自带行为锁**（例如 mapper 12 的语言位在复位后翻转、mapper 45 的
+`EXPREGS[5]` 递增、mapper 205 的 `EXPREGS[1]` 翻转）⇒ 这三条的期望值依赖
+「复位时到底该不该翻转」这一语义问题 ⇒ **需要业主口径**（上游就是翻转 ⇒
+建议照上游），故本轮不自行决定。
+
+**② 上游 mapper 45 的 CHR/PRG mask 重写本轮未取**
+
+上游 2.8.0 的 `M45CW`/`M45PW` 与本仓的 2.6.6 版**结构不同**（上游把 CHR 掩码改成
+`((EXPREGS[2] & 0x0F) > 7) ? ((1 << (EXPREGS[2] & 0x0F) << 3) - 1) : 0`，
+PRG 改成 `MV |= (EXPREGS[1] & 0x3F & mask) | (EXPREGS[1] & 0xC0)`），上游的
+`M45Write` 还多一条**奇地址锁位复位分支**（`EXPREGS[3] &= ~0x40`）。
+本轮**只取写窗口**（安全必需项），**未取 mask 重写与锁位分支** ⇒ 依据：
+① **证据档位只有「上游这么写」**（无权威出处，纪律 2）；② 上游自己在这一族代码里留有
+`// CNROM mode. Unclear. Untested.` 一类的存疑标记；③ 会改这些卡的 CHR/PRG 银行规则，
+需真 mapper 45 ROM + F11QA 基线评审才敢动 ⇒ **登记为待立项项**。

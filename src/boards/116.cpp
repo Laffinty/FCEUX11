@@ -281,7 +281,7 @@ static void StateRestore(int version) {
 	Sync();
 }
 
-static void UNLSL12Power(void) {
+void UNLSL12Power(void) {
 	mode = 0;
 	vrc2_chr[0] = ~0;
 	vrc2_chr[1] = ~0;

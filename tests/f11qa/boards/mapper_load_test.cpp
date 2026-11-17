@@ -576,6 +576,296 @@ static bool check_non_power2_chr_rom(const std::filesystem::path& dir) {
     return ok;
 }
 
+// ==================== v2.0.5 A2: MMC3-family board power wiring ====================
+//
+// The loader overwrites info->Power with CartInfo_PowerForward whenever the
+// registry produced a Cart object (src/ines.cpp:77-85), so for every
+// REGISTERED mapper the board's own `info->Power = MxxPower` assignment never
+// ran.  Mmc3BaseCart::on_power() hardcodes GenMMC3Power(), which installs only
+// the generic MMC3 command / IRQ handlers -- the per-board write and read
+// windows, the EXPREGS seeds and the extra IRQ wiring of the 18 MMC3-family
+// boards below were therefore never installed, and those boards could not
+// work.
+//
+// Every lock below asserts an observable that belongs to THAT board and that
+// the generic GenMMC3Power() path cannot produce.  Three techniques are used,
+// all of them immune to the open-bus echo that made a plain "write-then-read"
+// lock toothless (see the A1-S3 comment):
+//
+//   * EXPREGS / MMC3_cmd / DRegBuf -- the boards' own register files.  The
+//     test POISONS them before the load; the board's power function is the
+//     only thing that resets them, so a board whose power did not run keeps
+//     the poison.
+//   * handler identity -- GetWriteHandler() compared against a handler that
+//     only the generic MMC3 installs (MMC3_CMDWrite).
+//   * a write-回读 lock only where the board's own window is the thing under
+//     test (mapper 195's WRAM at $5000); there the data-bus latch is poisoned
+//     between the write and the read, so the open bus cannot echo the written
+//     byte back.
+//
+// The 18 numbers are WIRED; 17 of them have a behavioral lock below (mapper
+// 245 has none -- see the note in main()).  The v2.0.5 plan §1.4(B) listed
+// 17 -- mapper 165 was missing from that list (Mapper165_Init sets
+// info->Power = M165Power and mapper 165 IS registered, so M165Power was
+// swallowed by the forwarder as well).
+
+// The poison value for the boards' register files.  It has to differ from
+// every value a lock expects, otherwise the lock would pass even when the
+// board's handler never ran (mapper 254 expects EXPREGS[0] == 0xFF, so the
+// poison must not be 0xFF).
+static const uint8_t kA2Poison = 0xA5;
+
+enum class A2Probe {
+    EXPR_ZERO,        // the board's power must reset EXPREGS[expr_index] to 0
+    EXPR_VALUE,       // the board's power must set EXPREGS[expr_index] to expr_expect
+    WRITE_EXPR,       // a write must reach the board's handler and land in EXPREGS
+    WRITE_REGS,       // a write must reach the board's handler and land in MMC3_cmd/DRegBuf
+    HANDLER_NOT_MMC3, // the generic MMC3 command handler must be gone
+    WRAM_WINDOW,      // the board's WRAM window at $5000 must be there
+};
+
+struct A2Case {
+    uint32_t mapper;
+    A2Probe  probe;
+    uint32_t addr;
+    uint8_t  value;
+    uint8_t  expr_index;
+    uint8_t  expr_expect;
+    uint8_t  dreg_index;   // 0xFF = not checked
+    uint8_t  dreg_expect;
+    const char* note;
+};
+
+static const A2Case kA2Cases[] = {
+    {  12, A2Probe::EXPR_VALUE,       0,      0,    2, 0x01, 0xFF, 0x00,
+      "M12Power: EXPREGS[2]=1 (chinese default) + $4100-$5FFF handlers" },
+    {  37, A2Probe::WRITE_EXPR,       0x6000, 0x04, 0, 0x02, 0xFF, 0x00,
+      "M37Write at $6000-$7FFF: EXPREGS[0]=(V&6)>>1" },
+    {  44, A2Probe::WRITE_EXPR,       0xA001, 0x5A, 0, 0x02, 0xFF, 0x00,
+      "M44Write at $A000-$BFFF: EXPREGS[0]=V&7" },
+    {  45, A2Probe::EXPR_ZERO,        0,      0,    0, 0x00, 0xFF, 0x00,
+      "M45Power: EXPREGS[0..5]=0 (the A4 window lock follows below)" },
+    {  47, A2Probe::WRITE_EXPR,       0x6000, 0x01, 0, 0x01, 0xFF, 0x00,
+      "M47Write at $6000-$7FFF: EXPREGS[0]=V&1" },
+    {  49, A2Probe::EXPR_ZERO,        0,      0,    0, 0x00, 0xFF, 0x00,
+      "M49Power -> M49Reset: EXPREGS[0]=0" },
+    {  52, A2Probe::WRITE_EXPR,       0x6000, 0x80, 0, 0x80, 0xFF, 0x00,
+      "M52Write at $6000-$7FFF: EXPREGS[0]=V" },
+    { 114, A2Probe::WRITE_EXPR,       0x5000, 0x5A, 0, 0x5A, 0xFF, 0x00,
+      "M114ExWrite at $5000-$7FFF: EXPREGS[0]=V" },
+    { 115, A2Probe::WRITE_EXPR,       0x6000, 0x5A, 0, 0x5A, 0xFF, 0x00,
+      "M115Write at $4100-$7FFF: EXPREGS[0]=V" },
+    { 116, A2Probe::HANDLER_NOT_MMC3, 0x8000, 0,    0, 0x00, 0xFF, 0x00,
+      "UNLSL12Power replaces the generic MMC3 command handler at $8000-$FFFF" },
+    { 165, A2Probe::EXPR_VALUE,       0,      0,    0, 0xFD, 0xFF, 0x00,
+      "M165Power: EXPREGS[0]=0xFD (the CHR-RAM mode seed)" },
+    { 195, A2Probe::WRAM_WINDOW,      0x5000, 0x5A, 0, 0x00, 0xFF, 0x00,
+      "M195Power: 16 KiB WRAM window at $5000 + CartBR/CartBW handlers" },
+    { 205, A2Probe::WRITE_EXPR,       0x6000, 0x03, 0, 0x03, 0xFF, 0x00,
+      "M205Write at $6000-$7FFF: EXPREGS[0]=V&3" },
+    { 249, A2Probe::WRITE_EXPR,       0x5000, 0x5A, 0, 0x5A, 0xFF, 0x00,
+      "M249Write at $5000: EXPREGS[0]=V" },
+    { 250, A2Probe::WRITE_REGS,       0x80FF, 0xFF, 0, 0xFF, 0,    0x00,
+      "M250Write mangles the written value to A&0xFF" },
+    { 254, A2Probe::WRITE_EXPR,       0x8000, 0x00, 0, 0xFF, 0xFF, 0x00,
+      "M254Write at $8000-$BFFF: EXPREGS[0]=0xFF" },
+    { 406, A2Probe::WRITE_REGS,       0x8002, 0x5A, 0, 0x00, 0,    0x5A,
+      "M406CMDWrite permutes the address ($8002 -> $8003)" },
+};
+
+static const int NUM_A2_CASES =
+    static_cast<int>(sizeof(kA2Cases) / sizeof(kA2Cases[0]));
+
+// The control for the "the generic MMC3 handler must be gone" probe: a plain
+// MMC3 (mapper 4) MUST still have MMC3_CMDWrite at $8000, otherwise the
+// mapper-116 assertion would pass vacuously.
+static bool check_a2_generic_control() {
+    FCEUGI* gi = fceu11::LoadGame("fixtures/mapper_mmc3.nes", 1, true);
+    if (!gi) {
+        printf("FAIL: the plain MMC3 fixture did not load\n");
+        return false;
+    }
+    const bool is_cmd = (GetWriteHandler(0x8000) == &MMC3_CMDWrite);
+    printf("      plain MMC3: write handler $8000 == MMC3_CMDWrite: %d\n",
+           is_cmd ? 1 : 0);
+    fceu11::CloseGame();
+    if (!is_cmd) {
+        printf("FAIL: the plain MMC3 does not use MMC3_CMDWrite at $8000 -- "
+               "the control for the mapper-116 lock is broken\n");
+        return false;
+    }
+    return true;
+}
+
+static bool check_a2_case(const A2Case& c, const std::filesystem::path& dir) {
+    const std::filesystem::path rom =
+        dir / ("a2_mapper_" + std::to_string(c.mapper) + ".nes");
+    if (!write_minimal_ines_rom(rom, c.mapper)) {
+        printf("FAIL: cannot write the mapper %u ROM\n", c.mapper);
+        return false;
+    }
+
+    // Poison the boards' register files BEFORE the load.  The board's own
+    // power function is the only thing that resets them, so a board whose
+    // power did not run keeps the poison.
+    for (int i = 0; i < 8; ++i) EXPREGS[i] = kA2Poison;
+
+    FCEUGI* gi = fceu11::LoadGame(rom.string().c_str(), 1, true);
+    if (!gi) {
+        printf("FAIL: the mapper %u ROM did not load\n", c.mapper);
+        return false;
+    }
+    if (gi->mappernum != static_cast<int>(c.mapper)) {
+        printf("FAIL: loaded as mapper %d\n", gi->mappernum);
+        fceu11::CloseGame();
+        return false;
+    }
+
+    bool ok = true;
+    switch (c.probe) {
+    case A2Probe::EXPR_ZERO:
+    case A2Probe::EXPR_VALUE: {
+        const uint8_t got = EXPREGS[c.expr_index];
+        printf("      EXPREGS[%u] = 0x%02X (expected 0x%02X)\n",
+               c.expr_index, got, c.expr_expect);
+        if (got != c.expr_expect) {
+            printf("FAIL: mapper %u: EXPREGS[%u] is 0x%02X, expected 0x%02X -- "
+                   "the board's own power function did not run\n",
+                   c.mapper, c.expr_index, got, c.expr_expect);
+            ok = false;
+        }
+        break;
+    }
+    case A2Probe::WRITE_EXPR: {
+        X6502_DMW(c.addr, c.value);
+        const uint8_t got = EXPREGS[c.expr_index];
+        printf("      write $%04X <- 0x%02X => EXPREGS[%u] = 0x%02X "
+               "(expected 0x%02X)\n",
+               c.addr, c.value, c.expr_index, got, c.expr_expect);
+        if (got != c.expr_expect) {
+            printf("FAIL: mapper %u: the write to $%04X did not reach the "
+                   "board's handler (EXPREGS[%u] is 0x%02X, expected 0x%02X)\n",
+                   c.mapper, c.addr, c.expr_index, got, c.expr_expect);
+            ok = false;
+        }
+        break;
+    }
+    case A2Probe::WRITE_REGS: {
+        X6502_DMW(c.addr, c.value);
+        // The board's handler must have mangled the address / the value:
+        // MMC3_cmd carries the mangled result, DRegBuf the bank register.
+        const uint8_t cmd = MMC3_cmd;
+        const uint8_t dreg = (c.dreg_index == 0xFF) ? 0x00 : DRegBuf[c.dreg_index];
+        printf("      write $%04X <- 0x%02X => MMC3_cmd=0x%02X DRegBuf[%u]=0x%02X\n",
+               c.addr, c.value, cmd, c.dreg_index, dreg);
+        if (cmd != c.expr_expect) {
+            printf("FAIL: mapper %u: MMC3_cmd is 0x%02X, expected 0x%02X -- "
+                   "the write did not reach the board's handler\n",
+                   c.mapper, cmd, c.expr_expect);
+            ok = false;
+        }
+        if (c.dreg_index != 0xFF && dreg != c.dreg_expect) {
+            printf("FAIL: mapper %u: DRegBuf[%u] is 0x%02X, expected 0x%02X\n",
+                   c.mapper, c.dreg_index, dreg, c.dreg_expect);
+            ok = false;
+        }
+        break;
+    }
+    case A2Probe::HANDLER_NOT_MMC3: {
+        const bool is_cmd = (GetWriteHandler(c.addr) == &MMC3_CMDWrite);
+        printf("      write handler $%04X == MMC3_CMDWrite: %d\n",
+               c.addr, is_cmd ? 1 : 0);
+        if (is_cmd) {
+            printf("FAIL: mapper %u: the generic MMC3 command handler is still "
+                   "installed at $%04X -- the board's power function did not "
+                   "run\n", c.mapper, c.addr);
+            ok = false;
+        }
+        break;
+    }
+    case A2Probe::WRAM_WINDOW: {
+        const bool rd_ok = (GetReadHandler(0x5000) == &CartBR);
+        const bool wr_ok = (GetWriteHandler(0x5000) == &CartBW);
+        X6502_DMW(0x5000, 0x5A);   // into the board's WRAM window
+        X6502_DMW(0x4020, 0x00);   // poison the open-bus data latch
+        const uint8_t rb = X6502_DMR(0x5000);
+        printf("      $5000 read handler == CartBR: %d, write handler == "
+               "CartBW: %d, WRAM readback = 0x%02X\n",
+               rd_ok ? 1 : 0, wr_ok ? 1 : 0, rb);
+        if (!rd_ok || !wr_ok) {
+            printf("FAIL: mapper %u: the board's CartBR/CartBW handlers are "
+                   "not installed at $5000 -- the board's power function did "
+                   "not run\n", c.mapper);
+            ok = false;
+        }
+        if (rb != 0x5A) {
+            printf("FAIL: mapper %u: $5000 is not the board's WRAM window "
+                   "(readback 0x%02X, expected 0x5A)\n", c.mapper, rb);
+            ok = false;
+        }
+        break;
+    }
+    }
+    fceu11::CloseGame();
+    return ok;
+}
+
+// v2.0.5 A4: mapper 45's write window must start at $6000, not $5000.
+//
+// M45Write executes `WRAM[A - 0x6000]`, so a write into $5000-$5FFF is a
+// NEGATIVE index into WRAM -- an out-of-bounds write.  It was unreachable
+// while the board's power function never ran; wiring the power (A2) without
+// narrowing the window would have woken the defect.  Upstream 2.8.0 uses the
+// same $6000-$7FFF window.
+//
+// The board's own register file is the observable: a write that reaches
+// M45Write lands in EXPREGS (the register path) or in WRAM (the locked
+// path).  A write that does NOT reach it leaves EXPREGS alone -- so
+// "EXPREGS[0] is unchanged after a write to $5000" is the lock.
+static bool check_mapper45_window(const std::filesystem::path& dir) {
+    const std::filesystem::path rom = dir / "a2_mapper_45.nes";
+    FCEUGI* gi = fceu11::LoadGame(rom.string().c_str(), 1, true);
+    if (!gi) {
+        printf("FAIL: the mapper 45 ROM did not load\n");
+        return false;
+    }
+    bool ok = true;
+    // The board's power function resets EXPREGS[0..5].
+    for (int i = 0; i < 6; ++i) {
+        if (EXPREGS[i] != 0) {
+            printf("FAIL: mapper 45: EXPREGS[%d] is 0x%02X, expected 0\n",
+                   i, EXPREGS[i]);
+            ok = false;
+        }
+    }
+    // A write to $5000 must NOT reach the board's handler (that would be the
+    // negative-index WRAM write).
+    X6502_DMW(0x5000, 0x5A);
+    if (EXPREGS[0] != 0) {
+        printf("FAIL: mapper 45: a write to $5000 reached the board's handler "
+               "(EXPREGS[0] = 0x%02X) -- the write window must start at $6000\n",
+               EXPREGS[0]);
+        ok = false;
+    }
+    // ... and a write to $6000 must reach it.
+    X6502_DMW(0x6000, 0x5A);
+    if (EXPREGS[0] != 0x5A) {
+        printf("FAIL: mapper 45: a write to $6000 did not reach the board's "
+               "handler (EXPREGS[0] = 0x%02X, expected 0x5A)\n", EXPREGS[0]);
+        ok = false;
+    }
+    // The window identity: $5000 and $6000 have different write handlers.
+    const bool split = (GetWriteHandler(0x5000) != GetWriteHandler(0x6000));
+    printf("      write handlers $5000 != $6000: %d\n", split ? 1 : 0);
+    if (!split) {
+        printf("FAIL: mapper 45: $5000 and $6000 share the same write handler "
+               "-- the window was not narrowed to $6000-$7FFF\n");
+        ok = false;
+    }
+    fceu11::CloseGame();
+    return ok;
+}
+
 int main() {
     setvbuf(stdout, NULL, _IONBF, 0);
     printf("=== Mapper Load Test ===\n\n");
@@ -701,6 +991,47 @@ int main() {
     if (!check_mapper252_power(sweep_dir)) failed = true;
 
     if (!check_registered_forwarder_controls()) failed = true;
+
+    // ==================== v2.0.5 A2 ====================
+    // The 18 MMC3-family boards whose own power function was swallowed by
+    // CartInfo_PowerForward (and mapper 45's write window, A4).
+    printf("\n--- v2.0.5 A2: MMC3-family board power wiring ---\n");
+    {
+        std::error_code ec;
+        std::filesystem::create_directories(sweep_dir, ec);
+    }
+    printf("[A2] generic MMC3 control ... ");
+    if (check_a2_generic_control()) {
+        printf("OK\n");
+    } else {
+        failed = true;
+    }
+    for (int i = 0; i < NUM_A2_CASES; ++i) {
+        const A2Case& c = kA2Cases[i];
+        printf("[A2] mapper %3u ... ", c.mapper);
+        if (check_a2_case(c, sweep_dir)) {
+            printf("OK\n");
+        } else {
+            printf("FAILED\n");
+            failed = true;
+        }
+    }
+    // Mapper 245 is wired too, but it gets NO behavioral lock: M245Power
+    // seeds EXPREGS[0]=0 and then calls GenMMC3Power(), whose MMC3RegReset
+    // -> FixMMC3CHR -> cwrap -> M245CW immediately overwrites EXPREGS[0]
+    // with a CHR bank value (0x07 after the reset).  The board path and the
+    // base-class path therefore end in the SAME observable state, so no
+    // lock can tell them apart.  The override is kept because it is the
+    // semantically correct thing to do -- but it is honestly NOT covered.
+    printf("[A2] mapper 245 ... NO LOCK (M245Power is observationally "
+           "identical to GenMMC3Power: the EXPREGS[0] it seeds is "
+           "immediately overwritten by its own CHR wrap M245CW)\n");
+    printf("[A2] mapper  45 write window (A4) ... ");
+    if (check_mapper45_window(sweep_dir)) {
+        printf("OK\n");
+    } else {
+        failed = true;
+    }
 
     // v2.0.5 BUG-V205-01: a ROM whose CHR bank count is not a power of two
     // must load, with the file's CHR bytes in place and 0xFF padding after

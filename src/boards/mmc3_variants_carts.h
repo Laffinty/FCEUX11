@@ -29,6 +29,37 @@
 //     which would leave EXPREGS at zero — the 0xC000/0xE000 windows would
 //     then point at PRG bank 0 and the game would run the wrong code — so
 //     Mapper199Cart overrides on_power().
+//
+// v2.0.5 A2 (2026-11-17): the same defect applies to 18 MORE of these
+// classes, not just 198/199.  The loader overwrites info->Power with
+// CartInfo_PowerForward whenever the registry produced a Cart object
+// (src/ines.cpp), so for every REGISTERED mapper the board's own
+// `info->Power = MxxPower` assignment never runs.  Mmc3BaseCart::on_power()
+// hardcodes GenMMC3Power(), which installs only the generic MMC3 command /
+// IRQ handlers — the per-board write and read windows, the EXPREGS seeds
+// and the extra IRQ wiring of those 18 boards were therefore NEVER
+// installed, and the boards could not work.
+//
+// The fix is per class: each of the 18 overrides calls its own board power
+// function directly (the same pattern as the pre-existing Mapper198Cart /
+// Mapper199Cart overrides; the board power functions are no longer static,
+// they are declared in mmc3.cpp and, for mapper 116, in 116.cpp).
+//
+// The numbers (18): 12 37 44 45 47 49 52 114 115 116 165 195 205 245 249
+// 250 254 406.  The v2.0.5 plan §1.4(B) listed 17 of them — mapper 165 was
+// missing from that list (Mapper165_Init sets info->Power = M165Power and
+// mapper 165 IS registered, so M165Power was being swallowed as well); the
+// list was corrected to 18 when the wiring was implemented.
+//
+// The boards that must keep the base class behavior are the ones whose Init
+// leaves info->Power at GenMMC3Power: 74, 118, 119, 191, 192, 194 (plus 165
+// before this change).  Those must NOT get an override — the base class is
+// exactly right for them.
+//
+// ⚠️ The board-specific RESET functions (info->Reset = M12Reset / M37Reset
+// / M45Reset / M49Reset / M52Reset / M114Reset / M205Reset) are swallowed by
+// CartInfo_ResetForward in exactly the same way and are still NOT wired —
+// see the v2.0.5 plan's observation register.  This change is on_power only.
 
 #ifndef FCEU11_BOARDS_MMC3_VARIANTS_CARTS_H
 #define FCEU11_BOARDS_MMC3_VARIANTS_CARTS_H
@@ -37,24 +68,47 @@
 
 namespace fceu11 {
 
-class Mapper12Cart  : public Mmc3BaseCart { public: explicit Mapper12Cart(Bus& bus) noexcept  : Mmc3BaseCart(bus) {} };
-class Mapper37Cart  : public Mmc3BaseCart { public: explicit Mapper37Cart(Bus& bus) noexcept  : Mmc3BaseCart(bus) {} };
-class Mapper44Cart  : public Mmc3BaseCart { public: explicit Mapper44Cart(Bus& bus) noexcept  : Mmc3BaseCart(bus) {} };
-class Mapper45Cart  : public Mmc3BaseCart { public: explicit Mapper45Cart(Bus& bus) noexcept  : Mmc3BaseCart(bus) {} };
-class Mapper47Cart  : public Mmc3BaseCart { public: explicit Mapper47Cart(Bus& bus) noexcept  : Mmc3BaseCart(bus) {} };
-class Mapper49Cart  : public Mmc3BaseCart { public: explicit Mapper49Cart(Bus& bus) noexcept  : Mmc3BaseCart(bus) {} };
-class Mapper52Cart  : public Mmc3BaseCart { public: explicit Mapper52Cart(Bus& bus) noexcept  : Mmc3BaseCart(bus) {} };
+// v2.0.5 A2: the 18 classes whose board has its own power function override
+// on_power() and call that function directly.  See the file header comment
+// above for why the legacy `info->Power` assignment cannot be relied on.
+#define FCEUX11_MMC3_VARIANT_CART_WITH_POWER(name)                          \
+    class name : public Mmc3BaseCart {                                      \
+    public:                                                                \
+        explicit name(Bus& bus) noexcept : Mmc3BaseCart(bus) {}            \
+        void on_power() noexcept override;                                  \
+    }
+
+FCEUX11_MMC3_VARIANT_CART_WITH_POWER(Mapper12Cart);
+FCEUX11_MMC3_VARIANT_CART_WITH_POWER(Mapper37Cart);
+FCEUX11_MMC3_VARIANT_CART_WITH_POWER(Mapper44Cart);
+FCEUX11_MMC3_VARIANT_CART_WITH_POWER(Mapper45Cart);
+FCEUX11_MMC3_VARIANT_CART_WITH_POWER(Mapper47Cart);
+FCEUX11_MMC3_VARIANT_CART_WITH_POWER(Mapper49Cart);
+FCEUX11_MMC3_VARIANT_CART_WITH_POWER(Mapper52Cart);
+FCEUX11_MMC3_VARIANT_CART_WITH_POWER(Mapper114Cart);
+FCEUX11_MMC3_VARIANT_CART_WITH_POWER(Mapper115Cart);
+FCEUX11_MMC3_VARIANT_CART_WITH_POWER(Mapper116Cart);
+FCEUX11_MMC3_VARIANT_CART_WITH_POWER(Mapper165Cart);
+FCEUX11_MMC3_VARIANT_CART_WITH_POWER(Mapper195Cart);
+FCEUX11_MMC3_VARIANT_CART_WITH_POWER(Mapper205Cart);
+FCEUX11_MMC3_VARIANT_CART_WITH_POWER(Mapper245Cart);
+FCEUX11_MMC3_VARIANT_CART_WITH_POWER(Mapper249Cart);
+FCEUX11_MMC3_VARIANT_CART_WITH_POWER(Mapper250Cart);
+FCEUX11_MMC3_VARIANT_CART_WITH_POWER(Mapper254Cart);
+FCEUX11_MMC3_VARIANT_CART_WITH_POWER(Mapper406Cart);
+
+#undef FCEUX11_MMC3_VARIANT_CART_WITH_POWER
+
+// Boards with NO power function of their own -- the base class
+// (GenMMC3Power) is exactly right for these, so they must NOT override
+// on_power().  Do not add an override here by analogy: the base class
+// would then run the wrong power function.
 class Mapper74Cart  : public Mmc3BaseCart { public: explicit Mapper74Cart(Bus& bus) noexcept  : Mmc3BaseCart(bus) {} };
-class Mapper114Cart : public Mmc3BaseCart { public: explicit Mapper114Cart(Bus& bus) noexcept : Mmc3BaseCart(bus) {} };
-class Mapper115Cart : public Mmc3BaseCart { public: explicit Mapper115Cart(Bus& bus) noexcept : Mmc3BaseCart(bus) {} };
-class Mapper116Cart : public Mmc3BaseCart { public: explicit Mapper116Cart(Bus& bus) noexcept : Mmc3BaseCart(bus) {} };
 class Mapper118Cart : public Mmc3BaseCart { public: explicit Mapper118Cart(Bus& bus) noexcept : Mmc3BaseCart(bus) {} };
 class Mapper119Cart : public Mmc3BaseCart { public: explicit Mapper119Cart(Bus& bus) noexcept : Mmc3BaseCart(bus) {} };
-class Mapper165Cart : public Mmc3BaseCart { public: explicit Mapper165Cart(Bus& bus) noexcept : Mmc3BaseCart(bus) {} };
 class Mapper192Cart : public Mmc3BaseCart { public: explicit Mapper192Cart(Bus& bus) noexcept : Mmc3BaseCart(bus) {} };
 class Mapper191Cart : public Mmc3BaseCart { public: explicit Mapper191Cart(Bus& bus) noexcept : Mmc3BaseCart(bus) {} };
 class Mapper194Cart : public Mmc3BaseCart { public: explicit Mapper194Cart(Bus& bus) noexcept : Mmc3BaseCart(bus) {} };
-class Mapper195Cart : public Mmc3BaseCart { public: explicit Mapper195Cart(Bus& bus) noexcept : Mmc3BaseCart(bus) {} };
 class Mapper198Cart : public Mmc3BaseCart {
 public:
     explicit Mapper198Cart(Bus& bus) noexcept : Mmc3BaseCart(bus) {}
@@ -74,12 +128,6 @@ public:
     // enough for this one.
     void on_power() noexcept override;
 };
-class Mapper205Cart : public Mmc3BaseCart { public: explicit Mapper205Cart(Bus& bus) noexcept : Mmc3BaseCart(bus) {} };
-class Mapper245Cart : public Mmc3BaseCart { public: explicit Mapper245Cart(Bus& bus) noexcept : Mmc3BaseCart(bus) {} };
-class Mapper249Cart : public Mmc3BaseCart { public: explicit Mapper249Cart(Bus& bus) noexcept : Mmc3BaseCart(bus) {} };
-class Mapper250Cart : public Mmc3BaseCart { public: explicit Mapper250Cart(Bus& bus) noexcept : Mmc3BaseCart(bus) {} };
-class Mapper254Cart : public Mmc3BaseCart { public: explicit Mapper254Cart(Bus& bus) noexcept : Mmc3BaseCart(bus) {} };
-class Mapper406Cart : public Mmc3BaseCart { public: explicit Mapper406Cart(Bus& bus) noexcept : Mmc3BaseCart(bus) {} };
 
 } // namespace fceu11
 
