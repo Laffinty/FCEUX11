@@ -1740,4 +1740,131 @@ mod tests {
             assert_eq!(parse.mapper_no, 198);
         }
     }
+
+    /// v2.0.5 A3: the ROM-correction rows whose upstream mapper/mirror field is
+    /// a C EXPRESSION.
+    ///
+    /// Upstream's `src/ines-correct.h` writes some mapper numbers as bit-flag
+    /// expressions -- `256|0x1000`, `51|0x800` -- and one mirror as `0x10|4`.
+    /// The extractor that produced this repo's live table could not evaluate
+    /// expressions, so those rows were dropped WHOLE: the carts loaded with
+    /// the mapper number in their header instead of the corrected one. 22 rows
+    /// were lost that way.
+    ///
+    /// The lock pins the LOOKUP result for each of them -- the mapper number
+    /// the loader will actually use, the 0x1000 (12-bit mapper) and 0x800
+    /// (clear CHR ROM) flag semantics, and the mirror -- so a future
+    /// re-extraction that loses the expressions again turns red.
+    ///
+    /// The expected values are written out by hand from upstream's table, NOT
+    /// recomputed from the same expressions: a test that re-derives its
+    /// expectation with the implementation's own arithmetic agrees with a
+    /// wrong implementation.
+    #[test]
+    fn the_c_expression_correction_rows_reach_the_loader() {
+        // (crc32, expected mapper, expected mapper_mask, expected clear_vrom,
+        //  expected mirror)   -- mirror -2 means "no change"
+        let cases: &[(u32, i32, i32, i32, i32)] = &[
+            // {0xa912b064, 51|0x800, 8} -- 11-in-1 Ball Games (CHR ROM when
+            // it shouldn't have one): mapper 51, and the 0x800 flag means
+            // "clear the CHR ROM".
+            (0xa912b064, 51, 0xFF, 1, 8),
+            // {0x1d75fd35, 256|0x1000, -1} -- 2-in-1 Street Dance + Hit Mouse
+            (0x1d75fd35, 256, 0xFFF, 0, -2),
+            // {0x6eef8bb7, 257|0x1000, -1} -- PEC-586 Chinese
+            (0x6eef8bb7, 257, 0xFFF, 0, -2),
+            // {0xac7e98fb, 257|0x1000, -1} -- PEC-586 Chinese No Tape Out
+            (0xac7e98fb, 257, 0xFFF, 0, -2),
+            // {0x8d51a23b, 257|0x1000, -1} -- Chao Ji Wu Bi Han Ka (C) V1
+            (0x8d51a23b, 257, 0xFFF, 0, -2),
+            // {0x25c76773, 257|0x1000, -1} -- Chao Ji Wu Bi Han Ka (C) V2
+            (0x25c76773, 257, 0xFFF, 0, -2),
+            // {0x1ca9c322, 258|0x1000, -1} -- Blood Of Jurassic (GD-98)
+            (0x1ca9c322, 258, 0xFFF, 0, -2),
+            // {0x2469c1ae, 259|0x1000, -1} -- 150-in-1 Unchained FIGHT
+            (0x2469c1ae, 259, 0xFFF, 0, -2),
+            // {0x99d4464f, 260|0x1000, -1} -- HP10xx/HP20xx board dumps
+            (0x99d4464f, 260, 0xFFF, 0, -2),
+            (0xb72b2cf4, 260, 0xFFF, 0, -2),
+            (0x4dc6107d, 260, 0xFFF, 0, -2),
+            (0x0073dbd8, 260, 0xFFF, 0, -2),
+            (0x3b098344, 260, 0xFFF, 0, -2),
+            (0x1fc640c0, 260, 0xFFF, 0, -2),
+            (0x2f1ad1fc, 260, 0xFFF, 0, -2),
+            (0xa22214bb, 260, 0xFFF, 0, -2),
+            (0x5dd9073b, 260, 0xFFF, 0, -2),
+            (0x26a36cc2, 260, 0xFFF, 0, -2),
+            (0xd1e52b37, 260, 0xFFF, 0, -2),
+            (0x4d4a0e1b, 260, 0xFFF, 0, -2),
+            (0xb6dd2c9d, 260, 0xFFF, 0, -2),
+            // {0xb02fcb57, 406|0x1000, -1} -- Haradius Zero ver 1.2a 2019
+            (0xb02fcb57, 406, 0xFFF, 0, -2),
+        ];
+        assert_eq!(cases.len(), 22, "all 22 expression rows must be covered");
+        for &(crc, mapper, mask, clear_vrom, mirror) in cases {
+            let mut res = FceuInesHInfoResult {
+                mapper: -1,
+                mapper_mask: 0,
+                mirror: -2,
+                force_battery: 0,
+                clear_vrom: 0,
+            };
+            unsafe { fceux11_rust_ines_check_hinfo(crc, 0, &mut res) };
+            assert_eq!(res.mapper, mapper, "crc 0x{:08x}: mapper", crc);
+            assert_eq!(res.mapper_mask, mask, "crc 0x{:08x}: mapper_mask", crc);
+            assert_eq!(res.clear_vrom, clear_vrom, "crc 0x{:08x}: clear_vrom", crc);
+            assert_eq!(res.mirror, mirror, "crc 0x{:08x}: mirror", crc);
+        }
+    }
+
+    /// v2.0.5 A3: the two rows whose values upstream corrected after this
+    /// repo's table was extracted.
+    ///
+    /// * `0x243a8735` (Major League): upstream's mirror is `0x10|4` = 20.
+    ///   The old extractor could not evaluate it and wrote 0, which degrades
+    ///   the cart's one-screen mirroring to horizontal.  The C++ loader
+    ///   handles `Mirroring >= 0x10` the same way upstream does
+    ///   (`SetupCartMirroring(2 + (Mirroring & 1), 1, 0)`).
+    /// * `0x0da5e32e` (Urusei Yatsura): upstream corrected the mapper from
+    ///   101 to 87 and the mirror from -1 to 1 -- the cart used to be loaded
+    ///   as a completely different board.
+    ///
+    /// The negative assertion pins the other direction: `0xF3C85DC3` is the
+    /// CRC of a whole FILE, not a table key -- it must keep missing, or the
+    /// lookup would start correcting carts it has no business correcting.
+    #[test]
+    fn the_two_corrected_correction_rows_match_upstream() {
+        let mut major_league = FceuInesHInfoResult {
+            mapper: -1,
+            mapper_mask: 0,
+            mirror: -2,
+            force_battery: 0,
+            clear_vrom: 0,
+        };
+        unsafe { fceux11_rust_ines_check_hinfo(0x243a8735, 0, &mut major_league) };
+        assert_eq!(major_league.mapper, 32, "Major League: mapper");
+        assert_eq!(major_league.mirror, 20, "Major League: mirror (0x10|4)");
+
+        let mut urusei = FceuInesHInfoResult {
+            mapper: -1,
+            mapper_mask: 0,
+            mirror: -2,
+            force_battery: 0,
+            clear_vrom: 0,
+        };
+        unsafe { fceux11_rust_ines_check_hinfo(0x0da5e32e, 0, &mut urusei) };
+        assert_eq!(urusei.mapper, 87, "Urusei Yatsura: mapper");
+        assert_eq!(urusei.mirror, 1, "Urusei Yatsura: mirror");
+
+        let mut not_a_key = FceuInesHInfoResult {
+            mapper: -1,
+            mapper_mask: 0,
+            mirror: -2,
+            force_battery: 0,
+            clear_vrom: 0,
+        };
+        unsafe { fceux11_rust_ines_check_hinfo(0xF3C85DC3, 0, &mut not_a_key) };
+        assert_eq!(not_a_key.mapper, -1, "a whole-file CRC must not hit the table");
+        assert_eq!(not_a_key.mirror, -2, "a whole-file CRC must not hit the table");
+    }
 }

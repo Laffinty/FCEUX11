@@ -1526,7 +1526,7 @@ pub static ROM_CORRECTIONS: &[RomCorrection] = &[
     RomCorrection {
         crc32: 0x243a8735,
         mapper: 32,
-        mirror: 0,
+        mirror: 20,
     },
     RomCorrection {
         crc32: 0xbc7b1d0f,
@@ -1596,6 +1596,11 @@ pub static ROM_CORRECTIONS: &[RomCorrection] = &[
     RomCorrection {
         crc32: 0x1500e835,
         mapper: 48,
+        mirror: 8,
+    },
+    RomCorrection {
+        crc32: 0xa912b064,
+        mapper: 2099,
         mirror: 8,
     },
     RomCorrection {
@@ -1699,6 +1704,11 @@ pub static ROM_CORRECTIONS: &[RomCorrection] = &[
         mirror: 1,
     },
     RomCorrection {
+        crc32: 0x0da5e32e,
+        mapper: 87,
+        mirror: 1,
+    },
+    RomCorrection {
         crc32: 0xd2699893,
         mapper: 88,
         mirror: 0,
@@ -1707,11 +1717,6 @@ pub static ROM_CORRECTIONS: &[RomCorrection] = &[
         crc32: 0xbb7c5f7a,
         mapper: 89,
         mirror: 8,
-    },
-    RomCorrection {
-        crc32: 0x0da5e32e,
-        mapper: 101,
-        mirror: -1,
     },
     RomCorrection {
         crc32: 0x8eab381c,
@@ -2326,6 +2331,111 @@ pub static ROM_CORRECTIONS: &[RomCorrection] = &[
     RomCorrection {
         crc32: 0x57514c6c,
         mapper: 245,
+        mirror: -1,
+    },
+    RomCorrection {
+        crc32: 0x1d75fd35,
+        mapper: 4352,
+        mirror: -1,
+    },
+    RomCorrection {
+        crc32: 0x6eef8bb7,
+        mapper: 4353,
+        mirror: -1,
+    },
+    RomCorrection {
+        crc32: 0xac7e98fb,
+        mapper: 4353,
+        mirror: -1,
+    },
+    RomCorrection {
+        crc32: 0x8d51a23b,
+        mapper: 4353,
+        mirror: -1,
+    },
+    RomCorrection {
+        crc32: 0x25c76773,
+        mapper: 4353,
+        mirror: -1,
+    },
+    RomCorrection {
+        crc32: 0x1ca9c322,
+        mapper: 4354,
+        mirror: -1,
+    },
+    RomCorrection {
+        crc32: 0x2469c1ae,
+        mapper: 4355,
+        mirror: -1,
+    },
+    RomCorrection {
+        crc32: 0x99d4464f,
+        mapper: 4356,
+        mirror: -1,
+    },
+    RomCorrection {
+        crc32: 0xb72b2cf4,
+        mapper: 4356,
+        mirror: -1,
+    },
+    RomCorrection {
+        crc32: 0x4dc6107d,
+        mapper: 4356,
+        mirror: -1,
+    },
+    RomCorrection {
+        crc32: 0x0073dbd8,
+        mapper: 4356,
+        mirror: -1,
+    },
+    RomCorrection {
+        crc32: 0x3b098344,
+        mapper: 4356,
+        mirror: -1,
+    },
+    RomCorrection {
+        crc32: 0x1fc640c0,
+        mapper: 4356,
+        mirror: -1,
+    },
+    RomCorrection {
+        crc32: 0x2f1ad1fc,
+        mapper: 4356,
+        mirror: -1,
+    },
+    RomCorrection {
+        crc32: 0xa22214bb,
+        mapper: 4356,
+        mirror: -1,
+    },
+    RomCorrection {
+        crc32: 0x5dd9073b,
+        mapper: 4356,
+        mirror: -1,
+    },
+    RomCorrection {
+        crc32: 0x26a36cc2,
+        mapper: 4356,
+        mirror: -1,
+    },
+    RomCorrection {
+        crc32: 0xd1e52b37,
+        mapper: 4356,
+        mirror: -1,
+    },
+    RomCorrection {
+        crc32: 0x4d4a0e1b,
+        mapper: 4356,
+        mirror: -1,
+    },
+    RomCorrection {
+        crc32: 0xb6dd2c9d,
+        mapper: 4356,
+        mirror: -1,
+    },
+    RomCorrection {
+        crc32: 0xb02fcb57,
+        mapper: 4502,
         mirror: -1,
     },
     RomCorrection {
