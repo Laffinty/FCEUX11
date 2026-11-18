@@ -207,13 +207,10 @@ jobs:
         run: |
           ctest --test-dir build --build-config Release --output-on-failure -LE perf 2>&1 | Tee-Object -FilePath ctest-output.txt
           $ctestExit = $LASTEXITCODE
-          {
-            "## CTest output"
-            ""
-            "```"
-            Get-Content ctest-output.txt -Tail 600
-            "```"
-          } | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          $lines = Get-Content ctest-output.txt -Tail 800
+          $summary = @("## CTest output", "") + $lines
+          Set-Content -Path $env:GITHUB_STEP_SUMMARY -Value $summary -Encoding utf8
+          Get-Content ctest-output.txt | Select-String -Pattern "movie.roundtrip|WATCHDOG|The following tests FAILED" | ForEach-Object { Write-Host ("::error::" + $_.Line) }
           exit $ctestExit
 
       # v1.3 Legion Phase 7.2: Golden savestate drift check.
