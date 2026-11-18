@@ -212,3 +212,6 @@ build/*_output*.txt
 # that a reference checkout has somewhere to live that git will not see.
 # ---------------------------------------------------------------------------
 /Research_only/
+
+# r14: ctest output captured by the CI diagnostics step
+ctest-output.txt
