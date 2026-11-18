@@ -89,8 +89,20 @@ Launch `fceux11.exe`, load a game via **File → Open ROM** (NES: `.nes` / `.fds
 
 ## 版本历史 / Changelog
 
-详见 [CHANGELOG.md](CHANGELOG.md)。当前主线为 **v2.0.5**（上游 mapper 能力对齐 + 加载路径两项卡死修复；上一稳定发布 **v2.0.4**）。
-See [CHANGELOG.md](CHANGELOG.md). Mainline is **v2.0.5** (upstream mapper alignment plus two stall fixes on the ROM-load path; previous stable **v2.0.4**).
+完整记录见 [CHANGELOG.md](CHANGELOG.md)。当前主线为 **v2.0.5**（上一稳定发布 **v2.0.4_hotfix2**）；2.0 之前的版本同样只在该文件中。
+Full history in [CHANGELOG.md](CHANGELOG.md). Mainline is **v2.0.5** (previous stable: **v2.0.4_hotfix2**); pre-2.0 releases live in that file as well.
+
+| 版本 / Version | 中文 | English |
+|----------------|------|---------|
+| **v2.0.5**（2026-11-18） | 上游 mapper 能力对齐：75 个 mapper 号恢复板级上电、MMC3 家族 18 个变体接回、新增 mapper 471、ROM 矫正表补 22 条；另修加载卡顿、命令行加载与录制空档。 | Upstream mapper alignment: board-level power-up restored for 75 mapper numbers, 18 MMC3 variants reconnected, mapper 471 added, 22 more ROM-correction rows; also fixes for loading stalls, command-line loading and empty recordings. |
+| **v2.0.4_hotfix2**（2026-11-17） | 修复 `--no-console` 吞掉命令行 ROM，以及「关闭 ROM」后立刻「打开 ROM」的 GUI 卡死。 | Fixed `--no-console` swallowing a command-line ROM, and the GUI freezing when a ROM is reopened right after closing one. |
+| **v2.0.4_hotfix1**（2026-11-16） | 修复 CHR 数量非 2 幂的合法 iNES 卡带被判为「未知格式」。 | Fixed valid iNES cartridges with a non-power-of-two CHR count being rejected as an unknown format. |
+| **v2.0.4**（2026-11-15） | 残留精度与调试待办收口（20/22 项落地）。 | Accuracy and debugging backlog closed out (20 of 22 items landed). |
+| **v2.0.3**（2026-11-12） | GBA 卡带兼容性线收口（BIOS SWI 实现、存档芯片模型、ROM 窗口）。 | GBA cartridge-compatibility line closed out (BIOS SWI implementations, save-chip model, ROM window). |
+| **v2.0.2_hotfix1**（2026-11-10） | FC 侧修复批次（iNES loader、mapper 191/199）+ GBA 在途成果。 | FC-side fix batch (iNES loader, mappers 191/199) plus in-flight GBA work. |
+| **v2.0.2**（2026-11-08） | DEBUG 与性能优化：NES 四条热路径整体下移（full 帧 −34%）。 | Debug and performance: four NES hot paths moved down (full frame −34%). |
+| **v2.0.1**（2026-10-07） | GBA 精度优化（AGS 25/33 → 30/33）与 DMA、定时器计时修正。 | GBA accuracy work (AGS 25/33 → 30/33) plus DMA and timer timing fixes. |
+| **v2.0.0**（2026-10-03） | GBAEUX11 v2.0 落地：GBA 模拟支持并入主线。 | GBAEUX11 v2.0 landed: GBA emulation support merged into the mainline. |
 
 ### v2.0.5 行为变更 / Behaviour changes in v2.0.5
 
