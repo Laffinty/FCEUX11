@@ -417,7 +417,7 @@ static void M4Power(void) {
 }
 
 // v2.0.5 r14: the A5 NES 2.0 PRG-RAM sizing branch was REVERTED (the full
-// analysis is in docs/plans/FCEUX11-v2.0.5_构建计划.md, A5 / 9.24).
+// analysis is in docs/history/plans/FCEUX11-v2.0.5_构建计划.md, A5 / 9.25).
 //
 // Upstream FCEUX 2.8.0 (src/boards/mmc3.cpp:363-375) forwards the header's
 // declared PRG-RAM size straight into the MMC3 WRAM size:

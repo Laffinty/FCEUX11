@@ -1,6 +1,10 @@
 # Upstream issue draft — mapper 4 (MMC3) NES 2.0 PRG-RAM size forwarded verbatim
 
-> **状态：草稿，未发布。** 待业主审阅后决定是否向上游（FCEUX）提交。
+> 📌 **已归档（2026-11-18）**：自 `docs/plans/` 移入 `docs/history/plans/`。
+> 它是「mapper 4 的 NES 2.0 PRG-RAM」上游反馈的**草稿且未发布**（业主未拍板；项目已于 r14 回退 A5）。
+> 若要提交：按文首约定**删除全部中文对照段**后只发英文，并先经业主审阅。
+>
+> ~~**状态：草稿，未发布。**~~（以下为原文，保留作档案） 待业主审阅后决定是否向上游（FCEUX）提交。
 > 上游仓库：`https://github.com/TASEmulators/fceux`（2.8.0 开发版）。
 > 按业主偏好：**介绍性段落英中对照，技术正文纯英文**；发布前请删除所有中文对照段。
 

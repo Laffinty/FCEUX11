@@ -121,7 +121,7 @@
 // ⚠️ **A5（mapper 4 的 NES 2.0 PRG-RAM）已回退**：上游 2.8.0 把头声明的 PRG-RAM
 // 大小原样转成 MMC3 的 WRAM 尺寸，会让声明 0 的 mapper 4 卡带（ tepples
 // mmc3bigchrram 与本仓 6 个 fixture 全是这类）失去 $6000-$7FFF ⇒ 本仓 mapper 4
-// 的 WRAM 恒 8 KiB（完整根因见 docs/plans/FCEUX11-v2.0.5_构建计划.md §9.25）。
+// 的 WRAM 恒 8 KiB（完整根因见 docs/history/plans/FCEUX11-v2.0.5_构建计划.md §9.25）。
 //
 // ⚠️ **整版数值随惯例递增**（v2.0.4 → v2.0.5，即公式值 20004 → 20005）；该字段进
 // FCSX 电影模式存档头（state.cpp:397）与录像头（movie_record.cpp:591），但读取侧
