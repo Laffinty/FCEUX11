@@ -1057,34 +1057,49 @@ static bool check_mapper471_latch(const std::filesystem::path& dir) {
 
 // ==================== v2.0.5 A5: mapper 4 NES 2.0 PRG-RAM ====================
 //
-// Mapper4_Init sized the MMC3 WRAM from a hardcoded default (8 KiB) plus the
-// CRC32 Low-G-Man workaround, ignoring the NES 2.0 header's PRG-RAM shift
-// nibbles.  The fix (upstream 2.8.0 src/boards/mmc3.cpp:363-375) converts the
-// CartInfo byte counts -- wram_size + battery_wram_size, each "64 << shift"
-// bytes per the NESdev NES 2.0 header spec (bytes 10/11), already decoded by
-// the loader (ines.rs:563-571 -> ines_load.cpp:176-183, cart.h:85-88) -- into
-// the KiB unit GenMMC3_Init() expects, and demotes the Low-G-Man CRC branch to
-// `else if` so it cannot override a real NES 2.0 declaration.
+// (r14 rewrite -- the A5 branch was REVERTED; see the plan doc, A5 / 9.24.)
+//
+// Mapper4_Init sizes the MMC3 WRAM.  A5 (r13) adopted upstream 2.8.0's branch
+// (src/boards/mmc3.cpp:363-375):
+//
+//     if (info->ines2) ws = (info->wram_size + info->battery_wram_size) / 1024;
+//
+// which forwards the NES 2.0 header's declared PRG-RAM size straight into the
+// WRAM size.  That is wrong for MMC3: the chip carries exactly ONE 8 KiB PRG
+// RAM at $6000-$7FFF (NESdev "MMC3": "PRG RAM: Up to 8 KB"), so a declared
+// size can only mean "present" (8 KiB) or "absent" (0) -- never 1 KiB,
+// 32 KiB, ...  Forwarding it raw therefore dropped the WRAM of every mapper 4
+// cartridge whose header declares 0 (the chip is optional, so dump tools
+// leave it at 0): all six mapper 4 + NES 2.0 fixtures in this repo, and
+// tepples' mmc3bigchrram -- which uses $6000 as its test-result channel.
+// F11QA kgmqa-075 went PASS -> FAIL and the R4 gate flagged a pass_to_fail.
+//
+// The mapper 4 WRAM is therefore back to the hardware truth: 8 KiB,
+// regardless of what the header declares.  The locks below pin that.
 //
 // The observable is WRAMSIZE (src/boards/mmc3.cpp:73, `uint32 WRAMSIZE`, set
 // by GenMMC3_Init as `wram << 10`), read straight after each load:
-//   * leg 1  NES 2.0 mapper 4, byte-10 LOW nibble shift = 4 -> 64<<4 = 1024
-//            bytes -> ws = 1 -> WRAMSIZE == 1024.  (In this repo's loader the
-//            LOW nibble of byte 10 is wram_size and the HIGH nibble is
-//            battery_wram_size -- ines.rs:564-565.)
+//   * leg 1  NES 2.0 mapper 4, byte-10 LOW nibble shift = 0 (the real-world
+//            case: the optional chip is simply not declared) -> WRAMSIZE ==
+//            8192.  This is the leg the old lock was missing, and it is the
+//            one that catches the regression: with the upstream formula the
+//            declared size is 0 -> ws = 0 -> no WRAM at all -> RED.
 //   * leg 2  control: the iNES 1.0 fixture mapper_mmc3.nes must keep the
 //            hardcoded default, WRAMSIZE == 8192 -- pins the reverse guard
 //            (the non-NES 2.0 path is untouched).
-//   * leg 3  both nibbles (shift 3 + shift 3 -> 512 + 512 = 1024 bytes) ->
-//            ws = 1 -> WRAMSIZE == 1024: pins the SUM, so a mutation that
-//            drops battery_wram_size from it goes red (leg 1 cannot see that
-//            mutation: its battery nibble is 0).
+//   * leg 3  NES 2.0 mapper 4, byte-10 LOW nibble shift = 4 (a size MMC3
+//            cannot have) -> WRAMSIZE == 8192 as well.  This leg exists purely
+//            to prove the declared size is NOT forwarded: the upstream
+//            formula would yield 64<<4 = 1024 bytes -> 1024 -> RED.
+//   * leg 4  NES 2.0 mapper 4, byte-10 HIGH nibble (battery) shift = 4 ->
+//            WRAMSIZE == 8192, for the same reason against the battery half
+//            of the upstream formula.
 //
 // Mutation legs this section guards:
-//   M1: delete the `if (info->ines2)` branch        -> leg 1 + leg 3 red
-//   M2: `int ws = 8;` -> `int ws = 1;`              -> leg 2 red
-//   M3: the sum -> `info->wram_size / 1024`         -> leg 3 red (legs 1/2
-//       stay green)
+//   M1: restore the reverted A5 branch
+//       (`ws = (info->wram_size + info->battery_wram_size) / 1024`)
+//                                                          -> legs 1 + 3 + 4 red
+//   M2: `int ws = 8;` -> `int ws = 1;`                   -> all legs red
 
 extern uint32 WRAMSIZE;  // src/boards/mmc3.cpp:73 (GenMMC3_Init: WRAMSIZE = wram << 10)
 
@@ -1127,9 +1142,11 @@ static bool check_a5_mapper4_nes2_wram(const std::filesystem::path& dir) {
     std::filesystem::create_directories(dir, ec);  // the sweep may have removed it
     bool ok = true;
 
-    // Leg 1: NES 2.0, wram shift nibble = 4 -> 64<<4 = 1024 bytes -> ws = 1.
-    const std::filesystem::path rom = dir / "a5_mapper4_nes2.nes";
-    if (!write_nes2_mapper4_rom(rom, 4, 0)) {
+    // Leg 1: NES 2.0 with the PRG-RAM shift nibble = 0 -- the real-world
+    // case (the optional 8 KiB chip is simply not declared).  The WRAM must
+    // still be there: 8192.
+    const std::filesystem::path rom = dir / "a5_mapper4_nes2_zero.nes";
+    if (!write_nes2_mapper4_rom(rom, 0, 0)) {
         printf("FAIL: cannot write the NES 2.0 mapper 4 ROM\n");
         return false;
     }
@@ -1144,11 +1161,12 @@ static bool check_a5_mapper4_nes2_wram(const std::filesystem::path& dir) {
         fceu11::CloseGame();
         return false;
     }
-    printf("      NES 2.0 shift=4 (64<<4 = 1024 bytes): WRAMSIZE = %u "
-           "(expected 1024)\n", static_cast<unsigned>(WRAMSIZE));
-    if (WRAMSIZE != 1024) {
-        printf("FAIL: NES 2.0 mapper 4 with PRG-RAM shift 4 gave WRAMSIZE %u, "
-               "expected 1024 -- the ines2 branch did not run\n",
+    printf("      NES 2.0 shift=0 (chip not declared): WRAMSIZE = %u "
+           "(expected 8192)\n", static_cast<unsigned>(WRAMSIZE));
+    if (WRAMSIZE != 8192) {
+        printf("FAIL: NES 2.0 mapper 4 with PRG-RAM shift 0 gave WRAMSIZE %u, "
+               "expected 8192 -- mapper 4 always has its 8 KiB PRG RAM at "
+               "$6000-$7FFF; the declared size must not be forwarded\n",
                static_cast<unsigned>(WRAMSIZE));
         ok = false;
     }
@@ -1170,23 +1188,46 @@ static bool check_a5_mapper4_nes2_wram(const std::filesystem::path& dir) {
     }
     fceu11::CloseGame();
 
-    // Leg 3: both nibbles (shift 3 + shift 3) sum to 512 + 512 = 1024 bytes.
-    const std::filesystem::path rom2 = dir / "a5_mapper4_nes2_sum.nes";
-    if (!write_nes2_mapper4_rom(rom2, 3, 3)) {
-        printf("FAIL: cannot write the NES 2.0 mapper 4 sum ROM\n");
+    // Leg 3: NES 2.0 with the size nibble = 4 -- a size MMC3 cannot have.
+    // The WRAM must still be 8192: this leg proves the declared size is NOT
+    // forwarded (the upstream formula would give 64<<4 = 1024 bytes).
+    const std::filesystem::path rom2 = dir / "a5_mapper4_nes2_size.nes";
+    if (!write_nes2_mapper4_rom(rom2, 4, 0)) {
+        printf("FAIL: cannot write the NES 2.0 mapper 4 size ROM\n");
         return false;
     }
     gi = fceu11::LoadGame(rom2.string().c_str(), 1, true);
     if (!gi) {
-        printf("FAIL: the NES 2.0 mapper 4 sum ROM did not load\n");
+        printf("FAIL: the NES 2.0 mapper 4 size ROM did not load\n");
         return false;
     }
-    printf("      NES 2.0 shifts 3+3 (512+512 = 1024 bytes): WRAMSIZE = %u "
-           "(expected 1024)\n", static_cast<unsigned>(WRAMSIZE));
-    if (WRAMSIZE != 1024) {
-        printf("FAIL: NES 2.0 mapper 4 with PRG-RAM shifts 3+3 gave WRAMSIZE "
-               "%u, expected 1024 -- wram_size and battery_wram_size must be "
-               "summed\n", static_cast<unsigned>(WRAMSIZE));
+    printf("      NES 2.0 shift=4 (64<<4 = 1024 bytes): WRAMSIZE = %u "
+           "(expected 8192)\n", static_cast<unsigned>(WRAMSIZE));
+    if (WRAMSIZE != 8192) {
+        printf("FAIL: NES 2.0 mapper 4 with PRG-RAM shift 4 gave WRAMSIZE "
+               "%u, expected 8192 -- the declared size must not be forwarded "
+               "to the MMC3 WRAM\n", static_cast<unsigned>(WRAMSIZE));
+        ok = false;
+    }
+    fceu11::CloseGame();
+
+    // Leg 4: the battery half of the same thing (byte-10 HIGH nibble).
+    const std::filesystem::path rom3 = dir / "a5_mapper4_nes2_battery.nes";
+    if (!write_nes2_mapper4_rom(rom3, 0, 4)) {
+        printf("FAIL: cannot write the NES 2.0 mapper 4 battery ROM\n");
+        return false;
+    }
+    gi = fceu11::LoadGame(rom3.string().c_str(), 1, true);
+    if (!gi) {
+        printf("FAIL: the NES 2.0 mapper 4 battery ROM did not load\n");
+        return false;
+    }
+    printf("      NES 2.0 battery shift=4 (64<<4 = 1024 bytes): WRAMSIZE = %u "
+           "(expected 8192)\n", static_cast<unsigned>(WRAMSIZE));
+    if (WRAMSIZE != 8192) {
+        printf("FAIL: NES 2.0 mapper 4 with battery PRG-RAM shift 4 gave "
+               "WRAMSIZE %u, expected 8192 -- the declared size must not be "
+               "forwarded to the MMC3 WRAM\n", static_cast<unsigned>(WRAMSIZE));
         ok = false;
     }
     fceu11::CloseGame();
@@ -1632,7 +1673,7 @@ int main() {
     // Mapper 4 NES 2.0 PRG-RAM sizing (upstream 2.8.0 mmc3.cpp:363-375).
     // See the A5 section above for the leg structure and mutations.
     printf("\n--- v2.0.5 A5: mapper 4 NES 2.0 PRG-RAM ---\n");
-    printf("[A5] NES 2.0 shift nibbles -> GenMMC3 ws + iNES 1.0 control ...\n");
+    printf("[A5] mapper 4 WRAM is 8 KiB regardless of the NES 2.0 declaration ...\n");
     if (!check_a5_mapper4_nes2_wram(sweep_dir)) failed = true;
 
     // ==================== v2.0.5 A7-3 ====================

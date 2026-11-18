@@ -483,15 +483,27 @@ Select-String -Path src\rust\crates\fceux11-formats\src\ines\ines_data.rs `
 
 ---
 
-### A5 · mapper 4 的 NES 2.0 PRG-RAM（U3）—— ✅ **已落地（r13）**
+### A5 · mapper 4 的 NES 2.0 PRG-RAM（U3）—— 🔴 **r13 落地 → r14 回退（业主裁决：方案 A）**
 
-**r13 落地**：`Mapper4_Init` 插 `if (info->ines2) ws = (wram+battery)/1024`（Low-G-Man 分支降为 `else if`，上游 2.8.0 形状）+ 顺带采纳上游的提示文案（iNES→NES 2.0，无行为意义）。锁 = `mapper_load_test` A5 段三腿（NES 2.0 shift=4 ⇒ WRAMSIZE 1024 / iNES 1.0 对照 8192 钉反向守卫 / 双 nibble 求和），变异 A5-M1（删分支）红点 ①③红②绿 逐字对上。
+**r14 结论：A5 回退 ⇒ mapper 4 的 WRAM 恒 8KB。** 完整根因分析见 **§9.25**。
 
-**做法**：`src/boards/mmc3.cpp:419-429` 加 `info->ines2` 分支
+**r14 回退**：`src/boards/mmc3.cpp` 的 `Mapper4_Init` 删掉 `if (info->ines2) ws = (wram+battery)/1024` 分支，
+Low-G-Man 的 CRC32 分支恢复为 `if`，提示文案一并回到上游逐字（"UNIF format"，A5 顺带采纳的语义改动也一并回退——
+「文案语义修正」如要保留须另立议题，不混在本次回退里）。
+锁 = `mapper_load_test` A5 段**重写为四腿**：NES 2.0 shift=0 ⇒ 8192（**真实情形腿，r13 缺的那条**）/ iNES 1.0 对照 ⇒ 8192 /
+NES 2.0 shift=4 ⇒ 8192（证明声明值**不得**直通）/ NES 2.0 battery shift=4 ⇒ 8192（对 battery 半边同样钉死）。
+变异 A5-M1（把 A5 分支加回）⇒ **腿 1/3/4 红、腿 2 绿**（腿 1 正是 CI 炸掉的那处），**退出码 1**（非假红）；还原后 10/10 全绿。
+实测：kgmqa-075 由 `FAIL`（`$6000` 读到 `0xFC`）恢复 `PASS`（`$6000` 读到 `0x00`）。
+
+**r13 落地（已回退，留档）**：`Mapper4_Init` 插 `if (info->ines2) ws = (wram+battery)/1024`（Low-G-Man 分支降为 `else if`，上游 2.8.0 形状）+ 顺带采纳上游的提示文案（iNES→NES 2.0，无行为意义）。锁 = `mapper_load_test` A5 段三腿（NES 2.0 shift=4 ⇒ WRAMSIZE 1024 / iNES 1.0 对照 8192 钉反向守卫 / 双 nibble 求和），变异 A5-M1（删分支）红点 ①③红②绿 逐字对上。
+⚠️ **r13 的锁有结构性缺口**：三条腿**全部不覆盖 `wram_shift = 0`**，而这恰恰是**所有真实 mapper 4 ROM 的情形**（本仓 6 个 mapper 4 + NES 2.0 fixture 的 byte10 全是 0）；且腿①拿「声明 1KB」做正例——MMC3 硬件不可能有 1KB WRAM——**等于把上游的缺陷锁成了「正确行为」**。加上 r13 实施期未跑 F11QA 真 ROM 矩阵（`f11qa_direct_smoke` 是空洞门禁）⇒ 回归从锁缝里漏到 CI 才炸。
+
+**做法（原计划，已回退）**：`src/boards/mmc3.cpp:419-429` 加 `info->ines2` 分支
 （`ws = (info->wram_size + info->battery_wram_size) / 1024`）。
 本仓字段已有（`src/cart.h:85,87,88`），单位与上游一致（字节）。
 
 **反向守卫**：**不得**改非 NES 2.0 路径的 `ws = 8`；Low-G-Man 的 CRC32 分支保持原样。
+⚠️ r14 回退**不违反**该守卫：非 NES 2.0 路径的 `ws = 8` 与 Low-G-Man 的 CRC32 分支（`ws = 0`）都原样保留。
 
 ---
 
@@ -1413,3 +1425,80 @@ B2 用 **6 个 fixture × 120 帧**实测：**6/6 全部不满足**，且**差�
 
 ⇒ **人工验收若照字面等式做，必然误报 FAIL** ⇒ 建议把 V14 的判据改成并集式，并把 `code_and_data` 读出来。
 **本轮只登记口径更正，不改任何基线文件**（LT-09 的反向守卫：人工项是**确认**，不是**调判据**）。
+
+---
+
+### 9.25 · 缺陷登记：r13 的 A5（mapper 4 的 NES 2.0 PRG-RAM）**打挂一类真 ROM** ⇒ r14 回退（业主裁决）
+
+**状态**：✅ **已处置（r14）**——回退 A5 分支 + 重写锁 + 变异验证闭合；**业主裁决方案 A**（回退，不动 F11QA 冻结基线）
+
+**触发**：2026-11-17 夜 CI（`main` = `5caf8ab`）双 job 红：
+
+- `ci.yml`「CTest」步骤：44 项中 2 红 —— `movie_roundtrip_test`（Timeout 1500s）、`savestate_regression_rust_smoke`（Failed）
+- `f11qa.yml`「R4 gate」：`pass_to_fail = 3`（`kgmqa-022-savestate-regression-cpp` / `kgmqa-028-savestate-regression-rust` / `kgmqa-075-mmc3bigchrram-tepples`）、matrix grade = D
+  ⇒ ⚠️ **022 与 028 是同一个 binary + 同一份金标的两条别名** ⇒ 同一个根因 ⇒ 修一处消两条
+
+#### 9.25.1 · 三条失败的根因归属
+
+| 失败 | 根因 | 处置 |
+|---|---|---|
+| `savestate_regression_rust_smoke`（连带 022 / 028） | r13 的 **A7**（MMC5 上电默认值 `0xFF`→`0`，与上游 2.8.0 逐字一致）⇒ MMC5 的 savestate 字节变了 ⇒ `golden_savestate_hashes.json` 的 mmc5 项失效 | **金标更新** `d838366a…` → `e0f45177…`；变异验证闭合（改回 `0xFF` ⇒ hash 精确回到 `d838366a…` 且仅此一项 mismatch） |
+| `movie_roundtrip_test` Timeout | CI 环境差异致挂死（本地同一二进制 0.30s / 13 项全绿；本地跑 CI 同序前 12 项也全绿 ⇒ 排除测试间干扰） | **加固**（见 §9.25.4）；根因待 CI 自证 |
+| `kgmqa-075-mmc3bigchrram-tepples` | r13 的 **A5**（见下） | **A5 回退**（业主裁决方案 A） |
+
+⚠️ r13 的 A7 验收面写的是「ppu_frame_diff mmc5 90 帧金标 + mapper_byte_diff 状态金标 实测零漂移」——那两面**确实零漂移**，但**漏了 savestate 金标这一面** ⇒ 归 A7 的验收面缺口，不归 A7 的实现错误（A7 与上游逐字一致，是正确的上游对齐）。
+
+#### 9.25.2 · A5 的机制（精确到字节）
+
+- NES 2.0 头 **byte 10 = PRG-RAM 大小**（指数：0=无 / 7=8KB / 9=32KB），**byte 11 = CHR-RAM 大小**
+  （权威：上游 `src/ines.h` 字段偏移 ↔ 本仓 `src/rust/crates/fceux11-formats/src/ines.rs:16-30` 的 `FceuInesHeader` **逐字一致**；
+  本仓解析公式 `ines.rs:563-571` ↔ 上游 `src/ines.cpp:838-846` **逐字一致**）
+- `mmc3bigchrram.nes` 的头：**byte10 = 0x00（声明无 PRG-RAM）**、byte11 = 0x09（32KB CHR-RAM ✓ 正合该 ROM 名）
+- 上游 / 本仓公式 `ws = (wram_size + battery_wram_size) / 1024` ⇒ **ws = 0**
+- `GenMMC3_Init` 的 `if (wram)` 为假 ⇒ **完全不分配 WRAM** ⇒ `$6000-$7FFF` 没有测试通道 ⇒ ROM 跑挂、`$6000` 读到 `0xFC` ⇒ **FAIL**
+
+#### 9.25.3 · 上游同款缺陷（不是移植不完整）
+
+逐字比对（业主机器上的上游快照 `fceux-master` = **FCEUX 2.8.0**）：`Mapper4_Init` / `GenMMC3_Init` / `GenMMC3Power` **三处全部一致**；
+且上游 `src/ines.cpp` 里 `wram_size` **全仓只有一处赋值**（第 841 行）⇒ **上游没有任何 mapper 4 的默认 8KB 兜底**。
+⇒ **上游 2.8.0 在该 ROM 上同样会 FAIL**；A5 是完整照搬了上游的同一行为，不是移植缺失。
+⚠️ 上游 `changelog.txt` **无任何该改动的登记** ⇒ 属 2.8.0 开发期**新引入且未被 ROM 回归覆盖**的行为变更（上游没有本仓这种真 ROM 套件）。
+
+#### 9.25.4 · 规范怎么说（两个方向都有依据）
+
+- **NESdev《NES 2.0》**：byte 10/11 指数定义大小（0=无 / 7=8KB / 9=32KB）；**"Specifying 0 for the PRG RAM size would usually leave this region as open bus"**；"the vast majority may place up to 8k of PRG RAM in the $6000-7FFF region"
+- **NESdev《MMC3》**：`PRG RAM: Up to 8 KB`，CPU `$6000-$7FFF` 8KB
+- **NESdev《INES Mapper 004》**：Low-G Man 用 MMC3 无 PRG-RAM，**"Alternatively, NES 2.0 can be used to specify a PRG-RAM size of 0"**
+
+⇒ **严格按字面，上游的 `ws = 0` 是对的**；tepples 那个 ROM 声明 0 却依赖 `$6000` 通道 ⇒ **它的头与严格语义冲突**。
+⇒ 同时「绝大多数 mapper 4 板子有 8KB」也是事实 ⇒ **两种口径都有现实依据** ⇒ 故须由业主裁决。
+
+#### 9.25.5 · 影响面
+
+- **本仓自有资产**：6 个 mapper 4 + NES 2.0 的 fixture，**byte10 全是 0**
+  （`M4_P128K` / `M4_P128K_CR8K` / `M4_P128K_CR32K` / `M4_P256K_C256K` / `mmc3bigchrram` / `mapper_mapper260`）
+  ⇒ A5 之后**全部失去 `$6000-$7FFF`**
+- **生态**：mapper 4 的 PRG-RAM 是可选件、板子多数有 8KB ⇒ 现代 dump 工具给 byte10 填 0 很常见 ⇒ **这一类 ROM 集体失去 `$6000-$7FFF`**
+- **门禁面**：A5 现状下**本地全量 `ctest -LE perf` 44/44 全绿** ⇒ **本地 ctest 在结构上抓不到这类回归**，只有 F11QA 真 ROM 用例能抓
+
+#### 9.25.6 · r13 的锁为何漏网（结构性缺口）
+
+`tests/f11qa/boards/mapper_load_test.cpp` 的 A5 段三条腿：**NES 2.0 shift=4（声明 1KB）⇒ 1024** / **iNES 1.0 对照 ⇒ 8192** / **双 nibble 求和 ⇒ 1024**。
+⚠️ 三条腿**全部不覆盖 `wram_shift = 0`** —— 而这恰恰是**所有真实 mapper 4 ROM 的情形**；
+⚠️ 且腿①拿「声明 1KB」做正例——**MMC3 硬件不可能有 1KB WRAM**——**等于把上游的缺陷锁成了「正确行为」**。
+⚠️ 加上 r13 实施期未跑 F11QA 真 ROM 矩阵（`f11qa_direct_smoke` 是空洞门禁：0 项执行、退出 0、ctest 判 Passed）
+⇒ **回归从锁缝里漏到 CI 才炸。**
+
+#### 9.25.7 · r14 处置（业主裁决方案 A：回退）
+
+1. **回退源码**：`src/boards/mmc3.cpp` 的 `Mapper4_Init` 删 `if (info->ines2)` 分支；Low-G-Man 的 CRC32 分支恢复为 `if`；提示文案回到上游逐字（"UNIF format"；A5 顺带采纳的语义改动一并回退，文案语义修正如需保留须另立议题）
+2. **重写锁**（四腿，含 r13 缺的那条）：NES 2.0 shift=0 ⇒ 8192（**真实情形腿**）/ iNES 1.0 对照 ⇒ 8192 / NES 2.0 shift=4 ⇒ 8192（声明值不得直通）/ NES 2.0 battery shift=4 ⇒ 8192
+3. **变异验证闭合**：把 A5 分支加回 ⇒ **腿 1/3/4 红、腿 2 绿**（腿 1 正是 CI 炸掉的那处），**退出码 1**（非假红）⇒ 还原后 10/10 全绿
+4. **实测**：kgmqa-075 由 `FAIL`（`$6000` = `0xFC`）恢复 `PASS`（`$6000` = `0x00`），600 帧 958ms
+5. **反向守卫未被违反**：非 NES 2.0 路径的 `ws = 8` 与 Low-G-Man 的 CRC32 分支（`ws = 0`）都原样保留
+
+#### 9.25.8 · 代价与后续
+
+- **能力损失**：放弃「用 NES 2.0 头表达『无 PRG-RAM』」的能力。真实损失面极小——目前只有 Low-G-Man 家族需要，而它们的 **iNES 1.0 路径仍由上游同款 CRC32 特判覆盖**（`ws = 0`）
+- **与上游产生分叉**：mapper 4 + NES 2.0 的行为与上游 2.8.0 不同 ⇒ 上游若将来修正，本仓需再跟随 ⇒ **建议向上游提 issue**（草稿待业主审阅，见 `docs/plans/upstream_issue_mapper4_nes2_prgram.md`）
+- **A5 的原始意图作废**（按 NES 2.0 头给 mapper 4 定 WRAM 尺寸）——在 MMC3 硬件上本就没有意义（只有一片 8KB）

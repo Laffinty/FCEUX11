@@ -164,16 +164,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ⚠️ 口径更正：本仓 FM2 是纯文本格式（首行 `version N`），无二进制魔数——r11 登记的「`FCEUXM` 头」
   措辞按代码事实更正（计划 §9.23）。
 
-### Fixed — 上游 mapper 能力对齐收尾（A5 / A6 / A7 / A8-471）
+### Fixed — 上游 mapper 能力对齐收尾（A6 / A7 / A8-471）
 
-- **mapper 4（MMC3）的 NES 2.0 PRG-RAM**：头声明多大 WRAM 就给多大（此前一律按 8 KiB 装载）；
-  Low-G-Man CRC 兜底不变（反向守卫有锁）。
 - **mapper 210（Namco 175/340）镜像语义**：二值 `is210` 重构为三态判型（NES 2.0 submapper 1/2 优先，
   CRC 兜底），N340 的 `$E000` 镜像表修为 NESdev wiki 逐字语义（旧表 case3 与 case0 重复 = 坏表），
   读档后镜像随 mapper 状态恢复（vnapage 不在 savestate 内，mapper 钩子是唯一恢复点）。
   Mesen v2.2.0 的 2/3 互换未被现行 wiki 证实，登记为观察项。
 - **MMC5 上电默认值**：CHR bank 寄存器与填充/镜像寄存器上电为 0（上游 2.8.0 同款）——
   行为变更，F11QA 自动化面（帧金标 + mapper 状态金标）实测零漂移后保留。
+  ⚠️ r13 的验收面**漏了 savestate 金标这一面** ⇒ 已同步更新 `golden_savestate_hashes.json` 的
+  mmc5 项（变异验证闭合：默认值改回 `0xFF` ⇒ hash 精确回到旧值且仅此一项不匹配）。
 - **bandai x24c02**：I2C 非本板设备地址（`&0x78 != 0x50`）现在正确 NAK 并回 STANDBY，
   不再误 ACK 吞掉后续数据位（mapper 153/157/16 系 Datach/条码类游戏）。
 - **mapper 72（JF-17）写窗口**：`$6000-$FFFF` → `$8000-$FFFF`，`$6000-$7FFF` 的杂散写入不再能
@@ -183,9 +183,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   451 / 413 按计划转长尾（存档格式变更 / 需 misc ROM 装载通道）。
 - 新增回归锁 `mapper210_mirror_test`（六腿，CRC 强制用 GF(2) 线性求解器）与
   `mmc5_power_defaults_test`（15 断言，savestate 扫描通道）+ `mapper_load_test` 三段
-  （A5 / A7-72 / A7-bandai）+ 471 四腿段；**全部变异可红**（8 条变异腿逐项验证）。
+  （A7-72 / A7-bandai）+ 471 四腿段；**全部变异可红**（8 条变异腿逐项验证）。
 
 ### Known limitations（v2.0.5 线在途登记）
+
+- **mapper 4（MMC3）的 NES 2.0 PRG-RAM 声明**：本仓**按硬件事实恒给 8 KiB**（MMC3 只有一片 8 KB
+  PRG RAM，固定在 `$6000-$7FFF`），**不按 NES 2.0 头 byte 10 的声明调整**；这与上游 2.8.0
+  开发版不同——上游把声明值原样转成 WRAM 尺寸，头里声明 0 就干脆不分配 WRAM，于是该卡带
+  失去 `$6000-$7FFF`。影响面：声明 0 的 mapper 4 卡带在本仓**能**使用 `$6000-$7FFF`；
+  代价是「用 NES 2.0 头表达『无 PRG-RAM』」暂不支持（Low-G-Man 的 iNES 1.0 路径仍由
+  CRC32 兜底覆盖，`$6000-$7FFF` 仍按无 RAM 处理）。上游已就此准备反馈。
 
 - **V14 的 CDL 一致性判据口径更正**（LT-09）：计划写的
   `codecount + datacount + undefinedcount == cdloggerdataSize` 在 6/6 个 fixture 上**不成立**
