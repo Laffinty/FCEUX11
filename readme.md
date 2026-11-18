@@ -92,6 +92,18 @@ Launch `fceux11.exe`, load a game via **File → Open ROM** (NES: `.nes` / `.fds
 详见 [CHANGELOG.md](CHANGELOG.md)。当前主线为 **v2.0.5**（上游 mapper 能力对齐 + 加载路径两项卡死修复；上一稳定发布 **v2.0.4**）。
 See [CHANGELOG.md](CHANGELOG.md). Mainline is **v2.0.5** (upstream mapper alignment plus two stall fixes on the ROM-load path; previous stable **v2.0.4**).
 
+### v2.0.5 行为变更 / Behaviour changes in v2.0.5
+
+> 旧存档与录像仍可正常读取，但下列读数会变：
+> - MMC5 的 CHR bank 与填充/镜像寄存器上电为 0（原为 `0xFF`），该板卡带的开机画面可能变化；
+> - mapper 45 的写窗口收窄为 `$6000-$7FFF`（原 `$5000-$7FFF`）；
+> - mapper 72 的写窗口收窄为 `$8000-$FFFF`（原 `$6000-$FFFF`）；
+> - mapper 4 的工作 RAM 恒为 8 KiB，不再按 NES 2.0 头声明的 PRG-RAM 尺寸调整。
+>
+> Existing save states and movies still load, but four observable readouts change: the MMC5
+> power-on defaults, the write windows of mapper 45 and mapper 72, and mapper 4's work RAM,
+> which is now always 8 KiB — the size the chip actually has.
+
 ### v2.0.4 行为变更 / Behaviour changes in v2.0.4
 
 > 旧存档与录像仍可正常读取，但下列读数会变：
@@ -104,14 +116,11 @@ See [CHANGELOG.md](CHANGELOG.md). Mainline is **v2.0.5** (upstream mapper alignm
 
 ### 已知限制 / Known limitations
 
-> - **GUI 下运行会 yield 的 Lua 脚本可能崩溃**（无头 runner 不受影响）—— v2.0.4 未修，如实登记；
+> - **GUI 下运行会 yield 的 Lua 脚本可能崩溃**（无头 runner 不受影响）—— v2.0.5 仍未修，如实登记；
 > - **GBA 仍是 Alpha/Beta**：BIOS SWI 声音家族 12 号与 `0x2A` 走兜底实现，GPIO/RTC 未做；沿用 v2.0.3 的已知限制；
 > - **F11QA 矩阵以 CI 复核为准**（`pass_to_fail = 0`、grade ≥ B）。
 >
 > Known limitations: yielding Lua scripts may crash under the GUI (headless runners are unaffected); GBA remains Alpha/Beta with the v2.0.3 limitations still in force; the F11QA matrix is judged by CI (`pass_to_fail = 0`, grade ≥ B).
-
-> v2.0.5 的行为变更（MMC5 上电默认值、mapper 45/72 写窗口、mapper 4 的 PRG-RAM 不按 NES 2.0 声明调整）见 CHANGELOG `[2.0.5]`。
-> Behaviour changes in v2.0.5 (MMC5 power-on defaults, mapper 45/72 write windows, mapper 4 PRG-RAM no longer sized from the NES 2.0 declaration) are listed in CHANGELOG `[2.0.5]`.
 
 ---
 
