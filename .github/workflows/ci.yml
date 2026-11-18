@@ -195,7 +195,26 @@ jobs:
         # gating run. Wall-clock benchmarks are advisory on shared runners
         # (inter-host variance >> tolerance); they are run separately in the
         # "Bench tolerance gate" step below with continue-on-error.
-        run: ctest --test-dir build --build-config Release --output-on-failure -LE perf
+        #
+        # v2.0.5 r14: the ctest output is ALSO mirrored into the job summary.
+        # The job log can only be downloaded with admin rights
+        # ("Must have admin rights to Repository"), so until now a failing
+        # ctest was visible to nobody without repo admin access: the only
+        # symptom was "Process completed with exit code 1". The step summary
+        # is readable through the public check-runs API (output.summary), so
+        # this makes a CI failure diagnosable without admin rights.
+        # The original exit code is preserved (the step must still fail).
+        run: |
+          ctest --test-dir build --build-config Release --output-on-failure -LE perf 2>&1 | Tee-Object -FilePath ctest-output.txt
+          $ctestExit = $LASTEXITCODE
+          {
+            "## CTest output"
+            ""
+            "```"
+            Get-Content ctest-output.txt -Tail 600
+            "```"
+          } | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          exit $ctestExit
 
       # v1.3 Legion Phase 7.2: Golden savestate drift check.
       # If any of the SFORMAT-emitting sources have changed, the golden

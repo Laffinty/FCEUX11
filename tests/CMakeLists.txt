@@ -178,9 +178,16 @@ if(FCEUX11_BUILD_TESTS)
         core/movie_roundtrip_test.cpp
         git_info_stub.cpp
     )
+    # v2.0.5 r14: explicit TIMEOUT. ctest's default per-test timeout is
+    # 1500 s, which is why the CI hang of 2026-11-17 cost 25 minutes of
+    # runner time with no diagnostic output at all. The test carries its own
+    # 60 s in-process watchdog (stderr stage markers + exit code 3), so 300 s
+    # is a generous outer bound that only exists to cap the blast radius if
+    # that watchdog ever fails to fire.
     add_test(NAME movie_roundtrip_test
              COMMAND fceux11_movie_roundtrip_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    set_tests_properties(movie_roundtrip_test PROPERTIES TIMEOUT 300)
 
     # v2.0.5 A7-1 - MMC5 power-on defaults lock (plan section 3, A7-1).
     # GenMMC5Power must start CHRBanksA / CHRBanksB / NTAMirroring / NTFill /
