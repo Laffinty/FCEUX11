@@ -215,3 +215,6 @@ build/*_output*.txt
 
 # r14: ctest output captured by the CI diagnostics step
 ctest-output.txt
+
+# r15: movie_roundtrip_test stage log (written by the test itself)
+movie_roundtrip_stages.log

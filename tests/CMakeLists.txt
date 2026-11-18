@@ -561,6 +561,7 @@ if(FCEUX11_BUILD_TESTS)
             expected_api_test
             enum_class_bitflags_test config_store_test
             core_state_test
+            movie_roundtrip_test
             cpu_test ppu_test apu_test bus_test mapper_core_test
         savestate_core_test golden_savestate_test bench_tolerance_test
         ppu_frame_diff_test apu_wav_diff_test apu_wav_hq_diff_test

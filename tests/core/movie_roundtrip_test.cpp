@@ -45,6 +45,10 @@
 #include <chrono>
 #include <thread>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #include "types.h"
 #include "fceu.h"
 #include "movie.h"
@@ -96,12 +100,72 @@ const char* stage_name(int s) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Stage record: stderr for humans reading a local run, plus a file for CI.
+//
+// The file is written with raw Win32 (CreateFile/WriteFile) instead of
+// stdio/fprintf, because the 2026-11-18 CI run reported
+//
+//     9/44 Test #9: movie_roundtrip_test ....***Timeout 300.01 sec
+//
+// with NOT ONE stage marker in the captured output, and the 60 s in-process
+// watchdog never fired -- although an isolated probe had proven that the
+// std::thread + steady_clock + _Exit(3) mechanism works on this toolchain.
+// The explanation that fits both symptoms is a blocked CRT stdio lock: if the
+// main thread hangs while holding the stderr/stdout FILE lock, then a watchdog
+// that calls fprintf(stderr) blocks on that very lock and can never reach
+// _Exit, and ctest captures nothing because nothing was ever flushed. Raw
+// Win32 file writes take no CRT locks, so the hang site is recorded regardless.
+// ---------------------------------------------------------------------------
+constexpr const char* STAGE_LOG_NAME = "movie_roundtrip_stages.log";
+
+void stage_log_append(const char* line) {
+#ifdef _WIN32
+    HANDLE h = ::CreateFileA(STAGE_LOG_NAME, FILE_APPEND_DATA,
+                             FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                             OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h == INVALID_HANDLE_VALUE) return;
+    DWORD written = 0;
+    ::WriteFile(h, line, static_cast<DWORD>(std::strlen(line)), &written, nullptr);
+    ::CloseHandle(h);
+#else
+    (void)line;
+#endif
+}
+
+void stage_log_reset() {
+#ifdef _WIN32
+    HANDLE h = ::CreateFileA(STAGE_LOG_NAME, GENERIC_WRITE,
+                             FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                             CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h != INVALID_HANDLE_VALUE) ::CloseHandle(h);
+#endif
+}
+
 void set_stage(int s) {
     g_stage.store(s, std::memory_order_release);
-    std::fprintf(stderr, "[movie-roundtrip] stage %d: %s\n", s, stage_name(s));
+    char buf[160];
+    std::snprintf(buf, sizeof(buf), "stage %d: %s\n", s, stage_name(s));
+    stage_log_append(buf);
+    std::fprintf(stderr, "[movie-roundtrip] %s", buf);
     std::fflush(stderr);
 }
 
+// ---------------------------------------------------------------------------
+// v2.0.5 r15: why the watchdog writes with raw Win32 instead of fprintf.
+//
+// The 2026-11-18 CI run reported `movie_roundtrip_test ***Timeout 300.01 sec`
+// with NOT ONE of the stage markers above in the captured output. Two facts
+// together: (a) the in-process watchdog (60 s) never fired, although it had
+// been proven to work in an isolated probe, and (b) ctest captured no stderr
+// from the test at all.
+//
+// The explanation that fits both is a blocked CRT stdio lock: if the main
+// thread hangs while holding the stderr/stdout FILE lock, then a watchdog that
+// calls fprintf(stderr) blocks on that very lock and can never reach _Exit.
+// The marker writes below therefore go through CreateFile/WriteFile, which take
+// no CRT locks at all, so the hang site is recorded even in that scenario.
+// ---------------------------------------------------------------------------
 void start_watchdog() {
     std::thread([] {
         const auto t0 = std::chrono::steady_clock::now();
@@ -111,11 +175,12 @@ void start_watchdog() {
                 std::chrono::steady_clock::now() - t0).count();
             if (el >= WATCHDOG_SECONDS) {
                 const int s = g_stage.load(std::memory_order_acquire);
-                std::fprintf(stderr,
-                    "[movie-roundtrip] WATCHDOG: no progress for %lld s, "
-                    "stuck at stage %d (%s)\n",
+                char buf[200];
+                std::snprintf(buf, sizeof(buf),
+                    "WATCHDOG: no progress for %lld s, stuck at stage %d (%s)\n",
                     (long long)el, s, stage_name(s));
-                std::fflush(stderr);
+                // Raw Win32 only -- no CRT locks, no stdio buffering.
+                stage_log_append(buf);
                 std::_Exit(3);
             }
         }
@@ -151,6 +216,7 @@ bool file_has_nonzero(const char* path) {
 
 int main() {
     fceu11_test::TestContext ctx;
+    stage_log_reset();
     start_watchdog();
     set_stage(0);
 

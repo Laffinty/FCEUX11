@@ -211,6 +211,17 @@ jobs:
           $summary = @("## CTest output", "") + $lines
           Set-Content -Path $env:GITHUB_STEP_SUMMARY -Value $summary -Encoding utf8
           Get-Content ctest-output.txt | Select-String -Pattern "movie.roundtrip|WATCHDOG|The following tests FAILED" | ForEach-Object { Write-Host ("::error::" + $_.Line) }
+          $stageLog = "tests/movie_roundtrip_stages.log"
+          if (Test-Path $stageLog) {
+            Write-Host ("::error::--- {0} ---" -f $stageLog)
+            Get-Content $stageLog | ForEach-Object { Write-Host ("::error::STAGE " + $_) }
+          } else {
+            Write-Host ("::error::stage log missing: {0} (test never started, or cwd differs)" -f $stageLog)
+          }
+          $lastLog = "build/Testing/Temporary/LastTest.log"
+          if (Test-Path $lastLog) {
+            Get-Content $lastLog | Select-String -Pattern "movie-roundtrip|movie_roundtrip_test" | Select-Object -First 40 | ForEach-Object { Write-Host ("::error::LASTTEST " + $_.Line) }
+          }
           exit $ctestExit
 
       # v1.3 Legion Phase 7.2: Golden savestate drift check.
