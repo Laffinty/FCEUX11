@@ -5,7 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.5] - 2026-11-18
+
+### Fixed — 无声卡时每帧自旋（加载 ROM 后「卡死、键盘无响应」）
+
+- **主机没有可用音频设备时**（关掉/拔掉 USB 音箱即属此列；CI runner 同样没有声卡），
+  加载 ROM 后画面几乎不动、键盘无响应。根因：环形缓冲的唯一消费者是 SDL 音频回调，
+  回调只在设备打开时存在 ⇒ 没有设备就无人 drain ⇒ `s_BufferIn` 涨满后每次
+  `WriteSound` 都进入「sound sink is not draining」自旋（`SDL_Delay(1)` × 1000，
+  `waitCount` 是每次调用内的局部量 ⇒ 每帧重付一次）。实测**单次调用 1956 ms**，
+  即约 0.5 帧/秒。
+- 修法（`src/drivers/Qt/sdl-sound.cpp`）：`WriteSound` 顶部加闸门 ——
+  设备未打开时**直接丢弃样本**（没有设备就没有 sink，模拟器不该因主机没声卡而变慢）；
+  设备异步打开成功时先把环游标归零再发布「已打开」，避免读到旧的满环。
+  顺带修掉 `KillSound` 之后 `s_Buffer` 已释放而 `s_BufferSize` 仍非 0 的空指针写风险。
+- 新锁 `sound_no_device_test`（ctest **45** 项）：不需要音频硬件，断言「关闭的 sink
+  必须立即返回」；变异腿去掉闸门 ⇒ 单次 1956 ms 转红。**这是「无设备把驱动拖死」
+  这类路径的首个门禁**，此前完全没有覆盖。
+- ⚠️ 与上一条（加载卡顿）**根因不同**：上一条是设备探测耗时 8 秒，本条是探测失败后
+  的运行期自旋。
 
 ### Fixed — 加载 ROM 卡顿（音频设备探测）
 

@@ -2,7 +2,7 @@
 
 # FCEUX11
 
-[![Version](https://img.shields.io/badge/version-v2.0.4-blue)](https://github.com/Laffinty/FCEUX11/releases)
+[![Version](https://img.shields.io/badge/version-v2.0.5-blue)](https://github.com/Laffinty/FCEUX11/releases)
 [![License](https://img.shields.io/badge/license-GPL--v2-green)](COPYING)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?logo=windows)](https://www.microsoft.com/windows/windows-11)
 [![Qt](https://img.shields.io/badge/Qt-6.8%20LTS-41CD52?logo=qt)](https://www.qt.io)
@@ -89,8 +89,8 @@ Launch `fceux11.exe`, load a game via **File → Open ROM** (NES: `.nes` / `.fds
 
 ## 版本历史 / Changelog
 
-详见 [CHANGELOG.md](CHANGELOG.md)。当前主线为 **v2.0.4**（残留精度与调试待办收口，**20/22 项落地**；上一稳定发布 **v2.0.3**）。
-See [CHANGELOG.md](CHANGELOG.md). Mainline is **v2.0.4** (accuracy & debugging backlog closed out, **20 of 22 items landed**; previous stable **v2.0.3**).
+详见 [CHANGELOG.md](CHANGELOG.md)。当前主线为 **v2.0.5**（上游 mapper 能力对齐 + 加载路径两项卡死修复；上一稳定发布 **v2.0.4**）。
+See [CHANGELOG.md](CHANGELOG.md). Mainline is **v2.0.5** (upstream mapper alignment plus two stall fixes on the ROM-load path; previous stable **v2.0.4**).
 
 ### v2.0.4 行为变更 / Behaviour changes in v2.0.4
 
@@ -109,6 +109,9 @@ See [CHANGELOG.md](CHANGELOG.md). Mainline is **v2.0.4** (accuracy & debugging b
 > - **F11QA 矩阵以 CI 复核为准**（`pass_to_fail = 0`、grade ≥ B）。
 >
 > Known limitations: yielding Lua scripts may crash under the GUI (headless runners are unaffected); GBA remains Alpha/Beta with the v2.0.3 limitations still in force; the F11QA matrix is judged by CI (`pass_to_fail = 0`, grade ≥ B).
+
+> v2.0.5 的行为变更（MMC5 上电默认值、mapper 45/72 写窗口、mapper 4 的 PRG-RAM 不按 NES 2.0 声明调整）见 CHANGELOG `[2.0.5]`。
+> Behaviour changes in v2.0.5 (MMC5 power-on defaults, mapper 45/72 write windows, mapper 4 PRG-RAM no longer sized from the NES 2.0 declaration) are listed in CHANGELOG `[2.0.5]`.
 
 ---
 
