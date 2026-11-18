@@ -113,9 +113,22 @@
 // ⚠️ **数值口径不动**：`FCEU_VERSION_NUMERIC` 仍为 20004 —— 它进 FCSX 电影模式
 // 存档头（`state.cpp:397`）与录像头（`movie_record.cpp:591`），hotfix 编号只由
 // `FCEU_HOTFIX_TAG` 承载（与 v2.0.2_hotfix1 同一口径）。
+// v2.0.5（2026-11-18）— **整版发布**（不再是 hotfix）：
+// 内容 = 上游 mapper 能力对齐收尾（A1 75 个 mapper 注册 / A2 18 号板级 Power 接线 /
+// A3 矫正表补 22 条 / A4 mapper 45 写窗口 / A6 mapper 210 镜像语义 /
+// A7 MMC5 上电默认值 + bandai x24c02 + mapper 72 / A8-471 Impact Soft IM1）
+// + 线 B 长尾四条（LT-08/09/10/16）+ 线 C 加载卡顿与中文名路径 + CI 诊断增强。
+// ⚠️ **A5（mapper 4 的 NES 2.0 PRG-RAM）已回退**：上游 2.8.0 把头声明的 PRG-RAM
+// 大小原样转成 MMC3 的 WRAM 尺寸，会让声明 0 的 mapper 4 卡带（ tepples
+// mmc3bigchrram 与本仓 6 个 fixture 全是这类）失去 $6000-$7FFF ⇒ 本仓 mapper 4
+// 的 WRAM 恒 8 KiB（完整根因见 docs/plans/FCEUX11-v2.0.5_构建计划.md §9.25）。
+//
+// ⚠️ **整版数值随惯例递增**（v2.0.4 → v2.0.5，即公式值 20004 → 20005）；该字段进
+// FCSX 电影模式存档头（state.cpp:397）与录像头（movie_record.cpp:591），但读取侧
+// 从不拒绝比对（信息性字段）⇒ 旧存档/录像仍可读。
 inline constexpr int FCEU_VERSION_MAJOR = 2;
 inline constexpr int FCEU_VERSION_MINOR = 0;
-inline constexpr int FCEU_VERSION_PATCH = 4;
+inline constexpr int FCEU_VERSION_PATCH = 5;
 inline constexpr int FCEU_VERSION_TWEAK = 0;	// hotfix 计数；**不参与** NUMERIC
 
 inline constexpr int FCEU_VERSION_NUMERIC = (FCEU_VERSION_MAJOR * 10000) + (FCEU_VERSION_MINOR * 100) + FCEU_VERSION_PATCH;
@@ -123,12 +136,12 @@ inline constexpr int FCEU_VERSION_MAJOR_DECODE(int x) { return x / 10000; }
 inline constexpr int FCEU_VERSION_MINOR_DECODE(int x) { return (x / 100) % 100; }
 inline constexpr int FCEU_VERSION_PATCH_DECODE(int x) { return x % 100; }
 
-// v2.0.4_hotfix2 — hotfix 发布（BUG-V205-02/03：--no-console 吞 ROM、
-// 文件对话框 COM 死锁——推迟装载 r7 + 主线程 STA 引用垫片 r8）
-#define FCEU_HOTFIX_TAG "_hotfix2"
+// v2.0.5 是整版发布 ⇒ 无 hotfix 后缀（v2.0.4_hotfix2 的 hotfix 编号随整版清空；
+// hotfix 口径不变：hotfix 编号只由 FCEU_HOTFIX_TAG 承载，不进 FCEU_VERSION_NUMERIC）。
+#define FCEU_HOTFIX_TAG ""
 
-#define FCEU_VERSION_STRING "2.0.4" FCEU_HOTFIX_TAG " " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
-#define FCEU_DISPLAY_VERSION "v2.0.4" FCEU_HOTFIX_TAG
+#define FCEU_VERSION_STRING "2.0.5" FCEU_HOTFIX_TAG " " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
+#define FCEU_DISPLAY_VERSION "v2.0.5" FCEU_HOTFIX_TAG
 #define FCEU_NAME_AND_VERSION FCEU_NAME " " FCEU_DISPLAY_VERSION
 
 // FCEUX11 Contributors — Derivative work based on FCEUX

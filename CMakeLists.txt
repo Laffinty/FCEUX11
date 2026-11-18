@@ -16,8 +16,9 @@ endif()
 # NOTE: the shipping version label lives in `src/version.h` (`FCEU_DISPLAY_VERSION`
 # / `FCEU_HOTFIX_TAG`). CMake's `VERSION` argument accepts numeric components only,
 # so the hotfix suffix ("_hotfix1") cannot be spelled here — this line tracks the
-# *numeric* base (2.0.4) and is deliberately left untouched by hotfix releases.
-project(FCEUX11 VERSION 2.0.4 LANGUAGES CXX C)
+# *numeric* base and is left untouched by hotfix releases; a full release bumps it
+# (v2.0.5 -> 2.0.5, released 2026-11-18).
+project(FCEUX11 VERSION 2.0.5 LANGUAGES CXX C)
 
 # v0.2.1: Enforce MSVC toolchain; MinGW-w64 / MSYS2 support removed.
 # v0.3.1: Locked to MSVC 19.36+ (Visual Studio 17.6+) to avoid C++23
