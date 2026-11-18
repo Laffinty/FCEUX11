@@ -87,55 +87,6 @@ Launch `fceux11.exe`, load a game via **File → Open ROM** (NES: `.nes` / `.fds
 
 ---
 
-## 版本历史 / Changelog
-
-完整记录见 [CHANGELOG.md](CHANGELOG.md)。当前主线为 **v2.0.5**（上一稳定发布 **v2.0.4_hotfix2**）；2.0 之前的版本同样只在该文件中。
-Full history in [CHANGELOG.md](CHANGELOG.md). Mainline is **v2.0.5** (previous stable: **v2.0.4_hotfix2**); pre-2.0 releases live in that file as well.
-
-| 版本 / Version | 中文 | English |
-|----------------|------|---------|
-| **v2.0.5**（2026-11-18） | 上游 mapper 能力对齐：75 个 mapper 号恢复板级上电、MMC3 家族 18 个变体接回、新增 mapper 471、ROM 矫正表补 22 条；另修加载卡顿、命令行加载与录制空档。 | Upstream mapper alignment: board-level power-up restored for 75 mapper numbers, 18 MMC3 variants reconnected, mapper 471 added, 22 more ROM-correction rows; also fixes for loading stalls, command-line loading and empty recordings. |
-| **v2.0.4_hotfix2**（2026-11-17） | 修复 `--no-console` 吞掉命令行 ROM，以及「关闭 ROM」后立刻「打开 ROM」的 GUI 卡死。 | Fixed `--no-console` swallowing a command-line ROM, and the GUI freezing when a ROM is reopened right after closing one. |
-| **v2.0.4_hotfix1**（2026-11-16） | 修复 CHR 数量非 2 幂的合法 iNES 卡带被判为「未知格式」。 | Fixed valid iNES cartridges with a non-power-of-two CHR count being rejected as an unknown format. |
-| **v2.0.4**（2026-11-15） | 残留精度与调试待办收口（20/22 项落地）。 | Accuracy and debugging backlog closed out (20 of 22 items landed). |
-| **v2.0.3**（2026-11-12） | GBA 卡带兼容性线收口（BIOS SWI 实现、存档芯片模型、ROM 窗口）。 | GBA cartridge-compatibility line closed out (BIOS SWI implementations, save-chip model, ROM window). |
-| **v2.0.2_hotfix1**（2026-11-10） | FC 侧修复批次（iNES loader、mapper 191/199）+ GBA 在途成果。 | FC-side fix batch (iNES loader, mappers 191/199) plus in-flight GBA work. |
-| **v2.0.2**（2026-11-08） | DEBUG 与性能优化：NES 四条热路径整体下移（full 帧 −34%）。 | Debug and performance: four NES hot paths moved down (full frame −34%). |
-| **v2.0.1**（2026-10-07） | GBA 精度优化（AGS 25/33 → 30/33）与 DMA、定时器计时修正。 | GBA accuracy work (AGS 25/33 → 30/33) plus DMA and timer timing fixes. |
-| **v2.0.0**（2026-10-03） | GBAEUX11 v2.0 落地：GBA 模拟支持并入主线。 | GBAEUX11 v2.0 landed: GBA emulation support merged into the mainline. |
-
-### v2.0.5 行为变更 / Behaviour changes in v2.0.5
-
-> 旧存档与录像仍可正常读取，但下列读数会变：
-> - MMC5 的 CHR bank 与填充/镜像寄存器上电为 0（原为 `0xFF`），该板卡带的开机画面可能变化；
-> - mapper 45 的写窗口收窄为 `$6000-$7FFF`（原 `$5000-$7FFF`）；
-> - mapper 72 的写窗口收窄为 `$8000-$FFFF`（原 `$6000-$FFFF`）；
-> - mapper 4 的工作 RAM 恒为 8 KiB，不再按 NES 2.0 头声明的 PRG-RAM 尺寸调整。
->
-> Existing save states and movies still load, but four observable readouts change: the MMC5
-> power-on defaults, the write windows of mapper 45 and mapper 72, and mapper 4's work RAM,
-> which is now always 8 KiB — the size the chip actually has.
-
-### v2.0.4 行为变更 / Behaviour changes in v2.0.4
-
-> 旧存档与录像仍可正常读取，但下列读数会变：
-> - 非 FDS 卡带的 `.cdl` 输出改变（与上游 FCEUX 2.7.0 一致化）；
-> - 按住 Famicom 麦克风时 `$4016` bit2 恒为 1（旧为 1,0,1,0 交替）；
-> - CHR-RAM < 8K 的卡带画面会变、其既有 movie 会漂移（**≥8K 卡逐字节不变**）；
-> - Lua `input.get()` 恒含数值 `click` 字段（遍历键的脚本会多见到一个 `click=0`）。
->
-> Existing save states and movies still load, but four observable readouts change: the `.cdl` output for non-FDS cartridges, the Famicom microphone level on `$4016` bit2, the picture (and movie replay) of sub-8K CHR-RAM cartridges, and the always-present numeric `click` field in `input.get()`.
-
-### 已知限制 / Known limitations
-
-> - **GUI 下运行会 yield 的 Lua 脚本可能崩溃**（无头 runner 不受影响）—— v2.0.5 仍未修，如实登记；
-> - **GBA 仍是 Alpha/Beta**：BIOS SWI 声音家族 12 号与 `0x2A` 走兜底实现，GPIO/RTC 未做；沿用 v2.0.3 的已知限制；
-> - **F11QA 矩阵以 CI 复核为准**（`pass_to_fail = 0`、grade ≥ B）。
->
-> Known limitations: yielding Lua scripts may crash under the GUI (headless runners are unaffected); GBA remains Alpha/Beta with the v2.0.3 limitations still in force; the F11QA matrix is judged by CI (`pass_to_fail = 0`, grade ≥ B).
-
----
-
 ## 许可 / License
 
 FCEUX11 基于 FCEUX 开发，采用 **GNU GPLv2** 许可证发布。完整许可证文本见 [COPYING](COPYING)。
