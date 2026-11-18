@@ -5,6 +5,84 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+> 依据：`docs/plans/FCEUX11-遗留问题盘点与优化计划-2026-11-18.md` 批 1/批 2/批 3
+> 的执行批次（业主 2026-11-19 指示开工）。
+
+### Fixed — MMC3 家族 7 个板的板级 Reset 接线（v2.0.5 A2 的同族收尾）
+
+- **7 个 MMC3 家族板的板级 Reset 从不执行**（v2.0.5 计划 §9.22 / r9 ⑧ 登记的同族
+  观察项）：装载器对注册命中的板覆盖 `info->Reset = CartInfo_ResetForward` ⇒
+  `Mmc3BaseCart::on_reset()` 只跑 `MMC3RegReset()`。精确名单经
+  bmap 全表 × MapperEntry 注册表 × Cart 类继承链交叉推导 = **12/37/45/49/52/114/205**
+  （家族外无漏项；75 个未注册号的 Reset 已随 v2.0.5 A1 条件化恢复）。
+- 修法照 A2 的 `on_power` 同款模式：新宏 `FCEUX11_MMC3_VARIANT_CART_WITH_POWER_RESET`
+  + 7 个板 Reset 函数去 `static` + 7 个 `on_reset()` override 直调板函数。
+  **其余各板不得加**（无板级 Reset 函数，基类行为正确；mapper 245 只有 Power
+  没有 Reset），头文件注释与对照锁双重钉死名单。
+- ⚠️ **行为变更**：复位时 mapper 12 切换语言位（中/英）、mapper 45 推进锁位计数、
+  mapper 205 翻焊盘位、37/49/52/114 的 `EXPREGS` 归零（此前运行期写坏后复位残留）。
+  与上游 2.8.0 一致化。
+- 门禁：`fceux11_mapper_load_test` 新增 A-1 段（7 板腿 + 对照组「毒残留」钉名单）。
+  变异双向实测：M1（7 腿全还原为基类）⇒ 7 板腿全红、对照组与 A2 段保持绿；
+  M2（仅还原 mapper 12）⇒ 只有 mapper 12 红。`ctest -LE perf` **45/45**。
+
+### Fixed — f11qa direct 模式「0 项执行仍判 PASS」的空洞门禁（v2.0.5 r13 ⑥）
+
+- `tests/tests.json` 123 条全为子进程式 ⇒ direct 模式 0 项执行、退出 0、ctest 判
+  Passed。新增 `runner::direct_mode_honesty_guard`：非空清单 ∧ 0 项执行 ⇒ stderr
+  固定消息 + 非零退出；`kagami_qa_direct_main` 与 CLI `--direct` 两入口接线，
+  退出码与 blocking failures 取「或」。`f11qa` 单测 181 → **184**。
+- ctest 条目 `f11qa_direct_smoke` 改 **WILL_FAIL + FAIL_REGULAR_EXPRESSION**：
+  护栏在 ⇒ Expected Fail ⇒ 门禁绿；护栏被摘 ⇒ 退出 0 ⇒ 条目 Failed ⇒ 门禁红。
+  变异实测（护栏禁用 ⇒ 专用锁红，183/1）。`tests.json` 与生成器零改动。
+
+### Fixed — mapper198 的 $5000 写-回读锁无牙（改写 + 双向变异，关闭 v2.0.5 r2 ④）
+
+- 真变异（拆掉 `M195Power` 的 `setprg4r` + 双 `SetHandler`）实测：旧锁 readback
+  仍 0x5A ⇒ **无牙**——$5000 未映射时开总线回吐 DMW 刚填的数据总线锁存（r2 ④
+  的疑虑坐实；旧注释「the read comes back as 0x00」错误，已按实测更正）。
+- 改写为 A2 WRAM_WINDOW 技法（handler 身份 + 写-读之间向 `$4020` 毒化锁存）：
+  变异态 FAIL（handler 0/0、readback 0x00 = 毒值回吐）、还原后 PASS；旧形态
+  同腿对照留档（变异下仍绿 = 无牙的直接实测）。
+
+### Changed — F11QA 清单生成器机械字段对齐（坑 15 的机械层清零）
+
+- 新增 `scripts/tests_json_mechanical_overrides.json`（88 case：binary 85 /
+  args 84 / working_dir 83 / **sut_input 1**——第 4 处机械 input 字段，坑 15 清单
+  未记载），生成器按表采用；既有硬护栏（拒绝覆盖 + EXIT=2）保留并复验。
+- 复核（临时路径生成 + 逐字段 diff）：**机械三类漂移 = 0**；剩余漂移 **125 对**
+  全部为评审/手工层（failure_means 15 + known_limit 15 + provenance 15 +
+  protocol 78 + mirror 2）。15 条 `failure_means` 与手工层**不动**——
+  C-3/C-4 的评审稿见 `docs/plans/FCEUX11-F11QA期望值变更-评审稿-2026-11-18.md`。
+
+### Fixed — STA 引用垫片扩展到其余对话框路径（BUG-V205-03 同机制防呆）
+
+- 新垫 **6 处**（逐字照 hotfix2 已验证形态，`CoInitializeEx` 故意不配对）：
+  `loadStateFrom` / `saveStateAs` / `fdsLoadBiosFile`（ConsoleEmuControl.cpp）、
+  `aviRecordAsStart` / `wavRecordAsStart`（ConsoleRecording.cpp）、
+  `loadGameGenieROM`（ConsoleDebugWindows.cpp）。
+- 顺带修正一处既有垫片错位：`loadNSF` 的 `CoInitializeEx` 原在 `exec()` **之后**
+  （hotfix2 实际落点保护不到对话框本身），已移到 `exec()` 前并留更正注释。
+- 非 consoleWin_t 的对话框类（CheatsConf / HexEditor / PaletteEditor /
+  MovieRecord 等约 17 处）未审计，登记为后续观察项。
+
+### Added — D2 / C-2 的 PGO 发布策略立项材料
+
+- `scripts/train_pgo.ps1`（三场景 ×12,000 帧训练 + `.pgc` 产出清单）+
+  `docs/plans/FCEUX11-PGO发布策略立项材料-2026-11-19.md`（收益读数留档 /
+  `.pgc` 可复现性两选项 / CI 双 job 成本清单）。**默认 OFF 维持**（C-2 裁决）。
+
+### Known limitations
+
+- **D1 第一步受阻**：repro 脚本（`scripts/repro/lua_gui_yield_repro.ps1`）在
+  v2.0.5+ exe 上两条 Lua 加载路径（启动 `SDL.LuaScript` 注入、命令行 `--loadlua`）
+  均**静默不加载**（GUI 正常启动存活、计数器不出现）——v2.0.4 构建上曾加载成功
+  （`.zcode/repro` diag3/diag6），疑似 v2.0.5 启动链回归，**需另立小 RE**。
+  另实测：GUI 进程加 stdout 重定向后 0.6 s 退出（GUI 子系统不容忍重定向句柄），
+  已记入脚本注释。固定触发与复现率读数待该 RE + 业主桌面。
+
 ## [2.0.5] - 2026-11-18
 
 ### Fixed — 无声卡时每帧自旋（加载 ROM 后「卡死、键盘无响应」）

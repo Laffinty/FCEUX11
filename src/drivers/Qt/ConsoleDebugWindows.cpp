@@ -305,6 +305,16 @@ void consoleWin_t::loadGameGenieROM(void)
 	dialog.setOption(QFileDialog::DontUseNativeDialog, !useNativeFileDialogVal);
 	dialog.setSidebarUrls(urls);
 
+	{
+		// BUG-V205-03: same STA reference shim as openROMFile (ConsoleFile.cpp;
+		// v2.0.5 plan §9.20, A/B/C/D experiment) -- the extra, deliberately
+		// UNBALANCED apartment reference (no CoUninitialize) keeps the Win11
+		// native dialog's COM machinery on the caller's STA; without it a
+		// close/open dialog cycle can deadlock the GUI thread. The Game
+		// Genie ROM file copy below runs synchronously in this same stack.
+		CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+	}
+
 	ret = dialog.exec();
 
 	if ( ret )

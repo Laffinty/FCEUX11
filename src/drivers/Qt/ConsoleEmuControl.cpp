@@ -168,6 +168,17 @@ void consoleWin_t::loadStateFrom(void)
 	dialog.setOption(QFileDialog::DontUseNativeDialog, !useNativeFileDialogVal);
 	dialog.setSidebarUrls(urls);
 
+	{
+		// BUG-V205-03: same STA reference shim as openROMFile (ConsoleFile.cpp;
+		// v2.0.5 plan §9.20, A/B/C/D experiment) -- the extra, deliberately
+		// UNBALANCED apartment reference (no CoUninitialize) keeps the Win11
+		// native dialog's COM machinery on the caller's STA; without it a
+		// close/open dialog cycle can deadlock the GUI thread. This path is
+		// the r7 ④ named exposure: fceu11::LoadStateFile() below runs
+		// synchronously in this same call stack.
+		CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+	}
+
 	ret = dialog.exec();
 
 	if ( ret )
@@ -257,6 +268,17 @@ void consoleWin_t::saveStateAs(void)
 
 	dialog.setOption(QFileDialog::DontUseNativeDialog, !useNativeFileDialogVal);
 	dialog.setSidebarUrls(urls);
+
+	{
+		// BUG-V205-03: same STA reference shim as openROMFile (ConsoleFile.cpp;
+		// v2.0.5 plan §9.20, A/B/C/D experiment) -- the extra, deliberately
+		// UNBALANCED apartment reference (no CoUninitialize) keeps the Win11
+		// native dialog's COM machinery on the caller's STA; without it a
+		// close/open dialog cycle can deadlock the GUI thread.
+		// fceu11::SaveStateFile() below runs synchronously in this same
+		// call stack.
+		CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+	}
 
 	ret = dialog.exec();
 
@@ -559,6 +581,16 @@ void consoleWin_t::fdsLoadBiosFile(void)
 
 	dialog.setOption(QFileDialog::DontUseNativeDialog, !useNativeFileDialogVal);
 	dialog.setSidebarUrls(urls);
+
+	{
+		// BUG-V205-03: same STA reference shim as openROMFile (ConsoleFile.cpp;
+		// v2.0.5 plan §9.20, A/B/C/D experiment) -- the extra, deliberately
+		// UNBALANCED apartment reference (no CoUninitialize) keeps the Win11
+		// native dialog's COM machinery on the caller's STA; without it a
+		// close/open dialog cycle can deadlock the GUI thread. The BIOS
+		// file copy below runs synchronously in this same call stack.
+		CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+	}
 
 	ret = dialog.exec();
 

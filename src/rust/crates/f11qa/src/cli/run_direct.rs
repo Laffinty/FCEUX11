@@ -46,6 +46,22 @@ pub fn run(args: &Args) {
             "P5: --direct mode: using Fceux11DirectAdapter (in-process via C ABI bridge)."
         );
         let results = run_direct_rom_tests(&mut direct_adapter, &manifest);
+
+        // A-2 honesty guard (runner::direct_mode_honesty_guard): a
+        // non-empty manifest that drove zero tests (no input.rom entries)
+        // must not fall through as a silent success. This module has no
+        // exit-code channel of its own (the authoritative matrix comes
+        // from the subprocess pass), so a guard hit uses the crate's
+        // existing fatal-exit style — the same `std::process::exit(1)`
+        // cli::run applies to bad args. The subprocess path is untouched;
+        // it is simply not reached in this refusal case.
+        if let Err(msg) =
+            crate::runner::direct_mode_honesty_guard(manifest.len(), results.len())
+        {
+            eprintln!("{}", msg);
+            std::process::exit(1);
+        }
+
         for r in &results {
             eprintln!(
                 "  [direct] {}: {}",

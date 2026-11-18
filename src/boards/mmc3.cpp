@@ -473,7 +473,7 @@ void M12Power(void) {
 	SetReadHandler(0x4100, 0x5FFF, M12Read);
 }
 
-static void M12Reset(void) {
+void M12Reset(void) {
 	EXPREGS[0] = EXPREGS[1] = 0;
 	EXPREGS[2] ^= 1;
 	MMC3RegReset();
@@ -513,7 +513,7 @@ static DECLFW(M37Write) {
 	FixMMC3CHR(MMC3_cmd);
 }
 
-static void M37Reset(void) {
+void M37Reset(void) {
 	EXPREGS[0] = 0;
 	MMC3RegReset();
 }
@@ -618,7 +618,7 @@ static DECLFR(M45Read) {
 		return g_cpu.native_layout().DB;
 }
 
-static void M45Reset(void) {
+void M45Reset(void) {
 	EXPREGS[0] = EXPREGS[1] = EXPREGS[2] = EXPREGS[3] = EXPREGS[4] = 0;
 	EXPREGS[5]++;
 	EXPREGS[5] &= 7;
@@ -710,7 +710,7 @@ static DECLFW(M49Write) {
 	}
 }
 
-static void M49Reset(void) {
+void M49Reset(void) {
 	EXPREGS[0] = 0;
 	MMC3RegReset();
 }
@@ -756,7 +756,7 @@ static DECLFW(M52Write) {
 	FixMMC3CHR(MMC3_cmd);
 }
 
-static void M52Reset(void) {
+void M52Reset(void) {
 	EXPREGS[0] = EXPREGS[1] = 0;
 	MMC3RegReset();
 }
@@ -848,7 +848,7 @@ void M114Power(void) {
 	SetWriteHandler(0x5000, 0x7FFF, M114ExWrite);
 }
 
-static void M114Reset(void) {
+void M114Reset(void) {
 	EXPREGS[0] = 0;
 	MMC3RegReset();
 }
@@ -1272,7 +1272,7 @@ static DECLFW(M205Write) {
 	FixMMC3CHR(MMC3_cmd);
 }
 
-static void M205Reset(void) {
+void M205Reset(void) {
 	EXPREGS[0] = 0;
 	EXPREGS[1] ^= 2; /* solder pad */
 	MMC3RegReset();
@@ -1698,6 +1698,40 @@ void Mapper249Cart::on_power() noexcept { M249Power(); }
 void Mapper250Cart::on_power() noexcept { M250_Power(); }
 void Mapper254Cart::on_power() noexcept { M254_Power(); }
 void Mapper406Cart::on_power() noexcept { M406_Power(); }
+
+// ---------------------------------------------------------------------------
+// A-1 (2026-11-18 盘点计划 §二 A-1 / v2.0.5 §9.22): wire the 7 MMC3-family
+// boards' own reset functions.  语义来源 = 上游 2.8.0 同款板级 Reset.
+//
+// The loader overwrites info->Reset with CartInfo_ResetForward whenever the
+// registry produced a Cart object (src/ines.cpp), so for every REGISTERED
+// mapper the board's `info->Reset = MxxReset` assignment never ran.
+// Mmc3BaseCart::on_reset() calls MMC3RegReset() only -- so the EXPREGS part
+// of these seven boards' reset semantics never executed: the language-bit
+// toggle (12), the multi-cart lock counter (45) and the solder-pad bit (205)
+// never fired, and EXPREGS values written by the game at runtime survived a
+// reset on 37/49/52/114 (the board power clears them only at power-on).
+//
+// Each override calls its own board reset function directly -- the same
+// pattern as the on_power overrides above.  The board reset functions lost
+// their `static` for exactly this reason (the same precedent as the A2 power
+// wiring).  Every MxxReset here already ends in MMC3RegReset(), so the
+// override REPLACES the base-class behavior wholesale -- it must not call
+// MMC3RegReset itself on top.
+//
+// The 7 numbers: 12 37 45 49 52 114 205.  Every other MMC3-family board
+// either leaves info->Reset at GenMMC3_Init's MMC3RegReset or sets no Reset
+// at all -- for them the base class is exactly right, and they must NOT get
+// an on_reset override by analogy (see mmc3_variants_carts.h).
+// ---------------------------------------------------------------------------
+
+void Mapper12Cart::on_reset() noexcept  { M12Reset(); }
+void Mapper37Cart::on_reset() noexcept  { M37Reset(); }
+void Mapper45Cart::on_reset() noexcept  { M45Reset(); }
+void Mapper49Cart::on_reset() noexcept  { M49Reset(); }
+void Mapper52Cart::on_reset() noexcept  { M52Reset(); }
+void Mapper114Cart::on_reset() noexcept { M114Reset(); }
+void Mapper205Cart::on_reset() noexcept { M205Reset(); }
 
 namespace {
 

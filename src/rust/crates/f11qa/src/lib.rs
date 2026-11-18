@@ -493,6 +493,21 @@ pub mod direct_entry {
             blocking_failed
         );
 
+        // A-2 honesty guard (runner::direct_mode_honesty_guard): a
+        // non-empty manifest that drove zero tests (no input.rom entries)
+        // must not exit 0 — that was the vacuous `f11qa_direct_smoke`
+        // pass (v2.0.5 r13 ⑥). Zero executed is an ADDITIONAL failure
+        // condition, OR-ed with the blocking-failure count below; the
+        // matrix report is still written either way.
+        let zero_executed_violation =
+            match crate::runner::direct_mode_honesty_guard(manifest.len(), results.len()) {
+                Ok(()) => false,
+                Err(msg) => {
+                    eprintln!("{}", msg);
+                    true
+                }
+            };
+
         // Write minimal JSON report.
         let report = serde_json::json!({
             "runner": "kagami-qa-direct-runner",
@@ -515,6 +530,7 @@ pub mod direct_entry {
         // missing-ROM, E-1 pending accuracy rebalance) are reported in
         // the matrix but do not propagate to the process exit code —
         // the same convention as kagami-qa-runner (subprocess mode).
-        if blocking_failed > 0 { 1 } else { 0 }
+        // A-2: zero executed (guard above) fails the run regardless.
+        if blocking_failed > 0 || zero_executed_violation { 1 } else { 0 }
     }
 }

@@ -196,6 +196,17 @@ void consoleWin_t::aviRecordAsStart(void)
 	dialog.setOption(QFileDialog::DontUseNativeDialog, !useNativeFileDialogVal);
 	dialog.setSidebarUrls(urls);
 
+	{
+		// BUG-V205-03: same STA reference shim as openROMFile (ConsoleFile.cpp;
+		// v2.0.5 plan §9.20, A/B/C/D experiment) -- the extra, deliberately
+		// UNBALANCED apartment reference (no CoUninitialize) keeps the Win11
+		// native dialog's COM machinery on the caller's STA; without it a
+		// close/open dialog cycle can deadlock the GUI thread.
+		// aviRecordOpenFile() + aviDiskThread->start() below run
+		// synchronously in this same call stack.
+		CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+	}
+
 	ret = dialog.exec();
 
 	if ( ret )
@@ -386,6 +397,17 @@ void consoleWin_t::wavRecordAsStart(void)
 
 	dialog.setOption(QFileDialog::DontUseNativeDialog, !useNativeFileDialogVal);
 	dialog.setSidebarUrls(urls);
+
+	{
+		// BUG-V205-03: same STA reference shim as openROMFile (ConsoleFile.cpp;
+		// v2.0.5 plan §9.20, A/B/C/D experiment) -- the extra, deliberately
+		// UNBALANCED apartment reference (no CoUninitialize) keeps the Win11
+		// native dialog's COM machinery on the caller's STA; without it a
+		// close/open dialog cycle can deadlock the GUI thread.
+		// fceu11::BeginWaveRecord() below runs synchronously in this same
+		// call stack.
+		CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+	}
 
 	ret = dialog.exec();
 

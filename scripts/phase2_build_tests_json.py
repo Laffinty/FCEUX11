@@ -3,17 +3,29 @@ Phase 2 — tests.json v1.8 生成器（v1）
 数据驱动：47 项 v1.17 迁移 + 65 项 rom-suite + 8 项其他 = 120 项
 + r15 追加：kgmqa-121/122/123（共 123 项）
 
-⚠️⚠️ **2026-11-14（v2.0.4 r15）本脚本与产物 `tests/tests.json` 仍有 133 处漂移，
+⚠️⚠️ **2026-11-14（v2.0.4 r15）本脚本与产物 `tests/tests.json` 曾有 133 处漂移，
    直接重跑会「打断 88 条用例 + 翻转 15 条 failure_means（改 grade 语义）」：
      * 85 条 `input.binary` 还是旧名（`fceux11_*` → 现已是 `f11qa_*`）；
      * 84 条 `input.args` 缺失（产物里补了 `--rom/--frames` 等）；
      * 83 条 `input.working_dir` 不同；
      * 15 条 `failure_means`：产物是 `advisory`（业主裁决降级），本脚本仍是 `blocking`
        ⇒ 重生成会把它们翻回 blocking ⇒ **改判红体系与 grade 语义**。
-   ⇒ **本脚本现在带护栏**：直接写 `tests/tests.json` 时会先比对现产物，
-   发现上述漂移就**拒绝覆盖**并打印报告；要看生成结果请写到别的路径
-   （例：`python scripts/phase2_build_tests_json.py /tmp/gen.json`），
-   或在**完成一次「生成器对齐」**（把上述 133 处按产物为准回填进本脚本）之后再解除。
+
+✅ **2026-11-19（批 2.2，C-3 裁决「先机械对齐、后评审」）机械层已对齐**：
+   上面的 85/84/83 处 input 机械漂移 + 提取时新发现的 1 处
+   `input.sut_input`（kgmqa-107，V4 加的 SNES 鼠标注入 `[8,0]`），
+   已按**产物为准**逐字段回填进数据文件
+   `scripts/tests_json_mechanical_overrides.json`（88 case × 机械字段），
+   `make_case` 组装 `input` 时查表采用（采用计数在 main() 打印）。
+   ⇒ 重跑本脚本与产物的**剩余漂移**只剩评审/手工层：
+     * 15 条 `failure_means`（产物 advisory vs 本脚本 blocking）——
+       **C-4 同级评审地盘，本脚本不碰**；
+     * `known_limit` / `provenance` / `protocol` / `mirror_path` /
+       `mirror_glob` 等产物手工维护字段（本脚本 schema 从未建模，不碰）。
+   ⇒ 因此**护栏保留**：直接写 `tests/tests.json` 仍会因 15 条
+   failure_means **拒绝覆盖**（EXIT=2）——这是有意的，解除它须先走完 C-4 评审。
+   要看生成结果请写到别的路径
+   （例：`python scripts/phase2_build_tests_json.py /tmp/gen.json`）。
 """
 import json
 import sys
@@ -24,6 +36,48 @@ from copy import deepcopy
 # 镜像源第一个 tag (决策 8b) — 默认所有 rom-suite 引用
 DEFAULT_MIRROR_REF = 'v1.8.0-mirror'
 MIRROR_REPO = 'https://github.com/Laffinty/f11qa-rom-mirror'
+
+# ============================================================================
+# 机械覆盖表（批 2.2，2026-11-19，坑 15 对齐，C-3 裁决「先机械对齐、后评审」）
+# ----------------------------------------------------------------------------
+# 产物 tests/tests.json 是**事实源**。本脚本 KG_* 数据行里的
+# binary / args / working_dir 三类**机械** input 字段与产物漂移
+# （85 / 84 / 83 处），外加提取时新发现的 1 处 `input.sut_input`
+# （kgmqa-107，V4 加进产物的 SNES 鼠标注入 [8, 0]，生成器从未建模）
+# ——已按产物为准逐字段回填进 scripts/tests_json_mechanical_overrides.json，
+# make_case 组装 input 时查表采用。
+#
+# 机制：表值 = 产物 input 里的原值；表值为 null 表示「产物无此键」
+# （生成器须省略该键）。每 case 只覆盖**有漂移的字段**，无漂移的字段仍以
+# 本脚本 KG_* 数据行为准。采用计数在 main() 打印（纪律 10 的镜像——
+# 静默生效的覆盖表等于没有表）。
+#
+# 理由（坑 15 现状）：产物是半手工维护的产物，历史上对它做过三类机械修正
+# （binary 改名 f11qa_* / f11qa-rom-runner、args 补 --kgmqa-id 形态、
+# working_dir 改 '.'）+ V4 的 sut_input；在机械层上「生成器为准」是错的。
+# 对齐后剩余漂移应只剩**评审/手工层**（15 条 failure_means、known_limit、
+# provenance、protocol、mirror_path、mirror_glob）——本脚本一概不碰。
+# ============================================================================
+_MECHANICAL_OVERRIDES_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'tests_json_mechanical_overrides.json')
+_MECHANICAL_OVERRIDES = None
+_MECHANICAL_OVERRIDE_HITS = []
+
+
+def mechanical_overrides():
+    """Lazy-load the mechanical override table (missing file = hard error)."""
+    global _MECHANICAL_OVERRIDES
+    if _MECHANICAL_OVERRIDES is None:
+        if not os.path.exists(_MECHANICAL_OVERRIDES_PATH):
+            raise SystemExit(
+                'mechanical overrides table missing: %s '
+                '(batch-2.2 alignment data; regenerate it from tests/tests.json)'
+                % _MECHANICAL_OVERRIDES_PATH)
+        with open(_MECHANICAL_OVERRIDES_PATH, encoding='utf-8') as f:
+            doc = json.load(f)
+        _MECHANICAL_OVERRIDES = doc.get('overrides', {})
+    return _MECHANICAL_OVERRIDES
 
 # policy 默认值（v1.8 §六 §6.1）
 POLICY = {
@@ -364,6 +418,18 @@ def make_case(kgmqa_id, legacy_id, title, kind, layer, spec_source,
         input_obj['args'] = args
     if input_extra:
         input_obj.update(input_extra)
+
+    # 机械覆盖表（批 2.2）：产物为准的机械 input 字段（binary / args /
+    # working_dir + kgmqa-107 的 sut_input）。表值为 null ⇒ 产物无此键，
+    # 生成器省略。只覆盖登记过的字段；评审层字段不在表内（见上方说明块）。
+    ov = mechanical_overrides().get(kgmqa_id)
+    if ov:
+        for field, value in ov.items():
+            if value is None:
+                input_obj.pop(field, None)
+            else:
+                input_obj[field] = value
+        _MECHANICAL_OVERRIDE_HITS.append(kgmqa_id)
 
     case = {
         'kgmqa_id': kgmqa_id,
@@ -1141,6 +1207,15 @@ def main():
     cases.extend(build_cases_f_rest())      # 081-112 (32 项)
     cases.extend(build_cases_g_j())         # 113-120 (8 项)
     cases.append(build_case_121())          # 121（产物末尾，2026-11-06 追加）
+    # 机械覆盖采用计数（批 2.2，纪律 10 镜像）：当场看到表被用了多少——
+    # 计数为 0 说明表加载了却没生效，这本身就是要报出来的异常。
+    field_counts = {}
+    for cid in _MECHANICAL_OVERRIDE_HITS:
+        for f in mechanical_overrides().get(cid, {}):
+            field_counts[f] = field_counts.get(f, 0) + 1
+    print('mechanical overrides applied: %d cases (%s)' % (
+        len(_MECHANICAL_OVERRIDE_HITS),
+        ', '.join('%s=%d' % kv for kv in sorted(field_counts.items())) or 'none'))
     # v2.0.4 r15: 编号检查从「位置 == 编号」改为「集合完整」。
     # 122/123 是插在中间的（产物里就是那个顺序），位置法会刷一屏假 WARN；
     # 真正要防的是**编号缺失或重复**（那会让某条用例在重跑生成器后消失）。

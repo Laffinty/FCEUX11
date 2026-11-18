@@ -861,6 +861,32 @@ if(FCEUX11_BUILD_TESTS)
                  --manifest tests.json
                  --output ${CMAKE_BINARY_DIR}/f11qa_direct_matrix.json
                  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+        # A-2 (2026-11-19): the artifact tests.json has 123 cases, all
+        # subprocess-style (no input.rom entries), so the direct runner
+        # executed 0 of 123 and still exited 0 -- ctest judged this entry
+        # "Passed" while nothing ran (vacuous gate, v2.0.5 r13 ⑥). The
+        # runner now refuses that state: runner::direct_mode_honesty_guard
+        # (src/rust/crates/f11qa/src/runner/mod.rs) prints a fixed message
+        # to stderr and the process exits non-zero. This entry is therefore
+        # WILL_FAIL with FAIL_REGULAR_EXPRESSION matching the fixed
+        # message fragment "executed 0 of":
+        #   - guard present  => runner exits non-zero with the message
+        #                      => ctest reports "Expected Fail" => gate green;
+        #   - guard removed  => runner exits 0, no message
+        #                      => ctest reports "Failed" (expected to fail
+        #                         but passed) => gate red.
+        # Mutation check (discipline 3): comment out the
+        # direct_mode_honesty_guard call in direct_entry::kagami_qa_direct_main
+        # (src/rust/crates/f11qa/src/lib.rs), rebuild, then
+        # `ctest -R f11qa_direct_smoke` must report Failed; restore the
+        # call and it must report "Expected Fail" again.
+        # (Known WILL_FAIL limit: ctest cannot tell WHICH leg fired, so a
+        # non-zero exit for an unrelated reason would also read "Expected
+        # Fail" -- the regex narrows the honest path to the guard message.)
+        set_tests_properties(f11qa_direct_smoke PROPERTIES
+                WILL_FAIL TRUE
+                FAIL_REGULAR_EXPRESSION "executed 0 of"
+                TIMEOUT 120)
         if(WIN32)
             set_tests_properties(f11qa_direct_smoke PROPERTIES ENVIRONMENT_MODIFICATION
                     "${_FCEUX11_TEST_PATH_MODIFICATIONS}")

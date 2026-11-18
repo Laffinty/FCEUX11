@@ -37,6 +37,12 @@ if (-not $Rom)   { $Rom = Join-Path $repo "tests\fixtures\nestest.nes" }
 if (-not $Counter) { $Counter = Join-Path $repo ".zcode\repro\yield_counter.txt" }
 $Lua = Join-Path $repo "scripts\repro\yield_only.lua"
 
+# A-4 / D1 step-1 diagnostics: capture the GUI's stdout/stderr so a
+# "SCRIPT-NEVER-RAN" verdict is explainable (Lua load errors print to
+# stdout via FCEU_printf; a GUI-subsystem exe loses them unless redirected).
+$GuiLog   = Join-Path $repo ".zcode\repro\gui_launch_stdout.log"
+$GuiLogE  = Join-Path $repo ".zcode\repro\gui_launch_stderr.log"
+
 if (-not (Test-Path $Exe)) { Write-Output "MISSING EXE: $Exe"; exit 2 }
 if (-not (Test-Path $Rom)) { Write-Output "MISSING ROM: $Rom"; exit 2 }
 if (-not (Test-Path $Lua)) { Write-Output "MISSING LUA: $Lua"; exit 2 }
@@ -64,6 +70,12 @@ try {
     $start = Get-Date
     Write-Output ("LAUNCH: $Exe `"$Rom`"  (cwd=$cfgDir, watch $Seconds s)")
     $proc = Start-Process -FilePath $Exe -ArgumentList "`"$Rom`"" -WorkingDirectory $cfgDir -PassThru
+    # NOTE (2026-11-19): do NOT add -RedirectStandardOutput/-RedirectStandardError
+    # to this Start-Process. Measured: with redirection the GUI exits after
+    # ~0.6 s (empty exit code); without it the same exe runs normally. The
+    # GUI-subsystem process does not tolerate redirected handles here, so
+    # GUI-side Lua load errors are NOT capturable this way (diag4/5 in
+    # .zcode/repro reached the same wall on 2026-11-14).
 
     $deadline = $start.AddSeconds($Seconds)
     $crashed = $false
@@ -88,6 +100,14 @@ try {
     } else {
         Write-Output "SCRIPT-NEVER-RAN: no counter file => the harness did NOT exercise the path"
         if ($code -eq 0) { $code = 3 }
+    }
+
+    # --- GUI stdout/stderr tail (why didn't the script run?) ---
+    foreach ($lg in @($GuiLog, $GuiLogE)) {
+        if (Test-Path $lg) {
+            Write-Output ("--- {0} (tail) ---" -f (Split-Path -Leaf $lg))
+            Get-Content $lg -Tail 30 | ForEach-Object { Write-Output ("  " + $_) }
+        }
     }
 
     # --- Windows event log ---

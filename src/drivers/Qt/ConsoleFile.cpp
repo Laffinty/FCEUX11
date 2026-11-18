@@ -396,6 +396,18 @@ void consoleWin_t::loadNSF(void)
 	dialog.setOption(QFileDialog::DontUseNativeDialog, !useNativeFileDialogVal);
 	dialog.setSidebarUrls(urls);
 
+	{
+		// BUG-V205-03: same STA reference shim as openROMFile -- the extra,
+		// deliberately UNBALANCED apartment reference (no CoUninitialize;
+		// v2.0.5 plan §9.20 A/B/C/D experiment) must be held BEFORE exec()
+		// so the native dialog's COM machinery stays on the caller's STA
+		// for its whole lifetime. (Placement correction 2026-11-19: the
+		// call used to sit after exec() here, where it protected nothing --
+		// the hotfix2 commit message and the openROMFile form both put it
+		// before the dialog opens.)
+		CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+	}
+
 	ret = dialog.exec();
 
 	if ( ret )
@@ -416,11 +428,9 @@ void consoleWin_t::loadNSF(void)
 
 	g_config->setOption ("SDL.LastOpenNSF", filename.toStdString().c_str() );
 
-	// BUG-V205-03: same STA reference shim as openROMFile (the dialog itself
-	// needs it -- see the full comment there), plus the same deferral of
-	// LoadGame() out of the dialog's unwind window.
-	CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
-
+	// BUG-V205-03: same deferral as openROMFile -- LoadGame() must not run
+	// inside the native file-dialog's unwind window (the STA reference
+	// shim itself sits before dialog.exec() above, where it belongs).
 	QTimer::singleShot( 0, this, [this, filename](void)
 	{
 		FCEU_WRAPPER_LOCK();

@@ -117,9 +117,16 @@ static bool check_non_power2_prg(const char* path) {
 // GenMMC3Power() maps the WRAM at $6000 instead, so $5000 stays unmapped and
 // the cartridge has no work RAM there.
 //
-// Lock: write a byte to $5000 and read it back.  With M195Power running it
-// lands in the WRAM; without it the write is dropped (open bus) and the read
-// comes back as 0x00.
+// Lock (A-3 rewrite, 2026-11-19 -- closes the v2.0.5 r2 ④ observation): the
+// original body was a bare write-then-read, and the mutation leg (M195Power's
+// setprg4r + SetWriteHandler/SetReadHandler removed, leaving only
+// GenMMC3Power) proved it TOOTHLESS: the readback still returned 0x5A,
+// because with $5000 unmapped the open-bus echo hands back the data-bus
+// latch that X6502_DMW just filled (the old comment claimed "the read comes
+// back as 0x00" -- wrong, measured).  The rewrite uses the A2 WRAM_WINDOW
+// technique: handler identity first, then a poison write to $4020 between
+// the write and the read, so the open bus echoes the poison, not the payload
+// (same immunity argument as the A2 section header above).
 static bool check_mapper198_power(const char* path) {
     FCEUGI* gi = fceu11::LoadGame(path, 1, true);
     if (!gi) {
@@ -131,10 +138,34 @@ static bool check_mapper198_power(const char* path) {
         fceu11::CloseGame();
         return false;
     }
-    X6502_DMW(0x5000, 0x5A);
+    // A-3 rewrite (2026-11-19, closes the v2.0.5 r2 observation): the
+    // original body was a bare write-then-read and was measured TOOTHLESS
+    // under the real mutation (M195Power's $5000 wiring removed): the
+    // readback still returned 0x5A, because with $5000 unmapped the
+    // open-bus echo hands back the data-bus latch that X6502_DMW just
+    // filled (the old comment claimed "the read comes back as 0x00" --
+    // wrong, measured).  The rewrite uses the A2 WRAM_WINDOW technique:
+    // handler identity first, then a poison write to $4020 between the
+    // write and the read, so the open bus echoes the poison, not the
+    // payload.  Mutation-verified both ways on 2026-11-19: with the wiring
+    // removed this lock FAILS (handlers 0/0, readback 0x00 = the echoed
+    // poison); with the wiring restored it passes.  The old-style body was
+    // also run against the same mutation and stayed green (readback 0x5A).
+    const bool rd_ok = (GetReadHandler(0x5000) == &CartBR);
+    const bool wr_ok = (GetWriteHandler(0x5000) == &CartBW);
+    X6502_DMW(0x5000, 0x5A);   // into the board's WRAM window (when wired)
+    X6502_DMW(0x4020, 0x00);   // poison the open-bus data latch
     const uint8_t readback = X6502_DMR(0x5000);
-    printf("      WRAM[0x5000] readback = 0x%02X\n", readback);
+    printf("      $5000 read handler == CartBR: %d, write handler == "
+           "CartBW: %d, WRAM[0x5000] readback = 0x%02X\n",
+           rd_ok ? 1 : 0, wr_ok ? 1 : 0, readback);
     fceu11::CloseGame();
+    if (!rd_ok || !wr_ok) {
+        printf("FAIL: %s: the board's CartBR/CartBW handlers are not "
+               "installed at $5000 -- mapper 198's own power function "
+               "(M195Power) did not run\n", path);
+        return false;
+    }
     if (readback != 0x5A) {
         printf("FAIL: %s: $5000 is not writable -- mapper 198's own power "
                "function (M195Power) did not run\n", path);
@@ -142,6 +173,7 @@ static bool check_mapper198_power(const char* path) {
     }
     return true;
 }
+
 
 // v2.0.4 V9: mapper 218 (the CHR-RAM -> NTARAM board) maps CHR-RAM's 1K
 // pages into NTARAM through VPageR[] (src/boards/datalatch.cpp).  The PPU
@@ -863,6 +895,241 @@ static bool check_mapper45_window(const std::filesystem::path& dir) {
         ok = false;
     }
     fceu11::CloseGame();
+    return ok;
+}
+
+// ==================== A-1 (2026-11-18 plan §二 A-1): MMC3-family board reset wiring ====================
+//
+// The loader overwrites info->Reset with CartInfo_ResetForward whenever the
+// registry produced a Cart object (src/ines.cpp:82), so for every REGISTERED
+// mapper the board's own `info->Reset = MxxReset` assignment never ran.
+// Mmc3BaseCart::on_reset() calls MMC3RegReset() only, so the seven boards
+// whose reset does more than MMC3RegReset lost their reset semantics:
+//
+//     12   M12Reset   EXPREGS[0..1]=0; EXPREGS[2]^=1 -- reset toggles the
+//                      chinese/english language bit (a real user feature of
+//                      these multi-cart boards)
+//     37   M37Reset   EXPREGS[0]=0
+//     45   M45Reset   EXPREGS[0..4]=0; EXPREGS[5]=++&7 -- the multi-cart
+//                      lock counter advances once per reset
+//     49   M49Reset   EXPREGS[0]=0
+//     52   M52Reset   EXPREGS[0..1]=0
+//     114  M114Reset  EXPREGS[0]=0
+//     205  M205Reset  EXPREGS[0]=0; EXPREGS[1]^=2 -- the solder-pad bit
+//
+// While unwired, EXPREGS values written by the game at runtime SURVIVED a
+// user reset on 37/49/52/114 (state leak -- the board power clears them only
+// at power-on), and the toggle/counter semantics of 12/45/205 never fired.
+//
+// Every lock below poisons EXPREGS AFTER the load (from the game's point of
+// view -- the runtime state a user reset has to clean up) and drives
+// fceu11::ResetNES(): the same path a user reset takes (FCEUNPCMD_RESET ->
+// GameInterface(GI_RESETM2) -> iNESCart.Reset -> CartInfo_ResetForward ->
+// cart_obj->on_reset()).  The base-class path keeps the poison, so every
+// lock is red against the unwired behavior.  The observable is the boards'
+// own EXPREGS register file -- never a bus readback (the A1-S3 open-bus
+// echo trap).
+//
+// Mutation legs this section guards (discipline 3, verify two-way):
+//   M1: any ONE of the seven on_reset overrides reverted to the base-class
+//       body (MMC3RegReset() only) -> exactly that board's lock goes red;
+//       the other six and the controls stay green (per-board independence).
+//   M2: the EXPREGS line inside a board reset function dropped (e.g.
+//       `EXPREGS[2] ^= 1;` removed from M12Reset) -> that board's toggle /
+//       counter leg goes red on the poisoned index.
+//
+// Controls pin the seven-number list: plain MMC3 (mapper 4, the Mmc3Cart
+// override) and the six boards WITHOUT a board reset function (74/118/119/
+// 191/192/194 -- the header-only classes in mmc3_variants_carts.h) must
+// KEEP the poison: MMC3RegReset never touches EXPREGS.  An on_reset
+// override added by analogy to a board whose Init never sets info->Reset
+// turns the control red the moment it clears EXPREGS; an override that only
+// calls MMC3RegReset is observationally identical to the base class and
+// cannot be caught here (the mapper 245 precedent) -- the header comment in
+// mmc3_variants_carts.h forbids it instead.
+
+// The poison value for the reset locks (same role as kA2Poison above).  It
+// differs from every post-reset value the locks below assert (0 and the
+// toggle results 1 / 2), so a board whose reset did not run keeps the
+// poison and the lock reads red.
+static const uint8_t kA1Poison = 0xA5;
+
+// The four boards whose reset zeroes EXPREGS[0..zeroed) on top of
+// MMC3RegReset.  With the base-class path the poison survives -> red.
+struct A1ClearCase {
+    uint32_t    mapper;
+    int         zeroed;    // EXPREGS[0..zeroed) must read 0 after one reset
+    const char* reset_fn;  // names the expected actor in the run log
+};
+static const A1ClearCase kA1ClearCases[] = {
+    {  37, 1, "M37Reset"  },
+    {  49, 1, "M49Reset"  },
+    {  52, 2, "M52Reset"  },  // zeroes EXPREGS[0] AND EXPREGS[1]
+    { 114, 1, "M114Reset" },
+};
+static const int NUM_A1_CLEAR_CASES =
+    static_cast<int>(sizeof(kA1ClearCases) / sizeof(kA1ClearCases[0]));
+
+// Loads the synthetic A-1 ROM for `mapper` and guards the mappernum.  The
+// caller poisons EXPREGS, drives fceu11::ResetNES() and asserts; the caller
+// owns the CloseGame() on the success path.
+static bool load_a1_rom(uint32_t mapper, const std::filesystem::path& dir) {
+    const std::filesystem::path rom =
+        dir / ("a1_mapper_" + std::to_string(mapper) + ".nes");
+    if (!write_minimal_ines_rom(rom, mapper)) {
+        printf("FAIL: cannot write the mapper %u ROM\n", mapper);
+        return false;
+    }
+    FCEUGI* gi = fceu11::LoadGame(rom.string().c_str(), 1, true);
+    if (!gi) {
+        printf("FAIL: the mapper %u ROM did not load\n", mapper);
+        return false;
+    }
+    if (gi->mappernum != static_cast<int>(mapper)) {
+        printf("FAIL: loaded as mapper %d (expected %u)\n",
+               gi->mappernum, mapper);
+        fceu11::CloseGame();
+        return false;
+    }
+    return true;
+}
+
+// Asserts the full 8-byte EXPREGS footprint against `expect` and prints the
+// actual values under `tag`.
+static bool a1_expect_expregs(uint32_t mapper, const char* tag,
+                              const uint8_t expect[8]) {
+    printf("      %s EXPREGS =", tag);
+    for (int i = 0; i < 8; ++i) printf(" %02X", EXPREGS[i]);
+    printf("\n");
+    bool ok = true;
+    for (int i = 0; i < 8; ++i) {
+        if (EXPREGS[i] != expect[i]) {
+            printf("FAIL: mapper %u: %s EXPREGS[%d] is 0x%02X, expected "
+                   "0x%02X\n", mapper, tag, i, EXPREGS[i], expect[i]);
+            ok = false;
+        }
+    }
+    return ok;
+}
+
+// 37/49/52/114: one reset must zero EXPREGS[0..zeroed) and leave the rest
+// of the register file alone (the exact upstream footprint).
+static bool check_a1_reset_clears(const A1ClearCase& c,
+                                  const std::filesystem::path& dir) {
+    if (!load_a1_rom(c.mapper, dir)) return false;
+    for (int i = 0; i < 8; ++i) EXPREGS[i] = kA1Poison;
+    fceu11::ResetNES();
+    uint8_t expect[8];
+    for (int i = 0; i < 8; ++i)
+        expect[i] = kA1Poison;
+    for (int i = 0; i < c.zeroed; ++i)
+        expect[i] = 0x00;
+    char tag[64];
+    snprintf(tag, sizeof(tag), "after 1 reset (%s):", c.reset_fn);
+    const bool ok = a1_expect_expregs(c.mapper, tag, expect);
+    fceu11::CloseGame();
+    return ok;
+}
+
+// Mapper 12: the reset toggles the language bit EXPREGS[2] (^= 1) and
+// clears EXPREGS[0..1].  Two resets are needed to observe the toggle in
+// both directions (one reset cannot tell ^=1 from =1).  EXPREGS[2] is
+// poisoned with 0 BEFORE the resets -- poisoning it with kA1Poison and
+// asserting the two-reset result would be vacuous (0xA5 ^ 1 ^ 1 == 0xA5:
+// the poison would come back on its own).
+static bool check_a1_mapper12_reset(const std::filesystem::path& dir) {
+    if (!load_a1_rom(12, dir)) return false;
+    for (int i = 0; i < 8; ++i) EXPREGS[i] = kA1Poison;
+    EXPREGS[2] = 0x00;
+
+    bool ok = true;
+    fceu11::ResetNES();
+    const uint8_t after1[8] = { 0x00, 0x00, 0x01,
+                                kA1Poison, kA1Poison, kA1Poison, kA1Poison, kA1Poison };
+    ok = a1_expect_expregs(12, "after reset 1 (M12Reset):", after1) && ok;
+    fceu11::ResetNES();
+    const uint8_t after2[8] = { 0x00, 0x00, 0x00,
+                                kA1Poison, kA1Poison, kA1Poison, kA1Poison, kA1Poison };
+    ok = a1_expect_expregs(12, "after reset 2 (toggle back):", after2) && ok;
+    fceu11::CloseGame();
+    return ok;
+}
+
+// Mapper 45: the reset zeroes EXPREGS[0..4] and advances the multi-cart
+// lock counter EXPREGS[5] once per reset (++ then &7).  The counter is
+// poisoned with 0xFF so the wrap leg (0xFF + 1 -> 0) is on the first reset
+// and the increment leg (0 -> 1) on the second.
+static bool check_a1_mapper45_reset(const std::filesystem::path& dir) {
+    if (!load_a1_rom(45, dir)) return false;
+    for (int i = 0; i < 8; ++i) EXPREGS[i] = kA1Poison;
+    EXPREGS[5] = 0xFF;
+
+    bool ok = true;
+    fceu11::ResetNES();
+    const uint8_t after1[8] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                kA1Poison, kA1Poison };
+    ok = a1_expect_expregs(45, "after reset 1 (M45Reset, 0xFF wraps to 0):", after1) && ok;
+    fceu11::ResetNES();
+    const uint8_t after2[8] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+                                kA1Poison, kA1Poison };
+    ok = a1_expect_expregs(45, "after reset 2 (counter advances to 1):", after2) && ok;
+    fceu11::CloseGame();
+    return ok;
+}
+
+// Mapper 205: the reset zeroes EXPREGS[0] and flips the solder-pad bit
+// EXPREGS[1] bit 1 (^= 2).  EXPREGS[1] is poisoned with 0 before the resets
+// (same vacuity argument as mapper 12's language bit) so the two-reset
+// sequence is 0 -> 2 -> 0.
+static bool check_a1_mapper205_reset(const std::filesystem::path& dir) {
+    if (!load_a1_rom(205, dir)) return false;
+    for (int i = 0; i < 8; ++i) EXPREGS[i] = kA1Poison;
+    EXPREGS[1] = 0x00;
+
+    bool ok = true;
+    fceu11::ResetNES();
+    const uint8_t after1[8] = { 0x00, 0x02,
+                                kA1Poison, kA1Poison, kA1Poison, kA1Poison, kA1Poison, kA1Poison };
+    ok = a1_expect_expregs(205, "after reset 1 (M205Reset):", after1) && ok;
+    fceu11::ResetNES();
+    const uint8_t after2[8] = { 0x00, 0x00,
+                                kA1Poison, kA1Poison, kA1Poison, kA1Poison, kA1Poison, kA1Poison };
+    ok = a1_expect_expregs(205, "after reset 2 (toggle back):", after2) && ok;
+    fceu11::CloseGame();
+    return ok;
+}
+
+// The control legs pin the seven-number list.  Plain MMC3 (mapper 4 -- the
+// Mmc3Cart override calls MMC3RegReset only) and the six boards WITHOUT a
+// board reset function (74/118/119/191/192/194) must KEEP the poison:
+// MMC3RegReset never touches EXPREGS, and neither does the base-class
+// on_reset those six use.
+static bool check_a1_no_reset_controls(const std::filesystem::path& dir) {
+    bool ok = true;
+    FCEUGI* gi = fceu11::LoadGame("fixtures/mapper_mmc3.nes", 1, true);
+    if (!gi) {
+        printf("FAIL: the plain MMC3 fixture did not load\n");
+        return false;
+    }
+    for (int i = 0; i < 8; ++i) EXPREGS[i] = kA1Poison;
+    fceu11::ResetNES();
+    const uint8_t keep[8] = { kA1Poison, kA1Poison, kA1Poison, kA1Poison,
+                              kA1Poison, kA1Poison, kA1Poison, kA1Poison };
+    ok = a1_expect_expregs(4, "after 1 reset (poison must survive):", keep) && ok;
+    fceu11::CloseGame();
+
+    // The six boards whose Init never sets info->Reset: they run the base
+    // class's on_reset, and the poison must survive it too.
+    static const uint32_t kNoResetMappers[] = { 74, 118, 119, 191, 192, 194 };
+    for (uint32_t mapper : kNoResetMappers) {
+        if (!load_a1_rom(mapper, dir)) return false;
+        for (int i = 0; i < 8; ++i) EXPREGS[i] = kA1Poison;
+        fceu11::ResetNES();
+        ok = a1_expect_expregs(mapper,
+                               "after 1 reset (no board reset, poison must survive):",
+                               keep) && ok;
+        fceu11::CloseGame();
+    }
     return ok;
 }
 
@@ -1651,6 +1918,51 @@ int main() {
            "immediately overwritten by its own CHR wrap M245CW)\n");
     printf("[A2] mapper  45 write window (A4) ... ");
     if (check_mapper45_window(sweep_dir)) {
+        printf("OK\n");
+    } else {
+        failed = true;
+    }
+
+    // ==================== A-1 (2026-11-18 plan §二 A-1) ====================
+    // The 7 MMC3-family boards whose own reset function was swallowed by
+    // CartInfo_ResetForward -- the Reset-side sibling of the A2 power
+    // wiring above.  See the A-1 section comment for the leg structure and
+    // the mutation legs.
+    printf("\n--- A-1: MMC3-family board reset wiring ---\n");
+    {
+        std::error_code ec;
+        std::filesystem::create_directories(sweep_dir, ec);
+    }
+    for (int i = 0; i < NUM_A1_CLEAR_CASES; ++i) {
+        const A1ClearCase& c = kA1ClearCases[i];
+        printf("[A-1] mapper %3u clear ... ", c.mapper);
+        if (check_a1_reset_clears(c, sweep_dir)) {
+            printf("OK\n");
+        } else {
+            printf("FAILED\n");
+            failed = true;
+        }
+    }
+    printf("[A-1] mapper  12 language-bit toggle ... ");
+    if (check_a1_mapper12_reset(sweep_dir)) {
+        printf("OK\n");
+    } else {
+        failed = true;
+    }
+    printf("[A-1] mapper  45 lock counter ... ");
+    if (check_a1_mapper45_reset(sweep_dir)) {
+        printf("OK\n");
+    } else {
+        failed = true;
+    }
+    printf("[A-1] mapper 205 solder-pad toggle ... ");
+    if (check_a1_mapper205_reset(sweep_dir)) {
+        printf("OK\n");
+    } else {
+        failed = true;
+    }
+    printf("[A-1] no-reset controls (mapper 4 + 74/118/119/191/192/194) ... ");
+    if (check_a1_no_reset_controls(sweep_dir)) {
         printf("OK\n");
     } else {
         failed = true;

@@ -1,0 +1,1039 @@
+{
+  "_meta": {
+    "purpose": "Mechanical input-layer overrides for scripts/phase2_build_tests_json.py (pit-15 generator/artifact alignment, batch 2.2, 2026-11-19).",
+    "source_of_truth": "tests/tests.json artifact (values extracted verbatim, artifact case order).",
+    "extracted_fields": [
+      "input.binary",
+      "input.args",
+      "input.working_dir",
+      "input.sut_input (kgmqa-107 only; discovered during extraction - V4 added [8, 0] SNES-mouse injection to the artifact, the generator never modeled it)"
+    ],
+    "not_extracted": [
+      "failure_means (judgment layer, C-4 review)",
+      "expected (baseline, C-3 review)",
+      "known_limit / provenance (manual layer)",
+      "protocol / mirror_path / mirror_glob (case-level manual fields the generator schema never modeled)"
+    ],
+    "counts": {
+      "binary": 85,
+      "args": 84,
+      "working_dir": 83,
+      "sut_input": 1,
+      "cases": 88
+    },
+    "null_semantics": "null means the artifact input has NO such key; the generator must omit it (e.g. \"args\": null).",
+    "regenerate": "python: load tests/tests.json + generator, diff input.binary/args/working_dir per kgmqa_id, emit this file."
+  },
+  "overrides": {
+    "kgmqa-021-rom-regression-cpp": {
+      "binary": "f11qa_rom_regression_runner"
+    },
+    "kgmqa-022-savestate-regression-cpp": {
+      "binary": "f11qa_savestate_regression_runner"
+    },
+    "kgmqa-025-mapper-byte-diff-cpp": {
+      "binary": "f11qa_mapper_byte_diff_runner"
+    },
+    "kgmqa-030-blargg-runner": {
+      "args": [
+        "--rom",
+        "fixtures/nestest.nes",
+        "--frames",
+        "60"
+      ]
+    },
+    "kgmqa-031-blargg-smoke": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-031-blargg-smoke",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-032-cpu-instrs-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-032-cpu-instrs-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "3000"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-033-cpu-timing-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-033-cpu-timing-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-034-ppu-vbl-nmi-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-034-ppu-vbl-nmi-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-035-mmc3-4-scanline-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-035-mmc3-4-scanline-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-036-mmc3-v2-4-scanline-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-036-mmc3-v2-4-scanline-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-037-cpu-int-2-nmi-brk-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-037-cpu-int-2-nmi-brk-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-038-instr-misc-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-038-instr-misc-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-039-oam-stress-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-039-oam-stress-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-040-vbl-05-nmi-timing-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-040-vbl-05-nmi-timing-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-041-ppu-read-buffer-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-041-ppu-read-buffer-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-042-sprdma-dmc-dma-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-042-sprdma-dmc-dma-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-043-blargg-suite": {
+      "binary": "python",
+      "args": [
+        "scripts/run_blargg_suite_oracle.py"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-048-nestest": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-048-nestest",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "255"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-049-ppu-read-buffer-bisqwit": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-049-ppu-read-buffer-bisqwit",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "2000"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-050-cpu-dummy-writes-bisqwit": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-050-cpu-dummy-writes-bisqwit",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "400"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-051-cpu-exec-space-bisqwit": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-051-cpu-exec-space-bisqwit",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "400"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-052-cpu-flag-concurrency-bisqwit": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-052-cpu-flag-concurrency-bisqwit",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-053-branch-timing-tests-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-053-branch-timing-tests-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-054-cpu-interrupts-v2-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-054-cpu-interrupts-v2-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-055-cpu-reset-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-055-cpu-reset-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600",
+        "--reset-after",
+        "60"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-056-instr-timing-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-056-instr-timing-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "3000"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-057-instr-test-v3-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-057-instr-test-v3-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "3000"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-058-ppu-sprite-hit-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-058-ppu-sprite-hit-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-059-sprite-overflow-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-059-sprite-overflow-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-060-ppu-open-bus-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-060-ppu-open-bus-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-061-nmi-sync-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-061-nmi-sync-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-062-oam-read-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-062-oam-read-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-063-apu-test-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-063-apu-test-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-064-apu-mixer-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-064-apu-mixer-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-065-dmc-tests-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-065-dmc-tests-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-066-dmc-dma-during-read-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-066-dmc-dma-during-read-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-067-square-timer-div2-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-067-square-timer-div2-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-068-volume-tests-damianyerrick": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-068-volume-tests-damianyerrick",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-069-mmc3ir-test-nk": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-069-mmc3ir-test-nk",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-070-mmc5test-drag": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-070-mmc5test-drag",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-071-mmc5test-v2-awj": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-071-mmc5test-v2-awj",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-072-vrc24test-awj": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-072-vrc24test-awj",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-073-vrc6test-natt": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-073-vrc6test-natt",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-074-mmc1atest-tepples": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-074-mmc1atest-tepples",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-075-mmc3bigchrram-tepples": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-075-mmc3bigchrram-tepples",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-076-test28-tepples": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-076-test28-tepples",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-077-holy-mapperel-tepples": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-077-holy-mapperel-tepples",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-078-serom-lidnariq": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-078-serom-lidnariq",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-079-exram-quietust": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-079-exram-quietust",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-080-scanline-quietust": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-080-scanline-quietust",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-081-fds-irq-tests-sour": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-081-fds-irq-tests-sour",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-082-fds-mirroring-takuikaninja": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-082-fds-mirroring-takuikaninja",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-083-fds-audio-registers-takuikaninja": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-083-fds-audio-registers-takuikaninja",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-084-fds-4030d1-addr-takuikaninja": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-084-fds-4030d1-addr-takuikaninja",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-085-fds-4023-test-takuikaninja": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-085-fds-4023-test-takuikaninja",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-086-nes2-submapper-2-test": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-086-nes2-submapper-2-test",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-087-nes2-submapper-3-test": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-087-nes2-submapper-3-test",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-088-nes2-submapper-7-test": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-088-nes2-submapper-7-test",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-089-nes2-submapper-34-test": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-089-nes2-submapper-34-test",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-090-mmc5ramsize-rainwarrior": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-090-mmc5ramsize-rainwarrior",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-091-n163-soundram-rainwarrior": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-091-n163-soundram-rainwarrior",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-092-n163-soundram-init-rainwarrior": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-092-n163-soundram-init-rainwarrior",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-093-bntest": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-093-bntest",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-094-bxrom-512k-test-rainwarrior": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-094-bxrom-512k-test-rainwarrior",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-095-31-test": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-095-31-test",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-096-fme7acktest-tepples": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-096-fme7acktest-tepples",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-097-fme7ramtest-tepples": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-097-fme7ramtest-tepples",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-098-famicom-audio-swap-tests": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-098-famicom-audio-swap-tests",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "300"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-099-240pee-damianyerrick": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-099-240pee-damianyerrick",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-100-tvpassfail-tepples": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-100-tvpassfail-tepples",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-101-allpads-tepples": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-101-allpads-tepples",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-102-zap-ruder-tepples": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-102-zap-ruder-tepples",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-103-spadtest-tepples": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-103-spadtest-tepples",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-104-powerpad-tepples": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-104-powerpad-tepples",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-105-paddle-test3-3gengames": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-105-paddle-test3-3gengames",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-106-vaus-test-lidnariq": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-106-vaus-test-lidnariq",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-107-mset-rainwarrior": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-107-mset-rainwarrior",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": ".",
+      "sut_input": [
+        8,
+        0
+      ]
+    },
+    "kgmqa-108-mict-rainwarrior": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-108-mict-rainwarrior",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-109-telling-lys-tepples": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-109-telling-lys-tepples",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-110-dma-sync-test-v2-rahsennor": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-110-dma-sync-test-v2-rahsennor",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-111-read-joy3-blargg": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-111-read-joy3-blargg",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-112-nesstress-flubba": {
+      "binary": "f11qa-rom-runner",
+      "args": [
+        "--kgmqa-id",
+        "kgmqa-112-nesstress-flubba",
+        "--tests-json",
+        "tests/tests.json",
+        "--frames",
+        "600"
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-113-i18n-regression": {
+      "working_dir": "."
+    },
+    "kgmqa-114-menu-slot-check": {
+      "binary": "python",
+      "args": [
+        "scripts/check_menu_slots.py",
+        "."
+      ],
+      "working_dir": "."
+    },
+    "kgmqa-117-mirror-snapshot-check": {
+      "args": [
+        "-X",
+        "utf8",
+        "f11qa/mirror_snapshot_check.py",
+        "--manifest",
+        "fixtures/f11qa_mirror_pin.json",
+        "--tests-json",
+        "tests.json",
+        "--skip-fetch"
+      ]
+    },
+    "kgmqa-118-config-store-rust": {
+      "binary": "cargo",
+      "args": [
+        "test",
+        "-p",
+        "f11qa",
+        "--release",
+        "config_store"
+      ],
+      "working_dir": "src/rust"
+    },
+    "kgmqa-119-pixbuf-pool-rust": {
+      "binary": "cargo",
+      "args": [
+        "test",
+        "-p",
+        "f11qa",
+        "--release",
+        "pixbuf_pool"
+      ],
+      "working_dir": "src/rust"
+    },
+    "kgmqa-120-state-facade-rust": {
+      "binary": "cargo",
+      "args": [
+        "test",
+        "-p",
+        "f11qa",
+        "--release",
+        "state_facade"
+      ],
+      "working_dir": "src/rust"
+    }
+  }
+}
