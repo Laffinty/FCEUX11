@@ -189,6 +189,19 @@ if(FCEUX11_BUILD_TESTS)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     set_tests_properties(movie_roundtrip_test PROPERTIES TIMEOUT 300)
 
+    # v2.0.5 (PERF-02) - the audio sink contract when no device is open.
+    # Owner's report 2026-11-18: powering the USB speaker off (no sound card)
+    # made a loaded ROM appear frozen with a dead keyboard, because WriteSound
+    # spun ~1 s per call waiting for a callback that does not exist.
+    fceux11_add_test_executable(fceux11_sound_no_device_test
+        core/sound_no_device_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME sound_no_device_test
+             COMMAND fceux11_sound_no_device_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    set_tests_properties(sound_no_device_test PROPERTIES TIMEOUT 120)
+
     # v2.0.5 A7-1 - MMC5 power-on defaults lock (plan section 3, A7-1).
     # GenMMC5Power must start CHRBanksA / CHRBanksB / NTAMirroring / NTFill /
     # ATFill at 0 (upstream FCEUX 2.8.0 agreement; this fork used 0xFF). The
@@ -562,6 +575,7 @@ if(FCEUX11_BUILD_TESTS)
             enum_class_bitflags_test config_store_test
             core_state_test
             movie_roundtrip_test
+            sound_no_device_test
             cpu_test ppu_test apu_test bus_test mapper_core_test
         savestate_core_test golden_savestate_test bench_tolerance_test
         ppu_frame_diff_test apu_wav_diff_test apu_wav_hq_diff_test

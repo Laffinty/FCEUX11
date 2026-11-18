@@ -13,6 +13,12 @@ void WriteSound(int32 *Buffer, int Count);
 int KillSound(void);
 uint32 GetMaxSound(void);
 uint32 GetWriteSound(void);
+// v2.0.5 (PERF-02): true while an SDL audio device is open, i.e. while the ring
+// buffer actually has a consumer. When this is false WriteSound drops its
+// samples instead of waiting for a callback that does not exist. Exposed so a
+// test can pin that contract, and so the sound configuration dialog can say
+// "no device" instead of showing a buffer that will never drain.
+bool FCEUD_SoundDeviceIsOpen(void);
 // v2.0 S2-b4 stage 3': the rate the device was opened at, which is not always
 // the rate that was asked for. For a machine whose resampler is built around
 // it. See the definition in sdl-sound.cpp.

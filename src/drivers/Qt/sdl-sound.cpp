@@ -293,6 +293,15 @@ AudioOpenDeviceWorker(SDL_AudioSpec spec)
 	if (ok)
 	{
 		SDL_PauseAudio(0);
+		// v2.0.5 (PERF-02): while no device was open WriteSound dropped its
+		// samples, so the cursors may hold values from before the device was
+		// closed (or the ring may look full).  Reset them *before* publishing
+		// s_audioDeviceOpen: the emulation thread gates on that flag with
+		// acquire, so it can never observe a stale full ring that this device
+		// will not drain.
+		s_BufferRead.store(0, std::memory_order_release);
+		s_BufferWrite.store(0, std::memory_order_release);
+		s_BufferIn.store(0, std::memory_order_release);
 		s_audioOpenRate.store(static_cast<unsigned int>(spec.freq), std::memory_order_release);
 		s_audioDeviceOpen.store(true, std::memory_order_release);
 		s_audioFailAtMs.store(0, std::memory_order_release);
@@ -525,6 +534,17 @@ FCEUD_GetSoundRate(void)
 }
 
 /**
+ * True while an audio device is open (the ring buffer has a consumer).
+ *
+ * v2.0.5 (PERF-02): see the gate at the top of WriteSound.
+ */
+bool
+FCEUD_SoundDeviceIsOpen(void)
+{
+	return s_audioDeviceOpen.load(std::memory_order_acquire);
+}
+
+/**
  * Returns the amount of free space in the audio buffer.
  */
 uint32
@@ -541,6 +561,30 @@ WriteSound(int32 *buf,
            int Count)
 {
 	FCEU_PROFILE_FUNC(prof, "WriteSound"); // B2② 探点
+
+	// v2.0.5 (PERF-02): a closed sink must never cost the emulation thread a
+	// single microsecond.
+	//
+	// The ring buffer's only consumer is the SDL audio callback, which exists
+	// only while a device is open.  With no device (host whose USB sound card
+	// is unplugged/powered off -- the owner's report of 2026-11-18, or a CI
+	// runner, which has no audio endpoint at all) nothing ever drains the ring,
+	// so s_BufferIn climbs to s_BufferSize and stays there.  Every subsequent
+	// call then entered the "sound sink is not draining" spin below: one
+	// SDL_Delay(1) millisecond at a time until waitCount passed 1000, then a
+	// printf and a return -- and waitCount is local, so the next call paid the
+	// full second again.  Net effect: roughly one frame per second, which is
+	// exactly "the ROM loaded but everything is frozen and the keyboard does
+	// nothing".  (It also dereferenced the released ring after KillSound,
+	// because s_BufferSize keeps its old value while s_Buffer is null.)
+	//
+	// Dropping the samples is the correct behaviour: no device means no sink,
+	// and an emulator must not run slower because the host has no sound card.
+	// The ring is re-zeroed when a device opens later (see the worker below).
+	if (!s_audioDeviceOpen.load(std::memory_order_acquire))
+	{
+		return;
+	}
 
 	int uflowMode = 0;
 	int ovrFlowSkip = 1;
