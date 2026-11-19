@@ -37,7 +37,7 @@ pub mod scheduler;
 pub mod test_helpers;
 
 // =========================================================================
-// A-2 (2026-11-19, FCEUX11-遗留问题盘点与优化计划-2026-11-18.md §二 A-2):
+// A-2 (2026-11-19, docs/history/plans/FCEUX11-遗留问题盘点与优化计划-2026-11-18.md §二 A-2):
 // direct-mode honesty guard.
 //
 // Direct mode only drives manifest entries that carry `input.rom`; the

@@ -1,7 +1,7 @@
 # FCEUX11 -- PGO training-run script (batch 3 deliverable, 2026-11-19).
 #
 # Companion to the PGO release-policy proposal in
-# docs/plans/FCEUX11-PGO发布策略立项材料-2026-11-19.md (decision item D2 /
+# docs/history/plans/FCEUX11-PGO发布策略立项材料-2026-11-19.md (decision item D2 /
 # C-2).  The policy decision is: PGO stays OFF by default; this script makes
 # the training leg reproducible so the proposal can be evaluated without
 # re-deriving the procedure.

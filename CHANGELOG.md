@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-> 依据：`docs/plans/FCEUX11-遗留问题盘点与优化计划-2026-11-18.md` 批 1/批 2/批 3
+> 依据：`docs/history/plans/FCEUX11-遗留问题盘点与优化计划-2026-11-18.md` 批 1/批 2/批 3
 > 的执行批次（业主 2026-11-19 指示开工）。
 
 ### Fixed — MMC3 家族 7 个板的板级 Reset 接线（v2.0.5 A2 的同族收尾）
@@ -55,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 复核（临时路径生成 + 逐字段 diff）：**机械三类漂移 = 0**；剩余漂移 **125 对**
   全部为评审/手工层（failure_means 15 + known_limit 15 + provenance 15 +
   protocol 78 + mirror 2）。15 条 `failure_means` 与手工层**不动**——
-  C-3/C-4 的评审稿见 `docs/plans/FCEUX11-F11QA期望值变更-评审稿-2026-11-18.md`。
+  C-3/C-4 的评审稿见 `docs/history/plans/FCEUX11-F11QA期望值变更-评审稿-2026-11-18.md`。
 
 ### Fixed — STA 引用垫片扩展到其余对话框路径（BUG-V205-03 同机制防呆）
 
@@ -71,8 +71,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added — D2 / C-2 的 PGO 发布策略立项材料
 
 - `scripts/train_pgo.ps1`（三场景 ×12,000 帧训练 + `.pgc` 产出清单）+
-  `docs/plans/FCEUX11-PGO发布策略立项材料-2026-11-19.md`（收益读数留档 /
+  `docs/history/plans/FCEUX11-PGO发布策略立项材料-2026-11-19.md`（收益读数留档 /
   `.pgc` 可复现性两选项 / CI 双 job 成本清单）。**默认 OFF 维持**（C-2 裁决）。
+
+### Changed — 文档归档（2026-11-19）
+
+- **`docs/plans/` 三份在途文档全部移入 `docs/history/plans/`**（git 记为 rename，
+  历史可追）——遗留问题盘点与优化计划、F11QA 期望值变更评审稿、PGO 发布策略立项材料。
+  ⇒ `docs/plans/` 再次清空，与 v2.0.5 发布后的状态一致。
+- **路径引用同步改写**：`CHANGELOG.md`（3 处）、`scripts/train_pgo.ps1` 头注释、
+  `src/rust/crates/f11qa/src/runner/mod.rs` 的 A-2 注释、F11QA 评审稿内部的盘点文档
+  指针，共 6 处，改写后零残留。
+- **归档横幅 + 状态如实标注**（三份文档的归档当刻状态各不相同，不做「全部完成」的
+  一刀切表述）：① 盘点计划 = 批 1 全清 + 批 2 三清 + 批 3 材料交付，**批 2.1（A-4 /
+  D1 第一步）受阻**；② F11QA 评审稿 = **评审尚未放行**，期望值 / 基线 / 判定 / 门禁
+  口径**零改动**；③ PGO 立项材料 = 默认 OFF 维持，`.pgc` 可复现性两选项仍待裁决、
+  `train_pgo.ps1` 未在插桩树上实跑。
+- **索引同步**：`docs/history/README.md` 的 `plans/` 清单新增 3 行；`AGENTS.md` 治理
+  文档表新增盘点计划一行（并指明另两份的归档位置与状态）。
 
 ### Known limitations
 
