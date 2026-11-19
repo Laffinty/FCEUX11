@@ -27,11 +27,13 @@
 #include "utils/memory.h"
 #include "common/nes_shm.h"
 #include "Qt/throttle.h"
+#include "Qt/audio_probe_gate.h" // v2.0.5 (A1): device open/close state machine
 #include "../../profiler.h" // B2②: WriteSound 探点（OFF 态展开为空）
 
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
+#include <chrono>
 #include <memory>
 #include <atomic>
 #include <mutex>
@@ -91,13 +93,19 @@ static bool s_mute = false;
 //
 // Only the SDL side runs on the background thread; the core-side settings
 // (sample rate, volumes) stay on the calling thread exactly as before.
+//
+// v2.0.5 (A1): the *close* side was the remaining hole.  KillSound() used to
+// join that background thread unconditionally, and every KillSound() caller is
+// on the GUI thread inside FCEU_WRAPPER_LOCK -- so a close that arrived while a
+// probe was still running moved the rest of the probe (up to eight seconds on
+// the machine above) back into the GUI thread.  The open/close state machine
+// now lives in `audio_probe_gate.h`: a close is delegated to the probe thread
+// instead of waited for, a probe that is still wanted is not thrown away, and
+// SDL_CloseAudio() can still never run concurrently with SDL_OpenAudio().
 // ---------------------------------------------------------------------------
 static std::atomic<bool>         s_audioDeviceOpen{false};
-static std::atomic<bool>         s_audioOpenInFlight{false};
 static std::atomic<unsigned int> s_audioOpenRate{0};
 static std::atomic<uint32_t>     s_audioFailAtMs{0};
-static std::mutex                s_audioOpenMutex;
-static std::thread                s_audioOpenThread;
 
 // How long a failed endpoint probe is suppressed before it is retried.
 static const uint32_t kAudioRetryBackoffMs = 60000;
@@ -238,7 +246,36 @@ fillaudio(void *udata,
 }
 
 /**
- * Open the audio device on a background thread.
+ * Diagnostics hook for the PERF-01/A1 defect.
+ *
+ * The freeze showed up on hosts whose audio backend spends seconds discovering
+ * that it has no usable endpoint, and it is invisible on a host whose probe
+ * takes 300 ms -- so the fix cannot be demonstrated (or regressed against) by
+ * ordinary use on most machines.  Setting
+ *
+ *     FCEUX11_TEST_AUDIO_OPEN_DELAY_MS=3000
+ *
+ * makes every device probe take at least that long.  Closing or reloading a ROM
+ * (or touching an audio/video setting) while such a probe is running must NOT
+ * freeze the window any more.  Unset -- the normal case -- this costs one
+ * cached getenv() at startup.
+ *
+ * Same family as FCEUX11_AUDIO_TRACE (see audio_probe_gate.cpp).
+ */
+static int
+AudioProbeTestDelayMs(void)
+{
+	static const int ms = []
+	{
+		const char *v = std::getenv("FCEUX11_TEST_AUDIO_OPEN_DELAY_MS");
+		return v ? std::atoi(v) : 0;
+	}();
+
+	return ms;
+}
+
+/**
+ * Probe the machine for an audio endpoint and open the device.
  *
  * Why a thread: SDL_OpenAudio() is not just a handle hand-out -- the
  * backend probes the machine for a usable endpoint, and on a host whose
@@ -247,14 +284,19 @@ fillaudio(void *udata,
  * GUI thread, inside the wrapper lock, is what made "load a ROM" look like
  * a ten-second freeze.
  *
- * The caller never waits for the result; the device simply becomes
- * available a moment later.
+ * This function runs on the probe thread (or, for a close, nothing here runs
+ * at all).  It returns true when the device is open at `spec.freq`.
  */
-static void
-AudioOpenDeviceWorker(SDL_AudioSpec spec)
+static bool
+AudioOpenDeviceNow(SDL_AudioSpec spec)
 {
 	bool ok = false;
 	char firstErr[256] = { 0 };
+
+	if (AudioProbeTestDelayMs() > 0)
+	{
+		std::this_thread::sleep_for(std::chrono::milliseconds(AudioProbeTestDelayMs()));
+	}
 
 	if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0)
 	{
@@ -320,7 +362,46 @@ AudioOpenDeviceWorker(SDL_AudioSpec spec)
 		        (unsigned)(kAudioRetryBackoffMs / 1000));
 	}
 
-	s_audioOpenInFlight.store(false, std::memory_order_release);
+	return ok;
+}
+
+/**
+ * Close the device.  Runs on whichever thread performed the close -- the
+ * caller when nothing was in flight, otherwise the probe thread, which is the
+ * only way to keep SDL_CloseAudio() from running concurrently with the
+ * SDL_OpenAudio() that precedes it.
+ */
+static void
+AudioCloseDeviceNow(void)
+{
+	SDL_CloseAudio();
+	SDL_QuitSubSystem(SDL_INIT_AUDIO);
+	s_audioDeviceOpen.store(false, std::memory_order_release);
+	s_audioOpenRate.store(0, std::memory_order_release);
+}
+
+/**
+ * The open/close state machine.  A function-local static so that its
+ * destructor joins the probe thread before static teardown finishes: a
+ * device opened outside DriverInitialize (the sound dialog's "enable" path)
+ * is never closed by DriverKill, and a joinable std::thread would otherwise
+ * call std::terminate() on the way out.
+ */
+struct AudioProbeHolder
+{
+	fceu11::audio::AudioProbeGate gate;
+
+	AudioProbeHolder()
+	{
+		gate.setCloseHandler(AudioCloseDeviceNow);
+	}
+};
+
+static fceu11::audio::AudioProbeGate &
+AudioProbe(void)
+{
+	static AudioProbeHolder holder;
+	return holder.gate;
 }
 
 /**
@@ -329,8 +410,10 @@ AudioOpenDeviceWorker(SDL_AudioSpec spec)
  * Returns true when a device with that rate is already open (the caller
  * must then NOT touch the ring buffer -- the audio callback thread is
  * reading it), false when the device is not ready yet (it is being opened
- * on the background thread, or the last attempt failed and is still inside
+ * on the probe thread, or the last attempt failed and is still inside
  * the backoff window).
+ *
+ * Never waits for the backend.
  */
 static bool
 AudioEnsureDeviceOpen(const SDL_AudioSpec& spec)
@@ -344,13 +427,6 @@ AudioEnsureDeviceOpen(const SDL_AudioSpec& spec)
 		return true;
 	}
 
-	if (s_audioOpenInFlight.load(std::memory_order_acquire))
-	{
-		// An open is already running; do not start a second one and do not
-		// wait for it.
-		return false;
-	}
-
 	const uint32_t now = AudioNowMs();
 	const uint32_t failAt = s_audioFailAtMs.load(std::memory_order_acquire);
 	if (failAt != 0 && (now - failAt) < kAudioRetryBackoffMs)
@@ -360,13 +436,14 @@ AudioEnsureDeviceOpen(const SDL_AudioSpec& spec)
 		return false;
 	}
 
-	s_audioOpenInFlight.store(true, std::memory_order_release);
-	{
-		std::lock_guard<std::mutex> lk(s_audioOpenMutex);
-		if (s_audioOpenThread.joinable())
-			s_audioOpenThread.join();   // previous attempt has finished
-	}
-	s_audioOpenThread = std::thread(AudioOpenDeviceWorker, spec);
+	// The gate decides what an in-flight probe means: the same rate is
+	// reused (a close requested in between is cancelled), a different rate is
+	// queued behind it.  Either way this call returns immediately.
+	const SDL_AudioSpec captured = spec;
+
+	AudioProbe().requestOpen(static_cast<unsigned int>(spec.freq),
+	                         [captured]() { return AudioOpenDeviceNow(captured); });
+
 	return false;
 }
 
@@ -471,23 +548,34 @@ InitSound()
 
 	if (!deviceReady)
 	{
-		// The ring buffer is only (re)allocated when a device actually has
-		// to be opened.  When the device is already open the audio callback
-		// thread is reading this buffer, and replacing it under its feet is
-		// a data race the old code had as well (it reopened the device on
-		// every load, which tore the callback down and up again).
-		s_Buffer = std::make_unique<int[]>(s_BufferSize);
-
-		if (!s_Buffer)
+		// v2.0.5 (A1): never replace the ring under a live audio callback.
+		// Before the gate, KillSound() had already joined the probe and closed
+		// the device by the time this ran, so there was no consumer.  A close
+		// can now be *delegated*, so in principle a device can still be open
+		// here -- that needs a rate change that was not preceded by a
+		// KillSound(), which no call site does, but keeping the rule explicit
+		// is cheaper than relying on that.  The probe that is in flight closes
+		// the device and resets the cursors when it reopens.
+		if (!AudioProbe().isOpen())
 		{
-			return 0;
+			// The ring buffer is only (re)allocated when a device actually has
+			// to be opened.  When the device is already open the audio callback
+			// thread is reading this buffer, and replacing it under its feet is
+			// a data race the old code had as well (it reopened the device on
+			// every load, which tore the callback down and up again).
+			s_Buffer = std::make_unique<int[]>(s_BufferSize);
+
+			if (!s_Buffer)
+			{
+				return 0;
+			}
+			// hotfix3 B-1: store-release so the audio-callback thread, which loads
+			// these with acquire before touching the ring, sees the s_BufferStorage
+			// allocation above as well as the freshly-zeroed cursors.
+			s_BufferRead.store(0, std::memory_order_release);
+			s_BufferWrite.store(0, std::memory_order_release);
+			s_BufferIn.store(0, std::memory_order_release);
 		}
-		// hotfix3 B-1: store-release so the audio-callback thread, which loads
-		// these with acquire before touching the ring, sees the s_BufferStorage
-		// allocation above as well as the freshly-zeroed cursors.
-		s_BufferRead.store(0, std::memory_order_release);
-		s_BufferWrite.store(0, std::memory_order_release);
-		s_BufferIn.store(0, std::memory_order_release);
 	}
  
 	frmRateSampleAdj = (int)( ( ((double)soundrate) * getFrameRateAdjustmentRatio()) - ((double)soundrate) );
@@ -753,28 +841,51 @@ SilenceSound(int n)
 
 /**
  * Shut down the audio subsystem.
+ *
+ * v2.0.5 (A1): this used to join the probe thread unconditionally.  Every
+ * caller is on the GUI thread inside FCEU_WRAPPER_LOCK (CloseGame ->
+ * DriverKill, and the three settings dialogs), so a close that arrived while
+ * a probe was still running blocked the GUI for the rest of the probe -- up
+ * to eight seconds on a host whose audio endpoint is slow to fail.  The close
+ * is now delegated to the probe thread instead (`requestClose()` returns
+ * false), which keeps SDL_CloseAudio() from running concurrently with
+ * SDL_OpenAudio() without making anyone wait.
+ *
+ * The published flags are cleared first either way: WriteSound must stop
+ * feeding a ring that is about to lose its consumer.  The ring buffer itself
+ * is only released when this call performed the close itself -- a delegated
+ * close may still be followed by an InitSound() (the dialog pattern is
+ * `KillSound(); InitSound();`), which reallocates it.
  */
 int
 KillSound(void)
 {
 	fceu11::Sound(0);
 
-	// v2.0.5 (PERF-01): a device open may still be running on the background
-	// thread.  Join it before touching the SDL audio subsystem, otherwise
-	// SDL_CloseAudio() could run concurrently with SDL_OpenAudio().
-	{
-		std::lock_guard<std::mutex> lk(s_audioOpenMutex);
-		if (s_audioOpenThread.joinable())
-			s_audioOpenThread.join();
-	}
-
-	SDL_CloseAudio();
-	SDL_QuitSubSystem(SDL_INIT_AUDIO);
-	s_Buffer.reset();
-	s_BufferIn.store(0, std::memory_order_release);
 	s_audioDeviceOpen.store(false, std::memory_order_release);
 	s_audioOpenRate.store(0, std::memory_order_release);
+
+	if (AudioProbe().requestClose())
+	{
+		s_Buffer.reset();
+		s_BufferIn.store(0, std::memory_order_release);
+	}
+
 	return 0;
+}
+
+/**
+ * Exit path only: wait for the audio probe thread to finish, so the caller can
+ * tear SDL down without racing an SDL_OpenAudio() that is still running.
+ *
+ * Blocking by design -- the process is on its way out.  It also joins a probe
+ * that was started outside DriverInitialize and therefore never closed by
+ * DriverKill (see AudioProbeHolder).
+ */
+void
+WaitSoundProbeIdle(void)
+{
+	AudioProbe().waitIdle();
 }
 
 

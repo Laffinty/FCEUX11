@@ -828,6 +828,7 @@ int  fceuWrapperInit( int argc, char *argv[] )
 	}
 	  
 		DriverKill();
+	  WaitSoundProbeIdle(); // v2.0.5 (A1): no SDL_OpenAudio() may outlive SDL_Quit()
 	  SDL_Quit();
 	  return 0;
 	}
@@ -951,6 +952,7 @@ int  fceuWrapperInit( int argc, char *argv[] )
 		}
 	  
 		DriverKill();
+		WaitSoundProbeIdle(); // v2.0.5 (A1): see fceuWrapperClose
 		SDL_Quit();
 		return 0;
 	}
@@ -1056,6 +1058,7 @@ int  fceuWrapperInit( int argc, char *argv[] )
 			if (error != 1)
 			{
 				DriverKill();
+				WaitSoundProbeIdle(); // v2.0.5 (A1): see fceuWrapperClose
 				SDL_Quit();
 				return -1;
 			}
@@ -1141,6 +1144,9 @@ int  fceuWrapperClose( void )
 	CloseGame();
 
 	// exit the infrastructure
+	// v2.0.5 (A1): KillSound() no longer waits for a probe that is still
+	// running, so make sure there is none before SDL goes away.
+	WaitSoundProbeIdle();
 	fceu11::Kill();
 	SDL_Quit();
 

@@ -643,6 +643,22 @@ if(FCEUX11_BUILD_TESTS)
                 "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
     endif()
 
+    # v2.0.5 (A1) — audio device probe gate.  The defect was KillSound()
+    # joining the probe thread on the GUI thread (up to a full probe of window
+    # freeze); the fix lives in src/drivers/Qt/audio_probe_gate.cpp, which is
+    # pure std so this lock needs no core, no Qt and no SDL -- two translation
+    # units, seconds to build.  Gate count grows 45 -> 46.
+    add_executable(fceux11_audio_probe_test
+        f11qa/audio/audio_probe_gate_test.cpp
+        ${CMAKE_SOURCE_DIR}/src/drivers/Qt/audio_probe_gate.cpp
+    )
+    target_include_directories(fceux11_audio_probe_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/drivers
+    )
+    add_test(NAME audio_probe_gate_test
+             COMMAND fceux11_audio_probe_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
     # -------------------------------------------------------------------------
     # v0.3.0 — Performance baseline benchmarks (Google Benchmark preferred)
     # -------------------------------------------------------------------------

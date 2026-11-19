@@ -10,6 +10,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > 依据：`docs/history/plans/FCEUX11-遗留问题盘点与优化计划-2026-11-18.md` 批 1/批 2/批 3
 > 的执行批次（业主 2026-11-19 指示开工）。
 
+### Fixed — 音频设备探测的关闭路径把探测时长搬回 GUI 线程（v2.0.5 A1）
+
+- **症状**：加载 ROM 后的数秒内做任何会触发 `KillSound()` 的操作（再加载/关闭 ROM、
+  改音频或视频设置）⇒ 窗口无响应、音视频一起停住，看起来像「音视频异常缓慢」。
+- **根因**：`36af048`（PERF-01，v2.0.5）把 `SDL_OpenAudio()` 搬到后台线程，但
+  `KillSound()` **无条件** `join` 该线程，而它的全部调用点都在 GUI 线程 +
+  `FCEU_WRAPPER_LOCK` 之内 ⇒ 探测未结束时，**剩余探测时长整段搬回 GUI 线程**。
+  触发门槛 = 该主机的探测耗时（WASAPI 找不到可用端点时可达 8 秒）。
+- **修法**：新增 `src/drivers/Qt/audio_probe_gate.{h,cpp}` —— 设备开/关状态机。
+  `requestClose()` 在探测在飞时**只登记、不等待**，由探测线程在 `SDL_OpenAudio()`
+  返回后执行关闭（因此 `SDL_CloseAudio()` 与 `SDL_OpenAudio()` 仍然不会并发）；
+  同速率的请求**取消待办关闭并复用该次探测**（`KillSound(); InitSound();` 不二次探测）；
+  异速率请求排队一轮。`sdl-sound.cpp` 只保留 SDL 调用本身；新增
+  `WaitSoundProbeIdle()` 并在四处 `SDL_Quit()` 之前调用（退出路径，阻塞可接受）。
+- **顺带修掉**：探测线程是文件级 `static std::thread`，存在「关声音启动 → 声音对话框
+  启用 → 退出」这条**永不 join** 的路径 ⇒ 进程退出时 `std::terminate`。门控的析构
+  函数 join 兜底。
+- **不改变**：`WriteSound`、帧循环、模拟线程；探测时长（PERF-01 的收益保留）。
+- **门禁**：新锁 `audio_probe_gate_test`（5 腿：关闭不等待 / 委托关闭恰好一次 /
+  同速率只探测一次 / 异速率续跑一轮 / `sdl-sound.cpp` 无 join），
+  **ctest 45 → 46**；变异 M1–M5 逐腿实测转红，还原后源文件逐字节一致。
+  复核与三处结论更正见 `docs/plans/FCEUX11-v2.0.5_音视频异常缓慢-稳定性审计报告-2026-11-19.md` §十一。
+- **诊断开关**（业主机器可自证）：`FCEUX11_AUDIO_TRACE=1` 打印门控事件（带毫秒戳）；
+  `FCEUX11_TEST_AUDIO_OPEN_DELAY_MS=<ms>` 让设备探测至少耗时该值，用于在快机器上
+  复现「探测慢」的条件。本机实测：探测 15 s 且期间关 ROM，**修复前窗口阻塞
+  13 981 ms，修复后 0 ms**。
+
 ### Fixed — MMC3 家族 7 个板的板级 Reset 接线（v2.0.5 A2 的同族收尾）
 
 - **7 个 MMC3 家族板的板级 Reset 从不执行**（v2.0.5 计划 §9.22 / r9 ⑧ 登记的同族

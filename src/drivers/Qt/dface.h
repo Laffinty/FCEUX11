@@ -11,6 +11,11 @@ void DoDriverArgs(void);
 int InitSound();
 void WriteSound(int32 *Buffer, int Count);
 int KillSound(void);
+// v2.0.5 (A1): block until the audio device probe thread is idle.  Exit path
+// only, immediately before SDL_Quit(): the probe calls SDL_OpenAudio() on its
+// own thread, so quitting SDL underneath it is a race.  Never call this from an
+// interactive path -- waiting for that probe is the freeze this replaced.
+void WaitSoundProbeIdle(void);
 uint32 GetMaxSound(void);
 uint32 GetWriteSound(void);
 // v2.0.5 (PERF-02): true while an SDL audio device is open, i.e. while the ring

@@ -521,6 +521,7 @@ set(SRC_DRIVERS_QT
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/input.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/keyscan.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/sdl-sound.cpp  
+  ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/audio_probe_gate.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/sdl-video.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/sdl-joystick.cpp  
   ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/input/input_manager.cpp
