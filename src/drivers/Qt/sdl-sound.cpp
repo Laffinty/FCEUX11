@@ -29,6 +29,7 @@
 #include "Qt/throttle.h"
 #include "Qt/audio_probe_gate.h" // v2.0.5 (A1): device open/close state machine
 #include "Qt/audio_sink_wait.h"  // v2.0.5 (stall): bounded ring-full wait policy
+#include "Qt/audio_driver_fallback.h" // v2.0.5 (A3): scoped SDL_AUDIODRIVER fallback
 #include "../../profiler.h" // B2②: WriteSound 探点（OFF 态展开为空）
 
 #include <cstdio>
@@ -38,7 +39,15 @@
 #include <memory>
 #include <atomic>
 #include <mutex>
+#include <string>
 #include <thread>
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h> // SetEnvironmentVariableA: SDL reads its env there, but SDL has no unset
+#endif
 
 extern Config *g_config;
 extern bool turbo;
@@ -118,6 +127,11 @@ static uint32_t AudioNowMs(void)
 	return static_cast<uint32_t>(SDL_GetTicks());
 }
 
+// v2.0.5 (A3): the FCEUX11_AUDIO_TRACE switch, used by AudioOpenDeviceNow
+// above; the definition (and the stalled-sink usage) sit with the other
+// trace helpers further down the file.
+static bool AudioTraceEnabled(void);
+
 /**
  * v2.0.5 (stall): the "ring is full" policy, shared by all three write modes.
  * See audio_sink_wait.h -- it tolerates a full ring for one frame, then drops
@@ -128,6 +142,42 @@ AudioSinkWait(void)
 {
 	static fceu11::audio::SinkWaitGuard guard;
 	return guard;
+}
+
+/**
+ * v2.0.5 (A3): the SDL_AUDIODRIVER fallback policy -- see
+ * audio_driver_fallback.h.  The environment itself is injected here so the
+ * policy stays pure std and the lock test can run without SDL.  The unset
+ * leg goes through the Win32 API on Windows because SDL_getenv reads that
+ * environment block; the CRT's own getenv/unsetenv copy would be invisible
+ * to it.
+ *
+ * Touched only by the probe thread: the gate serialises probes, and
+ * waitIdle() joins the thread before SDL shuts down, so the sticky state
+ * needs no lock of its own.
+ */
+static fceu11::audio::AudioDriverFallbackPolicy &
+AudioDriverFallback(void)
+{
+	static fceu11::audio::AudioDriverFallbackPolicy policy(
+	    []() -> std::string
+	    {
+		    const char *v = SDL_getenv("SDL_AUDIODRIVER");
+		    return v ? std::string(v) : std::string();
+	    },
+	    [](const std::string &v)
+	    {
+		    SDL_setenv("SDL_AUDIODRIVER", v.c_str(), 1);
+	    },
+	    []()
+	    {
+#ifdef _WIN32
+		    ::SetEnvironmentVariableA("SDL_AUDIODRIVER", nullptr);
+#else
+		    ::unsetenv("SDL_AUDIODRIVER");
+#endif
+	    });
+	return policy;
 }
 
 extern int EmulationPaused;
@@ -334,18 +384,71 @@ AudioOpenDeviceNow(SDL_AudioSpec spec)
 		std::this_thread::sleep_for(std::chrono::milliseconds(AudioProbeTestDelayMs()));
 	}
 
-	if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0)
+	// v2.0.5 (A3): the SDL_AUDIODRIVER override is scoped to this attempt.
+	// The fallback loop below writes the variable so a broken WASAPI install
+	// can still produce sound -- but the write must not outlive the attempt:
+	// the variable is process-global, inherited by child processes, and
+	// re-read by every later SDL_InitSubSystem(SDL_INIT_AUDIO), so leaving it
+	// behind pinned this process to the fallback driver forever.  A sound
+	// card that came back stayed silent until restart, because the default
+	// (WASAPI) path was never tried again.  The memory of "which fallback
+	// driver worked" moves into the policy (sticky state); the variable
+	// itself is handed back exactly as this attempt found it.
+	fceu11::audio::AudioDriverFallbackPolicy &drivers = AudioDriverFallback();
+	drivers.capture();
+
+	// One open attempt: quit whatever may be running, optionally pin the
+	// driver through SDL_AUDIODRIVER, then init and open.  SDL reads the
+	// variable when the audio subsystem is initialised, which is why every
+	// attempt starts from a torn-down subsystem.  The application itself
+	// never inits the audio subsystem (fceuWrapper.cpp only does
+	// SDL_INIT_VIDEO), so this quit/init pair is the whole refcount.
+	const auto attempt = [&spec](const char *driverName) -> bool
 	{
-		snprintf(firstErr, sizeof(firstErr), "%s", SDL_GetError());
-	}
-	else if (SDL_OpenAudio(&spec, nullptr) >= 0)
+		SDL_CloseAudio();
+		SDL_QuitSubSystem(SDL_INIT_AUDIO);
+		if (driverName && driverName[0])
+			SDL_setenv("SDL_AUDIODRIVER", driverName, 1);
+		if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0)
+			return false;
+		return SDL_OpenAudio(&spec, nullptr) >= 0;
+	};
+
+	// A fallback driver that opened the device before is retried first, so a
+	// machine whose WASAPI is broken does not re-pay that backend's
+	// seconds-long probe on every reopen.
+	const bool hadSticky = !drivers.sticky().empty();
+
+	if (hadSticky && AudioTraceEnabled())
 	{
-		ok = true;
+		fprintf(stderr, "[audio-driver] sticky fallback '%s' attempted first\n",
+		        drivers.sticky().c_str());
 	}
-	else
+
+	ok = attempt(hadSticky ? drivers.sticky().c_str() : nullptr);
+
+	if (!ok)
 	{
 		snprintf(firstErr, sizeof(firstErr), "%s", SDL_GetError());
 
+		if (hadSticky)
+		{
+			// The remembered driver stopped working.  Drop it and give the
+			// default chain its chance again -- WASAPI may have recovered,
+			// which is exactly the case the old pinned environment could
+			// never reach.
+			if (AudioTraceEnabled())
+			{
+				fprintf(stderr, "[audio-driver] sticky fallback failed; dropped, default chain retried\n");
+			}
+			drivers.dropSticky();
+			drivers.restore();
+			ok = attempt(nullptr);
+		}
+	}
+
+	if (!ok)
+	{
 		// Fallback: the default backend (WASAPI on Windows) is the one that
 		// stalls and then fails when the host has no usable default endpoint.
 		// directsound and winmm open in milliseconds on the same machine and
@@ -354,19 +457,24 @@ AudioOpenDeviceNow(SDL_AudioSpec spec)
 		static const char* const fallbacks[] = { "directsound", "winmm" };
 		for (const char* fb : fallbacks)
 		{
-			SDL_CloseAudio();
-			SDL_QuitSubSystem(SDL_INIT_AUDIO);
-			SDL_setenv("SDL_AUDIODRIVER", fb, 1);
-
-			if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0)
-				continue;
-			if (SDL_OpenAudio(&spec, nullptr) >= 0)
+			if (attempt(fb))
 			{
 				ok = true;
+				drivers.rememberSuccess(fb);
+				if (AudioTraceEnabled())
+				{
+					fprintf(stderr, "[audio-driver] fallback '%s' opened the device; remembered in-process\n", fb);
+				}
 				break;
 			}
 		}
 	}
+
+	// v2.0.5 (A3): whatever happened, the process environment is handed back
+	// exactly as the attempt found it; the sticky state above remembers the
+	// working driver instead, and child processes no longer inherit a pinned
+	// SDL_AUDIODRIVER.
+	drivers.restore();
 
 	if (ok)
 	{
@@ -706,12 +814,15 @@ GetWriteSound(void)
  * hold no SDL audio lock here: the wait happens unlocked.
  */
 /**
- * True when FCEUX11_AUDIO_TRACE is set: every dropped frame gets its own line,
- * which is also a frame counter for a stalled-sink run ("N lines in T seconds
- * = N frames in T seconds").  Without it the warning is once per episode.
+ * True when FCEUX11_AUDIO_TRACE is set.
+ *
+ * For the stalled-sink trace this makes every dropped frame its own line,
+ * which doubles as a frame counter ("N lines in T seconds = N frames in T
+ * seconds"); without it the warning is once per episode.  The A3 driver
+ * fallback reuses the same switch for its state transitions.
  */
 static bool
-AudioTraceStallDrops(void)
+AudioTraceEnabled(void)
 {
 	static const bool on = []
 	{
@@ -737,7 +848,7 @@ AudioWaitForRingRoom(void)
 		static int loggedEpisode = 0;
 		const int episode = AudioSinkWait().episodes();
 
-		if (AudioTraceStallDrops())
+		if (AudioTraceEnabled())
 		{
 			fprintf(stderr, "[audio-sink] dropped one frame (episode %d, total %d)\n",
 			        episode, AudioSinkWait().droppedCalls());

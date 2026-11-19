@@ -673,6 +673,21 @@ if(FCEUX11_BUILD_TESTS)
              COMMAND fceux11_audio_sink_wait_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
+    # v2.0.5 (A3) — scoped SDL_AUDIODRIVER fallback.  The fallback loop used
+    # to leave SDL_AUDIODRIVER set for the life of the process, so the default
+    # (WASAPI) path was never tried again after one fallback -- a sound card
+    # that came back stayed silent until restart.  Header-only policy plus one
+    # source guard on sdl-sound.cpp, no SDL/Qt/core.  Gate count grows 47 -> 48.
+    add_executable(fceux11_audio_driver_fallback_test
+        f11qa/audio/driver_fallback_test.cpp
+    )
+    target_include_directories(fceux11_audio_driver_fallback_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/drivers
+    )
+    add_test(NAME audio_driver_fallback_test
+             COMMAND fceux11_audio_driver_fallback_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
     # -------------------------------------------------------------------------
     # v0.3.0 — Performance baseline benchmarks (Google Benchmark preferred)
     # -------------------------------------------------------------------------
