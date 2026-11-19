@@ -1361,14 +1361,29 @@ static void fceuWrapper_sync_gba_audio(bool active)
 	// The device's rate, not the configured one: `InitSound` falls back to a
 	// supported value when asked for something it cannot open, and the core's
 	// resampler has to be built around what was actually opened.
-	fceu11_gba_configure_audio(FCEUD_GetSoundRate(),
-	                          static_cast<uint32>(FSettings.SoundVolume));
+	//
+	// v2.0.5 (stage 3): only on the true edge. The false edge is a GBA
+	// session ending -- there is no GBA resampler left to configure, and the
+	// Rust core's configure call must not run for a machine that is not
+	// active.
+	if (active)
+	{
+		fceu11_gba_configure_audio(FCEUD_GetSoundRate(),
+		                          static_cast<uint32>(FSettings.SoundVolume));
+	}
 
 	// The pacing target. A GBA frame is 59.7275 fps where NTSC is 60.098823;
 	// leaving the video system's rate in force would run the machine 0.62% fast,
 	// which is a drift of about 26 ms a second -- the exact thing the fractional
 	// audio accumulator exists to prevent, arriving through the timing side
 	// instead of the sample-count side.
+	//
+	// v2.0.5 (stage 3): the false edge hands the base rate back (0.0 clears
+	// the override). This edge used to be unreachable: the only caller sat
+	// inside `if (fceu11_gba_active())`, so a GBA session ending left the
+	// override pinned at 59.7275 and every NES session afterwards was paced
+	// 0.618% slow until the process exited. RefreshThrottleFPS() reads the
+	// override but never clears it.
 	SetThrottleBaseRateOverride(active ? fceu11_gba_base_rate() : 0.0);
 }
 
@@ -1443,18 +1458,26 @@ int  fceuWrapperUpdate( void )
 		// there. The GUI's 120 Hz timer keeps repainting the cleared pool, which
 		// is the black screen this stage ships. Stage 2 is what makes it carry
 		// a picture.
+		//
+		// v2.0.5 (stage 3): the session flip is detected for BOTH directions,
+		// outside the machine branch. It used to live inside the GBA-only
+		// branch, so the false edge (a GBA session ending) never ran: the
+		// throttle override stayed pinned at 59.7275 fps and every NES session
+		// afterwards was paced 0.618% slow until the process exited. Running
+		// the check here also means an interleaved NES session is observed, so
+		// a second .gba load re-configures its audio (the rate or the volume
+		// can have changed meanwhile) instead of relying on a stale flip flag.
+		// A pure-NES session (never touching .gba) sees gbaActive == the
+		// initial false and does nothing at all -- zero behaviour change.
+		const bool gbaActive = fceu11_gba_active();
+		if ( gbaActive != g_gbaSessionActive )
+		{
+			g_gbaSessionActive = gbaActive;
+			fceuWrapper_sync_gba_audio(gbaActive);
+		}
+
 		if ( fceu11_gba_active() )
 		{
-			// Re-configure only when the session actually changed. `active` is
-			// the value from *last* frame, so a freshly loaded .gba costs one
-			// call here and then nothing until a .nes replaces it.
-			const bool active = fceu11_gba_active();
-			if ( active != g_gbaSessionActive )
-			{
-				g_gbaSessionActive = active;
-				fceuWrapper_sync_gba_audio(active);
-			}
-
 			// The whole pad, read as raw key state and pushed in.
 			//
 			// Read from the **binding table**, not from `joy[]`. `joy[]` is

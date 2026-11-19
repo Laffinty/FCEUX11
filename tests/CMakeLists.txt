@@ -688,6 +688,18 @@ if(FCEUX11_BUILD_TESTS)
              COMMAND fceux11_audio_driver_fallback_test
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
+    # v2.0.5 (stage 3) — GBA throttle base-rate reset guard.  The session flip
+    # used to be detected only inside the GBA branch, so a GBA session ending
+    # never cleared the throttle override and every later NES session was
+    # paced 0.618% slow.  Pure source guard on fceuWrapper.cpp, no linking.
+    # Gate count grows 48 -> 49.
+    add_executable(fceux11_gba_throttle_reset_guard_test
+        f11qa/driver/gba_throttle_reset_guard_test.cpp
+    )
+    add_test(NAME gba_throttle_reset_guard_test
+             COMMAND fceux11_gba_throttle_reset_guard_test
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
     # -------------------------------------------------------------------------
     # v0.3.0 — Performance baseline benchmarks (Google Benchmark preferred)
     # -------------------------------------------------------------------------
