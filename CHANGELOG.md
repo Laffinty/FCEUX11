@@ -10,6 +10,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > 依据：`docs/history/plans/FCEUX11-遗留问题盘点与优化计划-2026-11-18.md` 批 1/批 2/批 3
 > 的执行批次（业主 2026-11-19 指示开工）。
 
+### Fixed — 音频设备「已打开但停止排空」时每帧自旋约 1 秒（v2.0.5 阶段 2）
+
+- **症状**：设备仍显示打开、但回调不再消费环形缓冲（端点被拔/被独占/驱动停摆）⇒
+  `WriteSound` 每帧在 wrapper 锁内 `SDL_Delay(1)` 自旋到满额约 1 秒 ⇒ 约 1 fps，
+  窗口冻结、音视频一起「变慢」。PERF-02 只补了「根本没有设备」那一半。
+- **修法**：新增 `src/drivers/Qt/audio_sink_wait.h`（纯 std）：环满时**最多等一帧**
+  （16 ms），仍不满就**闩锁并丢弃**本帧样本，后续调用**零等待**；环重新排空时自动解锁，
+  新设备打开时复位。三处写路径（underflow / 1:1 / overflow）共用同一条有界等待，
+  其余语义不变（仍在解锁后等待、仍丢弃本帧剩余样本）。
+- **顺带修**：`GetWriteSound()` 的 `s_BufferSize - s_BufferIn` 在计数越过环尾时下溢到
+  ~4 GiB（GBA 路径直接喂给 `resize()` ⇒ OOM abort）⇒ 改走 `RingFree()` 夹逼，并在
+  underflow 模式的重复写入循环收尾处把计数夹到环尾。
+- **行为变更**：停滞日志由「每帧一条」变为「每个 episode 一条」（文案仍含
+  `Sound sink is not draining`）。
+- **诊断开关**：`FCEUX11_TEST_AUDIO_STALL=1` 让设备打开后立刻暂停回调（「端点消失」
+  的等价状态）；`FCEUX11_AUDIO_TRACE=1` 时每丢一帧打印一行（该行数即帧计数）。
+  本机实测（14 s 窗口、同一 ROM）：**修复前 7 帧 ≈ 0.5 fps，修复后 840 帧 ≈ 60 fps**。
+- **门禁**：新锁 `audio_sink_wait_test`（5 腿）**ctest 46 → 47**；变异 M1–M4 逐腿转红。
+
 ### Fixed — 音频设备探测的关闭路径把探测时长搬回 GUI 线程（v2.0.5 A1）
 
 - **症状**：加载 ROM 后的数秒内做任何会触发 `KillSound()` 的操作（再加载/关闭 ROM、

@@ -28,6 +28,7 @@
 #include "common/nes_shm.h"
 #include "Qt/throttle.h"
 #include "Qt/audio_probe_gate.h" // v2.0.5 (A1): device open/close state machine
+#include "Qt/audio_sink_wait.h"  // v2.0.5 (stall): bounded ring-full wait policy
 #include "../../profiler.h" // B2②: WriteSound 探点（OFF 态展开为空）
 
 #include <cstdio>
@@ -115,6 +116,18 @@ static const uint32_t kAudioRetryBackoffMs = 60000;
 static uint32_t AudioNowMs(void)
 {
 	return static_cast<uint32_t>(SDL_GetTicks());
+}
+
+/**
+ * v2.0.5 (stall): the "ring is full" policy, shared by all three write modes.
+ * See audio_sink_wait.h -- it tolerates a full ring for one frame, then drops
+ * samples instead of waiting, and unlatches when the ring drains again.
+ */
+static fceu11::audio::SinkWaitGuard &
+AudioSinkWait(void)
+{
+	static fceu11::audio::SinkWaitGuard guard;
+	return guard;
 }
 
 extern int EmulationPaused;
@@ -275,6 +288,29 @@ AudioProbeTestDelayMs(void)
 }
 
 /**
+ * Diagnostics hook for the stalled-sink defect (v2.0.5 phase 2).
+ *
+ * "Device open but no longer draining" is easy to describe and hard to reach on
+ * demand: it needs an endpoint to disappear after the device was opened.  With
+ *
+ *     FCEUX11_TEST_AUDIO_STALL=1
+ *
+ * the device is opened and then paused immediately, so the callback never
+ * consumes the ring while s_audioDeviceOpen stays true -- exactly the state the
+ * old code spun ~1 second per frame in.  Read once, unset by default.
+ */
+static bool
+AudioProbeTestStall(void)
+{
+	static const bool on = []
+	{
+		const char *v = std::getenv("FCEUX11_TEST_AUDIO_STALL");
+		return v != nullptr && v[0] != '\0' && v[0] != '0';
+	}();
+	return on;
+}
+
+/**
  * Probe the machine for an audio endpoint and open the device.
  *
  * Why a thread: SDL_OpenAudio() is not just a handle hand-out -- the
@@ -335,6 +371,14 @@ AudioOpenDeviceNow(SDL_AudioSpec spec)
 	if (ok)
 	{
 		SDL_PauseAudio(0);
+
+		if (AudioProbeTestStall())
+		{
+			// Diagnostic: keep the device open but stop the consumer, so the
+			// ring can never drain (see AudioProbeTestStall).
+			SDL_PauseAudio(1);
+			fprintf(stderr, "Sound: FCEUX11_TEST_AUDIO_STALL - device opened and paused\n");
+		}
 		// v2.0.5 (PERF-02): while no device was open WriteSound dropped its
 		// samples, so the cursors may hold values from before the device was
 		// closed (or the ring may look full).  Reset them *before* publishing
@@ -347,6 +391,10 @@ AudioOpenDeviceNow(SDL_AudioSpec spec)
 		s_audioOpenRate.store(static_cast<unsigned int>(spec.freq), std::memory_order_release);
 		s_audioDeviceOpen.store(true, std::memory_order_release);
 		s_audioFailAtMs.store(0, std::memory_order_release);
+
+		// v2.0.5 (stall): a fresh device starts with empty cursors, so a latch
+		// left over from the previous one must not make us deaf to it.
+		AudioSinkWait().reset();
 
 		const char* driverName = SDL_GetCurrentAudioDriver();
 		fprintf(stderr, "Loading SDL sound with %s driver...\n", driverName ? driverName : "unknown");
@@ -634,11 +682,77 @@ FCEUD_SoundDeviceIsOpen(void)
 
 /**
  * Returns the amount of free space in the audio buffer.
+ *
+ * v2.0.5 (A2-stall): clamped.  This used to be `s_BufferSize - s_BufferIn`,
+ * which underflows to ~4 GiB once the producer has pushed s_BufferIn past
+ * s_BufferSize -- and the GBA path feeds this value straight into resize().
  */
 uint32
 GetWriteSound(void)
 {
-	return(s_BufferSize - s_BufferIn);
+	return fceu11::audio::RingFree(s_BufferIn.load(std::memory_order_acquire), s_BufferSize);
+}
+
+/**
+ * The ring buffer is full.  Give the sink one frame's worth of grace, then stop
+ * waiting and report failure so the caller drops this frame's samples.
+ *
+ * v2.0.5 (stall): this replaces three copies of
+ *
+ *     while (s_BufferIn == s_BufferSize) { SDL_Delay(1); if (++waitCount > 1000) return; }
+ *
+ * which cost about a second per call -- per *frame*, because waitCount was
+ * local -- whenever the device was open but nothing drained it.  Callers must
+ * hold no SDL audio lock here: the wait happens unlocked.
+ */
+/**
+ * True when FCEUX11_AUDIO_TRACE is set: every dropped frame gets its own line,
+ * which is also a frame counter for a stalled-sink run ("N lines in T seconds
+ * = N frames in T seconds").  Without it the warning is once per episode.
+ */
+static bool
+AudioTraceStallDrops(void)
+{
+	static const bool on = []
+	{
+		const char *v = std::getenv("FCEUX11_AUDIO_TRACE");
+		return v != nullptr && v[0] != '\0' && v[0] != '0';
+	}();
+	return on;
+}
+
+static bool
+AudioWaitForRingRoom(void)
+{
+	const bool ready =
+	    AudioSinkWait().waitForRoom(
+	        []() { return s_BufferIn.load(std::memory_order_acquire) < s_BufferSize; },
+	        []() { SDL_Delay(1); }) == fceu11::audio::SinkWaitGuard::Verdict::Ready;
+
+	if (!ready)
+	{
+		// Once per episode, not once per dropped frame: a sink that is gone
+		// stays gone, and a message per frame would bury the log while the
+		// emulator happily keeps running at full speed.
+		static int loggedEpisode = 0;
+		const int episode = AudioSinkWait().episodes();
+
+		if (AudioTraceStallDrops())
+		{
+			fprintf(stderr, "[audio-sink] dropped one frame (episode %d, total %d)\n",
+			        episode, AudioSinkWait().droppedCalls());
+		}
+		else if (episode != loggedEpisode)
+		{
+			loggedEpisode = episode;
+			fprintf(stderr,
+			        "Warning: Sound sink is not draining; dropping samples to keep the "
+			        "emulator running (episode %d).\n",
+			        episode);
+		}
+	}
+
+	return ready;
 }
 
 /**
@@ -673,6 +787,10 @@ WriteSound(int32 *buf,
 	{
 		return;
 	}
+
+	// v2.0.5 (stall): clear the latch as soon as the ring is no longer full --
+	// the sink came back and this frame can wait again if it has to.
+	AudioSinkWait().observe(s_BufferIn.load(std::memory_order_acquire), s_BufferSize);
 
 	int uflowMode = 0;
 	int ovrFlowSkip = 1;
@@ -716,8 +834,6 @@ WriteSound(int32 *buf,
 	extern int EmulationPaused;
 	if (EmulationPaused == 0)
 	{
-		int waitCount = 0;
-
 		if ( uflowMode )
 		{	// Underflow mode
 			SDL_LockAudio();
@@ -726,16 +842,8 @@ WriteSound(int32 *buf,
 				if ( s_BufferIn == s_BufferSize )
 				{
 					SDL_UnlockAudio();
-					while (s_BufferIn == s_BufferSize) 
-					{
-						SDL_Delay(1); waitCount++;
-
-						if ( waitCount > 1000 )
-						{
-							printf("Error: Sound sink is not draining... Breaking out of audio loop to prevent lockup.\n");
-							return;
-						}
-					}
+					if ( !AudioWaitForRingRoom() )
+						return;
 					SDL_LockAudio();
 				}
 
@@ -745,6 +853,14 @@ WriteSound(int32 *buf,
 					s_BufferWrite = (s_BufferWrite + 1) % s_BufferSize;
             
 					s_BufferIn++;
+				}
+
+				// v2.0.5 (stall): the duplication loop can push the count past
+				// the end within one call; clamp it so the fill level -- and
+				// GetWriteSound's arithmetic -- stay inside the ring.
+				if ( s_BufferIn > s_BufferSize )
+				{
+					s_BufferIn = s_BufferSize;
 				}
             
 				Count--;
@@ -764,16 +880,8 @@ WriteSound(int32 *buf,
 					if (s_BufferIn == s_BufferSize) 
 					{
 						SDL_UnlockAudio();
-						while (s_BufferIn == s_BufferSize) 
-						{
-							SDL_Delay(1); waitCount++;
-
-							if ( waitCount > 1000 )
-							{
-								printf("Error: Sound sink is not draining... Breaking out of audio loop to prevent lockup.\n");
-								return;
-							}
-						}
+						if ( !AudioWaitForRingRoom() )
+							return;
 						SDL_LockAudio();
 					}
 
@@ -794,16 +902,8 @@ WriteSound(int32 *buf,
 					if (s_BufferIn == s_BufferSize) 
 					{
 						SDL_UnlockAudio();
-						while (s_BufferIn == s_BufferSize) 
-						{
-							SDL_Delay(1); waitCount++;
-
-							if ( waitCount > 1000 )
-							{
-								printf("Error: Sound sink is not draining... Breaking out of audio loop to prevent lockup.\n");
-								return;
-							}
-						}
+						if ( !AudioWaitForRingRoom() )
+							return;
 						SDL_LockAudio();
 					}
 
