@@ -10,6 +10,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > 依据：`docs/history/plans/FCEUX11-遗留问题盘点与优化计划-2026-11-18.md` 批 1/批 2/批 3
 > 的执行批次（业主 2026-11-19 指示开工）。
 
+### Fixed — 音频回退驱动的环境变量永久污染进程（v2.0.5 阶段 3 · A3）
+
+- **症状**：WASAPI 探测失败后回退到 directsound/winmm 一次，进程环境变量
+  `SDL_AUDIODRIVER` 就被永久改写：此后每次重开设备都不再尝试 WASAPI——
+  声卡恢复（USB 音箱重新通电）后音频不会回来，除非重启程序；子进程还会继承该变量。
+- **修法**：新纯 std 头 `src/drivers/Qt/audio_driver_fallback.h`（注入式
+  get/set/unset）：覆盖变量**限定在单次探测内**（capture/restore，缺席态还原为
+  「未设置」）；「哪个回退驱动好使」改为**进程内 sticky 状态**——下一轮探测先试
+  sticky（坏 WASAPI 机器不重付秒级探测），sticky 失效即丢弃并重走默认链
+  （WASAPI 恢复后自动找回，恰是旧实现永远到不了的状态）。Windows 侧 unset 走
+  `SetEnvironmentVariableA`（SDL 读取的是 Win32 环境块）。
+- **门禁**：新锁 `audio_driver_fallback_test`（6 策略腿 + 源码守卫「`capture()` 必须先于
+  首次 attempt、`restore()` 必须后于最后一次 attempt」）**ctest 47 → 48**；
+  变异 M1–M6 逐腿实测转红。
+- **诊断**：`FCEUX11_AUDIO_TRACE=1` 打印 sticky 尝试/丢弃/记忆与环境还原事件。
+
+### Fixed — GBA 会话结束后限速基准不复位，后续 NES 钉在 59.7275 fps（v2.0.5 阶段 3）
+
+- **症状**：玩过任一 `.gba` 后再加载 `.nes`，NES 会话被永久钉在 59.7275 fps
+  （比 NTSC 60.098823 慢 0.618%，约 6.18 ms/秒）直到退出程序。
+- **根因**：会话翻转检测原来只在 `if (fceu11_gba_active())` 分支内 ⇒ GBA 会话
+  **结束**（false 边）永远不执行 ⇒ `SetThrottleBaseRateOverride(0.0)` 无人调用；
+  `RefreshThrottleFPS()` 只读不清。
+- **修法**：翻转检测移出机器分支（`fceuWrapper.cpp`），两个方向都跑；GBA 音频
+  配置以 `if (active)` 门控（非活跃会话不再调 Rust 配置入口）。附带修掉第二个
+  潜伏缺陷：旧翻转标志在 NES 会话期间不被观察 ⇒ 「.gba→.nes→.gba」的第二次
+  GBA 装载不重配音频。纯 NES 会话零行为变更。
+- **门禁**：新守卫 `gba_throttle_reset_guard_test`（G1–G5 源码断言，含「翻转块
+  位置必须先于机器分支」这条结构断言）**ctest 48 → 49**；变异 M1–M4 逐腿实测转红。
+
+### 登记不修 — 无设备时内核仍合成音频样本（v2.0.5 阶段 3 · A5，实测裁决）
+
+- **实测**（bench 同 ROM 无声对照，三轮中位数）：无设备时内核每帧多花
+  **LQ ≈ 0.025 ms（≈0.15%）、HQ ≈ 0.19 ms（≈1.1%）**——落在审计预估带小端；
+  节流下帧预算余量 >95%、turbo 下整体跳过音频 ⇒ 用户不可感。按「用户可感/
+  解锁/防呆/成本」口径登记不修。数据与依据见
+  `docs/history/plans/FCEUX11-v2.0.5_A1音频探测线程修复-构建计划.md` r6。
+
 ### Fixed — 音频设备「已打开但停止排空」时每帧自旋约 1 秒（v2.0.5 阶段 2）
 
 - **症状**：设备仍显示打开、但回调不再消费环形缓冲（端点被拔/被独占/驱动停摆）⇒
