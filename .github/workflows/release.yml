@@ -255,10 +255,19 @@ jobs:
           }
 
           # Smoke test: the packaged tree must report the version we are cutting.
+          #
+          # Do NOT use `& .\dist\fceux11.exe --version`: fceux11.exe is a GUI
+          # subsystem binary, and PowerShell's call operator returns immediately
+          # with no captured stdout for those -- the check then compares '' and
+          # fails even though the binary is fine (that is exactly how the first
+          # release run died). cmd /c with a redirect waits and captures.
           $env:PATH = "$PWD\dist;$env:PATH"
-          $reported = (& .\dist\fceux11.exe --version) -join "`n"
-          if ($reported.Trim() -ne $version) {
-            throw "packaged exe reports '$($reported.Trim())', expected '$version'"
+          $probe = Join-Path $PWD 'version_probe.txt'
+          cmd /c ".\dist\fceux11.exe --version > `"$probe`" 2>&1"
+          if (-not (Test-Path $probe)) { throw "version probe produced no output file" }
+          $reported = (Get-Content $probe -Raw).Trim()
+          if ($reported -ne $version) {
+            throw "packaged exe reports '$reported', expected '$version'"
           }
           Write-Host "packaged exe reports $reported"
 
