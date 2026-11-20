@@ -32,6 +32,10 @@ const ROM: &str = include_str!("rom.rs");
 // mode 5 page flip fix, one locks the GBATEK-verified-correct "palette index
 // 0 is transparent in bitmap modes" behaviour against future regressions.
 const LCD: &str = include_str!("lcd.rs");
+// W4 of the MKSC evidence plan (docs/plans/FCEUX11-GBA兼容性方法论与MKSC取证-
+// 构建计划-2026-11-21.md §三): same-priority OBJ tie-break follows the OAM
+// index regardless of the affine bit (GBADotnet #64's scenario).
+const OAM_PRIORITY: &str = include_str!("oam_priority.rs");
 
 /// Every fixture the plan asks for, with the work item that owns it.
 ///
@@ -78,6 +82,17 @@ const PLANNED: &[(&str, &[&str])] = &[
         "mode4_index0_is_transparent_under_a_lower_priority_obj",
         &["S3-e"],
     ),
+    // W4 (MKSC evidence plan §三): the affine/normal tie-break lock, two
+    // mirror legs. Both green locks from birth; the owner tag names the plan
+    // batch, not a v2.0.3 work item.
+    (
+        "oam_priority_normal_obj0_beats_affine_obj1_at_the_same_obj_priority",
+        &["W4-MKSC"],
+    ),
+    (
+        "oam_priority_affine_obj0_beats_normal_obj1_at_the_same_obj_priority",
+        &["W4-MKSC"],
+    ),
 ];
 
 /// The ones that must be red today, and only those.
@@ -103,7 +118,7 @@ const REPRODUCERS: &[&str] = &[];
 /// but says nothing about why.
 fn fixtures() -> Vec<(String, Option<String>)> {
     let mut out = Vec::new();
-    for source in [SWI, OAM, BACKUP, ROM, LCD] {
+    for source in [SWI, OAM, BACKUP, ROM, LCD, OAM_PRIORITY] {
         let mut ignore: Option<String> = None;
         let mut is_test = false;
         for line in source.lines() {

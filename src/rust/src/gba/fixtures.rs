@@ -147,6 +147,7 @@ pub mod backup;
 pub mod guards;
 pub mod lcd;
 pub mod oam;
+pub mod oam_priority;
 pub mod rom;
 pub mod swi;
 
