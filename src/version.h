@@ -126,9 +126,20 @@
 // ⚠️ **整版数值随惯例递增**（v2.0.4 → v2.0.5，即公式值 20004 → 20005）；该字段进
 // FCSX 电影模式存档头（state.cpp:397）与录像头（movie_record.cpp:591），但读取侧
 // 从不拒绝比对（信息性字段）⇒ 旧存档/录像仍可读。
+// v2.0.6（2026-11-20）— **整版发布**（稳定性维护版）：
+// 内容 = v2.0.5「音视频异常缓慢」稳定性审计线的三阶段修复（A1+A2 音频探测关闭
+// 路径把探测时长搬回 GUI 线程 / 阶段 2 设备停排空时每帧自旋约 1 秒 /
+// A3 SDL_AUDIODRIVER 回退永久污染进程环境 / GBA 会话结束时限速基准不复位）
+// + 遗留问题盘点批 1/2/3（MMC3 家族 7 板板级 Reset 接线 / f11qa direct 门禁
+// 空洞护栏 / mapper198 锁改写 / 生成器机械字段对齐 / STA 垫片扩展 6 处 /
+// PGO 立项材料）+ A5 实测裁决登记不修。
+//
+// ⚠️ **整版数值随惯例递增**（v2.0.5 → v2.0.6，即公式值 20005 → 20006）；该字段进
+// FCSX 电影模式存档头（state.cpp:397）与录像头（movie_record.cpp:591），但读取侧
+// 从不拒绝比对（信息性字段）⇒ 旧存档/录像仍可读。
 inline constexpr int FCEU_VERSION_MAJOR = 2;
 inline constexpr int FCEU_VERSION_MINOR = 0;
-inline constexpr int FCEU_VERSION_PATCH = 5;
+inline constexpr int FCEU_VERSION_PATCH = 6;
 inline constexpr int FCEU_VERSION_TWEAK = 0;	// hotfix 计数；**不参与** NUMERIC
 
 inline constexpr int FCEU_VERSION_NUMERIC = (FCEU_VERSION_MAJOR * 10000) + (FCEU_VERSION_MINOR * 100) + FCEU_VERSION_PATCH;
@@ -136,12 +147,12 @@ inline constexpr int FCEU_VERSION_MAJOR_DECODE(int x) { return x / 10000; }
 inline constexpr int FCEU_VERSION_MINOR_DECODE(int x) { return (x / 100) % 100; }
 inline constexpr int FCEU_VERSION_PATCH_DECODE(int x) { return x % 100; }
 
-// v2.0.5 是整版发布 ⇒ 无 hotfix 后缀（v2.0.4_hotfix2 的 hotfix 编号随整版清空；
-// hotfix 口径不变：hotfix 编号只由 FCEU_HOTFIX_TAG 承载，不进 FCEU_VERSION_NUMERIC）。
+// v2.0.6 是整版发布 ⇒ 无 hotfix 后缀（hotfix 编号口径不变：只由
+// FCEU_HOTFIX_TAG 承载，不进 FCEU_VERSION_NUMERIC）。
 #define FCEU_HOTFIX_TAG ""
 
-#define FCEU_VERSION_STRING "2.0.5" FCEU_HOTFIX_TAG " " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
-#define FCEU_DISPLAY_VERSION "v2.0.5" FCEU_HOTFIX_TAG
+#define FCEU_VERSION_STRING "2.0.6" FCEU_HOTFIX_TAG " " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
+#define FCEU_DISPLAY_VERSION "v2.0.6" FCEU_HOTFIX_TAG
 #define FCEU_NAME_AND_VERSION FCEU_NAME " " FCEU_DISPLAY_VERSION
 
 // FCEUX11 Contributors — Derivative work based on FCEUX
