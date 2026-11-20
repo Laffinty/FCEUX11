@@ -152,10 +152,41 @@ def check_changelog(version):
     return []
 
 
-def render(version, kicker_en, sub_en, items_en, kicker_zh, sub_zh, items_zh):
+SENTENCE_END = "。．.!?！？"
+
+
+def as_sentence(text):
+    """Headline -> sentence, the way the shipped releases read.
+
+    The v2.0.5 release body is a flat list of full sentences; the page's <h3>
+    headlines are that sentence minus the terminator, so add one rather than
+    paraphrasing anything.
+    """
+    text = text.strip()
+    if text and text[-1] not in SENTENCE_END:
+        text += "。" if any("\u4e00" <= c <= "\u9fff" for c in text) else "."
+    return text
+
+
+def render(version, items_en, items_zh):
+    """Release body: one English line then one Chinese line per item.
+
+    This mirrors the shipped releases (v2.0.5 and earlier): a flat list, no
+    headings, one sentence per language per item. The SourceForge download
+    badge that follows the list on the release page is produced elsewhere and
+    is deliberately not part of this text.
+    """
     out = []
-    out.append("## FCEUX11 v%s" % version)
+    for (title_en, _), (title_zh, _) in zip(items_en, items_zh):
+        out.append("- " + as_sentence(title_en))
+        out.append("- " + as_sentence(title_zh))
     out.append("")
+    return "\n".join(out)
+
+
+def render_detailed(version, kicker_en, sub_en, items_en, kicker_zh, sub_zh, items_zh):
+    """Long form: both blocks in full, for reading outside GitHub Releases."""
+    out = ["## FCEUX11 v%s" % version, ""]
     out.append("### 简体中文 · %s" % (kicker_zh or "本次更新"))
     out.append("")
     out.append(sub_zh)
@@ -190,6 +221,13 @@ def main(argv):
         action="store_true",
         help="validate only: locales, changelog and both notes sources",
     )
+    ap.add_argument(
+        "--format",
+        choices=["release", "detailed"],
+        default="release",
+        help="release: flat EN/ZH sentence list + download badge (matches the "
+             "shipped GitHub Releases); detailed: both blocks in full",
+    )
     args = ap.parse_args(argv)
 
     try:
@@ -202,10 +240,10 @@ def main(argv):
     problems += check_changelog(version)
 
     try:
-        _, heading_en, sub_en, items_en = whatsnew_section(
+        kicker_en, heading_en, sub_en, items_en = whatsnew_section(
             read_text(os.path.join(REPO_ROOT, EN_PAGE))
         )
-        _, heading_zh, sub_zh, items_zh = whatsnew_section(
+        kicker_zh, heading_zh, sub_zh, items_zh = whatsnew_section(
             read_text(os.path.join(REPO_ROOT, ZH_PAGE))
         )
         if heading_en != "v" + version:
@@ -227,7 +265,11 @@ def main(argv):
             print("  - %s" % p, file=sys.stderr)
         return 1
 
-    notes = render(version, "What's new", sub_en, items_en, "本次更新", sub_zh, items_zh)
+    if args.format == "detailed":
+        notes = render_detailed(version, kicker_en, sub_en, items_en,
+                                kicker_zh, sub_zh, items_zh)
+    else:
+        notes = render(version, items_en, items_zh)
 
     if args.check:
         print("OK  v%s: %d entries, %d locales, CHANGELOG section present"
