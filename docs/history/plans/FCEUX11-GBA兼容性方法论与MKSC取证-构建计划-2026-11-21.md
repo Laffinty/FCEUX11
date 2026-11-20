@@ -211,6 +211,7 @@ WAITCNT=`0x4494`（探针首帧实测）· DISPSTAT 池引用 28 处 · KEYINPUT
 | SIO / 联机 | 不在范围 | 联机需求出现 |
 | 音频听感 | M4A 结构通路已通，未人工验收 | 业主人工验收 |
 | dump_frames 落盘语义 | 与 doc 不符（2026-11-21 实测） | W1 澄清后若判缺陷 → 另立小项 |
+| **SELECT 设置屏入口条件（游戏侧）** | 「PRESS SELECT」提示下 Select 在 6 种状态/时长被无视；游戏活表（IWRAM `0x03004F30`，IWRAM 差分定位）完整看到 `bit2=0x04` ⇒ **非本仓缺陷**，是游戏 UI 条件未命中 | 业主 GUI 人工一次即可分辨（设置屏能否打开）；本仓不动 |
 | `0x4000308` BIOSPROT | **已结案**：图形数据假阳性 | 无 |
 
 ## §七 出口判据
@@ -225,3 +226,32 @@ WAITCNT=`0x4494`（探针首帧实测）· DISPSTAT 池引用 28 处 · KEYINPUT
 ## §八 变更记录
 
 - **r1（2026-11-21）**：立项。业主两项裁决入档：① 兼容性方法论裁定（通用机制主线 / Tier B 硬件变体 / Tier C 四门槛禁止清单）；② MKSC 取证批次 W1–W5 立项。§四 事实底座冻结（四路取证：ROM 反汇编 scan1–3.py / 权威信源 / 本仓实现实读 / 探针实测）。版本归属未定——命名用日期，不占用 v2.0.6。
+- **r2（2026-11-21，全批执行收口）**：五批次全部执行完毕，逐项结果：
+  - **W1 ✅**：三份基线落盘 `Research_only/mksc_study/baseline/`（boot / race / probe_a）+ 研究区
+    README（含复跑命令与 harness 编译配方）。`dump_frames` 语义澄清：默认模式把
+    `GBA_PROBE_FRAMES` 当**步数**循环（600 帧请求 ≈ 2.8 帧游戏时间、只落 1 个采样行），
+    `TRACE=1` 是按周期的逐步 trace——判为探针缺陷候选登记 §六，未改行为。
+  - **W2 ✅**：注入导航无头进比赛成功（排程与研究区 README 固化）。**`DMA0: armed with
+    timing 2 (HBlank)` 于测量帧 1541 实测，control=`0xA660` 与 ROM 装载函数逐字一致**；
+    cartprobe 比赛基线 2400 帧 = 2081 个不同帧哈希、0 预算超限、verdict running。
+    GBA 核心跑真机级比赛玩法（透视 HDMA）实证。
+  - **W3 ◐ 止损降级（计划 §三 预设路径）**：观测工具全部就绪并验证（电池哈希监视 +
+    `.srm` 快照 + DMA/按键监视）；flash 全阶段零写入被证实（boot/菜单/比赛 12000+ 帧
+    Flash64 65536 字节不变 = 只在真正存档动作时写）。**触发侧两条路径到线**：
+    ① 设置屏 Select 在 6 状态被无视——**已排除本仓缺陷**（游戏活表 `0x03004F30`
+    完整看到 bit2=0x04，IWRAM 差分定位），判定游戏 UI 条件未命中 → §六 新观察项；
+    ② 盲驾 12000 帧 REVERSE+草地未完赛。降级：触发交业主 GUI 人工，观测侧就绪。
+  - **W4 ✅**：`fixtures/oam_priority.rs` 两条镜像腿**从出生即绿**（本仓对 GBADotnet #64
+    的裁决本来正确）；变异验证闭合（并列裁决 `>`→`>=` 翻转 ⇒ 双腿仅在重叠断言红、
+    独占列全绿 = 外科级定位；`git checkout` 还原 ⇒ 绿）；G2 集合同提交收扩（14→16 条，
+    守卫扫描模块 5→6）。实施坑：mode 3-5 下 OBJ 字符区对应 2D 编址 **tile 512+**，
+    低号砖被整层跳过（GBATEK `:3156-3157`）。
+  - **W5 ✅**：Rust 门禁全绿（root 301 passed/20 ignored = 321 总含 2 条新锁、gba-core
+    249、debug 94、media 52、formats 158、utils 51、lua 54、双态 check EXIT=0）；
+    ctest `-LE perf` 门禁随重链跑毕（读数见提交信息）。本文按 §七 归档
+    `docs/history/plans/`；AGENTS.md 长尾节指针就位。
+  - **实施新事实（非缺陷）**：root crate 是 `crate-type=["staticlib"]`，不能作 Rust
+    依赖——研究区 harness 的编译配方（隔离 target + LTO off + `--crate-type rlib` +
+    `ffi-stubs` feature + 双 `-L` + crt-static/panic=abort）固化在研究区 README。
+    探针观测坑新增一条：`cartprobe` 的 keymirror 类观测必须先做 **IWRAM 差分定位**
+    真表，pool 词猜地址会命中无关数据。
