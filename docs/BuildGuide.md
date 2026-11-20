@@ -155,6 +155,19 @@ Compress-Archive -Path dist\* -DestinationPath FCEUX11-v2.0.6-win64.zip
 
 `dist` 目录可直接运行，复制到任意 Windows 11 电脑都能启动。
 
+> **⚠️ 必须在 Visual Studio 开发者环境中运行该脚本**（先 `call vcvars64.bat`，或从
+> 「Developer PowerShell for VS」启动）。脚本靠 `dumpbin` 分析依赖；没有它时**会直接
+> 报错退出**，而不是产出一个依赖未知的包。
+>
+> 脚本负责的内容（v2.0.6 起）：
+> - Qt 插件目录 `platforms` / `styles` / `imageformats`（缺 `qwindows.dll` 则启动即失败）；
+> - **完整依赖闭包**（不止一层传递依赖：如 `icudt78.dll`、brotlidec/brotlicommon、jpeg62）；
+> - **VC++ 运行时**（`MSVCP140.dll` / `VCRUNTIME140.dll` / `VCRUNTIME140_1.dll`）随包部署，
+>   因此目标机器**无需预装** VC++ Redistributable；
+> - 末尾自检：任何未解析的依赖都会让脚本**报错退出**，不会静默产出跑不起来的包。
+>
+> 在没装过 Visual Studio 的机器上验证过一次，才能把「解压即用」当作实测结论。
+
 ---
 
 ## 7. 常见问题
