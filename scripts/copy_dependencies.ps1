@@ -112,24 +112,47 @@ $copied = 0
 Write-Host "`nDeploying dependencies..." -ForegroundColor Cyan
 
 # ---------------------------------------------------------------------------
-# 1. Qt plugins. The platform plugin is not optional: without
-#    platforms\qwindows.dll the exe aborts at startup with "could not find or
-#    load the Qt platform plugin". styles and imageformats carry the shipped
-#    look and the image loaders. This step used to be missing entirely.
+# 1. Qt plugins, laid out the way the shipped releases are: everything under
+#    `plugins\<kind>\` with a `qt.conf` pointing Qt at it. The platform plugin
+#    is not optional -- without qwindows.dll the exe aborts at startup with
+#    "could not find or load the Qt platform plugin".
+#
+#    The plugin set matches the v2.0.5 release package exactly (one platform
+#    plugin, the GIF/ICO image loaders, the modern Windows style) rather than
+#    everything vcpkg ships: dropping in qdirect2d/qminimal/qoffscreen only
+#    adds surface area nothing selects on a desktop build.
 # ---------------------------------------------------------------------------
 $qtPlugins = Join-Path (Split-Path $vcpkgBin -Parent) "Qt6\plugins"
+$pluginPlan = [ordered]@{
+    "platforms"   = @("qwindows.dll")
+    "styles"      = @("qmodernwindowsstyle.dll")
+    "imageformats" = @("qgif.dll", "qico.dll")
+}
+
 if (Test-Path $qtPlugins) {
-    foreach ($sub in @("platforms", "styles", "imageformats")) {
+    foreach ($sub in $pluginPlan.Keys) {
         $srcDir = Join-Path $qtPlugins $sub
         if (-not (Test-Path $srcDir)) { continue }
-        $dstDir = Join-Path $OutputDir $sub
+        $dstDir = Join-Path $OutputDir ("plugins\" + $sub)
         New-Item -ItemType Directory -Path $dstDir -Force | Out-Null
-        Get-ChildItem $srcDir -Filter *.dll | ForEach-Object {
-            Copy-Item $_.FullName -Destination $dstDir -Force
+        $n = 0
+        foreach ($name in $pluginPlan[$sub]) {
+            $src = Join-Path $srcDir $name
+            if (Test-Path $src) {
+                Copy-Item $src -Destination $dstDir -Force
+                $n++
+            } else {
+                Write-Host "  [PLUGINS][WARN] $sub\$name not found" -ForegroundColor Yellow
+            }
         }
-        $n = (Get-ChildItem $dstDir -Filter *.dll).Count
-        Write-Host "  [PLUGINS] $sub -> $n dll(s)" -ForegroundColor Green
+        Write-Host "  [PLUGINS] plugins\$sub -> $n dll(s)" -ForegroundColor Green
     }
+
+    # qt.conf is what makes `plugins\` the search root; the exe otherwise looks
+    # in the bare `platforms\` next to it.
+    $qtConf = "[Paths]`r`nPlugins = plugins`r`nPrefix = .`r`n"
+    [IO.File]::WriteAllText((Join-Path $OutputDir "qt.conf"), $qtConf, (New-Object Text.UTF8Encoding($false)))
+    Write-Host "  [PLUGINS] qt.conf written (Plugins = plugins)" -ForegroundColor Green
 } else {
     Write-Host "  [WARN] Qt plugin directory not found at $qtPlugins" -ForegroundColor Yellow
 }

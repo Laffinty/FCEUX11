@@ -1,0 +1,359 @@
+# FCEUX11 — release pipeline (manual only)
+#
+# Triggered by hand from the Actions tab. It is deliberately not automatic:
+# publishing is an outward-facing action and the owner decides when a version
+# ships.
+#
+# The order is the contract. A tag is created as the LAST step, so any gate
+# that fails leaves no tag and no release behind:
+#
+#   preflight  -> version from src/version.h, all 12 web pages already carry
+#                 that version, CHANGELOG has the section, both notes sources
+#                 parse, the tag does not already exist.
+#   gate-ci    -> CI, F11QA and Deploy Pages must all be green for this commit.
+#   build      -> full Release build + ctest -LE perf (the artifact we ship is
+#                 built here, not reused from another run).
+#   package    -> scripts/copy_dependencies.ps1 -> v2.0.5-style layout ->
+#                 fceux11-vX.Y.Z-windows-amd64.zip, smoke-tested via --version.
+#   release    -> create tag + GitHub Release with bilingual notes extracted
+#                 from web/index.html (EN) and web/zh-CN/index.html (ZH),
+#                 attach the zip. dry_run stops just before the tag.
+#
+# Pages gate note: pages.yml only runs when web/** changes, so a release commit
+# that does not touch web/ has no Pages run of its own. In that case the gate
+# requires the latest successful Pages deploy AND that web/ is byte-identical
+# between that deploy's commit and the release commit -- i.e. what is live is
+# exactly what is being released.
+
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (default: read from src/version.h)"
+        required: false
+        default: ""
+      dry_run:
+        description: "Dry run: run every gate but do not create the tag or release"
+        type: boolean
+        default: true
+      wait_timeout_minutes:
+        description: "How long to wait for CI / F11QA / Pages to finish"
+        required: false
+        default: "90"
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Preflight (version / web / changelog / notes)
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      tag: ${{ steps.v.outputs.tag }}
+      tag_exists: ${{ steps.tagcheck.outputs.exists }}
+      dry_run: ${{ steps.v.outputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: v
+        run: |
+          set -euo pipefail
+          if [ -n "${{ inputs.version }}" ]; then
+            V="${{ inputs.version }}"
+          else
+            MAJOR=$(grep -oE 'FCEU_VERSION_MAJOR[[:space:]]*=[[:space:]]*[0-9]+' src/version.h | grep -oE '[0-9]+$')
+            MINOR=$(grep -oE 'FCEU_VERSION_MINOR[[:space:]]*=[[:space:]]*[0-9]+' src/version.h | grep -oE '[0-9]+$')
+            PATCH=$(grep -oE 'FCEU_VERSION_PATCH[[:space:]]*=[[:space:]]*[0-9]+' src/version.h | grep -oE '[0-9]+$')
+            V="${MAJOR}.${MINOR}.${PATCH}"
+          fi
+          if ! echo "$V" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::version '$V' is not X.Y.Z"; exit 1
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "tag=v$V"     >> "$GITHUB_OUTPUT"
+          echo "dry_run=${{ inputs.dry_run }}" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: $V"
+
+      - name: Gate - every web locale already carries this version
+        run: |
+          set -euo pipefail
+          V="${{ steps.v.outputs.version }}"
+          fail=0
+          for page in web/index.html web/ar/index.html web/de/index.html web/es/index.html \
+                      web/fr/index.html web/hi/index.html web/ja/index.html web/ko/index.html \
+                      web/th/index.html web/vi/index.html web/zh-CN/index.html web/zh-TW/index.html; do
+            if [ ! -f "$page" ]; then echo "::error::missing $page"; fail=1; continue; fi
+            if ! grep -q "<h2>v${V}</h2>" "$page"; then
+              echo "::error::$page does not carry <h2>v${V}</h2> (web folder not updated for this release)"
+              fail=1
+            fi
+          done
+          [ "$fail" -eq 0 ] || exit 1
+          echo "All 12 locale pages carry v${V}."
+
+      - name: Gate - CHANGELOG section and notes sources parse
+        run: |
+          set -euo pipefail
+          python3 scripts/extract_release_notes.py --version "${{ steps.v.outputs.version }}" --check
+
+      - name: Note whether the tag already exists
+        id: tagcheck
+        run: |
+          set -euo pipefail
+          if git rev-parse -q --verify "refs/tags/${{ steps.v.outputs.tag }}" >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::tag ${{ steps.v.outputs.tag }} already exists; the release job will update the existing release instead of creating one"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  gate-ci:
+    name: Gate (CI + F11QA + Pages green for this commit)
+    needs: preflight
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # The gate logic lives in scripts/check_release_gates.py: it polls the
+      # Actions API, and for Pages it falls back to "what is deployed equals
+      # this commit's web/" when the commit itself did not touch web/ (that is
+      # the case for any release that is not also a site update).
+      - name: Wait for CI / F11QA / Pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 scripts/check_release_gates.py             --repo "${{ github.repository }}"             --sha "${{ github.sha }}"             --timeout-min "${{ inputs.wait_timeout_minutes }}"
+
+
+  build:
+    name: Build (Release + ctest)
+    needs: [preflight, gate-ci]
+    runs-on: windows-2022
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
+    env:
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg_bincache
+      RUST_TOOLCHAIN: '1.100.0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: |
+            vcpkg_installed/x64-windows
+            vcpkg_installed/vcpkg/status
+            vcpkg_installed/vcpkg/info
+            vcpkg_bincache
+          key: vcpkg-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            vcpkg-
+
+      - name: Cache blargg ROMs
+        uses: actions/cache@v4
+        with:
+          path: tests/fixtures/blargg
+          key: blargg-roms-${{ hashFiles('scripts/download_blargg_roms.ps1') }}
+          restore-keys: blargg-roms-
+
+      - name: Fetch blargg test ROMs
+        shell: pwsh
+        run: ./scripts/download_blargg_roms.ps1
+
+      - name: Setup MSVC dev cmd
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Setup CMake 4.0
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: '4.0.x'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: x86_64-pc-windows-msvc
+
+      - name: Prepare vcpkg binary cache dir
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path "${{ github.workspace }}\vcpkg_bincache" | Out-Null
+
+      - name: Configure CMake (Ninja)
+        run: >
+          cmake -S . -B build
+          -G "Ninja"
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER=cl
+          -DCMAKE_CXX_COMPILER=cl
+          -DFCEUX11_BUILD_TESTS=ON
+          -DENABLE_LINT_CPPCHECK=OFF
+          -DVCPKG_INSTALLED_DIR=${{ github.workspace }}/vcpkg_installed
+          -DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}/cmake/triplets
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: CTest (-LE perf)
+        shell: pwsh
+        run: |
+          ctest --test-dir build --build-config Release --output-on-failure -LE perf 2>&1 | Tee-Object -FilePath ctest-output.txt
+          $ctestExit = $LASTEXITCODE
+          Set-Content -Path $env:GITHUB_STEP_SUMMARY -Value (@("## CTest", "") + (Get-Content ctest-output.txt -Tail 400)) -Encoding utf8
+          exit $ctestExit
+
+      - name: Package (v2.0.5 layout)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = "${{ needs.preflight.outputs.version }}"
+          if (Test-Path dist) { Remove-Item dist -Recurse -Force }
+          New-Item -ItemType Directory -Path dist | Out-Null
+          Copy-Item build\src\fceux11.exe dist\fceux11.exe
+
+          # copy_dependencies.ps1 needs dumpbin, which the MSVC dev-cmd step put
+          # on PATH; it throws (or exits non-zero) when it cannot analyse the
+          # binary or when a dependency is left unresolved.
+          try {
+            & .\scripts\copy_dependencies.ps1 -ExecutablePath "$PWD\dist\fceux11.exe" -OutputDir "$PWD\dist"
+          } catch {
+            throw "copy_dependencies.ps1 failed: $_"
+          }
+          if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw "copy_dependencies.ps1 exit $LASTEXITCODE" }
+
+          # Layout assertions: the packaging defects this pipeline exists to
+          # prevent were all silent ones.
+          $required = @(
+            'dist\fceux11.exe', 'dist\qt.conf',
+            'dist\plugins\platforms\qwindows.dll',
+            'dist\licenses\COPYING.txt'
+          )
+          foreach ($f in $required) {
+            if (-not (Test-Path $f)) { throw "missing from package: $f" }
+          }
+          $crt = @('MSVCP140.dll','VCRUNTIME140.dll','VCRUNTIME140_1.dll')
+          foreach ($d in $crt) {
+            if (-not (Test-Path (Join-Path 'dist' $d))) { throw "missing VC runtime: $d" }
+          }
+
+          # Smoke test: the packaged tree must report the version we are cutting.
+          $env:PATH = "$PWD\dist;$env:PATH"
+          $reported = (& .\dist\fceux11.exe --version) -join "`n"
+          if ($reported.Trim() -ne $version) {
+            throw "packaged exe reports '$($reported.Trim())', expected '$version'"
+          }
+          Write-Host "packaged exe reports $reported"
+
+          $zip = "fceux11-v$version-windows-amd64.zip"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path "dist\*" -DestinationPath $zip
+          $count = (Get-ChildItem dist -Recurse -File).Count
+          Write-Host "zip: $zip ($((Get-Item $zip).Length) bytes, $count files in dist)"
+          Set-Content -Path $env:GITHUB_STEP_SUMMARY -Value @("## Package", "", "- $zip", "- $count files in dist") -Encoding utf8
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-zip
+          path: fceux11-v*-windows-amd64.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Tag + Release
+    needs: [preflight, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-zip
+          path: artifacts
+
+      - name: Generate release notes from web pages
+        run: |
+          set -euo pipefail
+          python3 scripts/extract_release_notes.py \
+            --version "${{ needs.preflight.outputs.version }}" \
+            --out notes.md
+          echo "--- notes.md (first 40 lines) ---"
+          head -40 notes.md
+
+      - name: Publish tag and release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          VERSION: ${{ needs.preflight.outputs.version }}
+          TAG: ${{ needs.preflight.outputs.tag }}
+          TAG_EXISTS: ${{ needs.preflight.outputs.tag_exists }}
+          DRY_RUN: ${{ needs.preflight.outputs.dry_run }}
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/${REPO}"
+          auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json")
+
+          zip=$(ls artifacts/*.zip)
+          asset=$(basename "$zip")
+          echo "asset: $asset ($(stat -c%s "$zip") bytes)"
+
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "::notice::dry run -- would tag ${TAG} at ${SHA}, publish a release and attach ${asset}"
+            exit 0
+          fi
+
+          if [ "$TAG_EXISTS" != "true" ]; then
+            # Lightweight tag through the refs API, matching the existing tags
+            # (v2.0 .. v2.0.5 are all commit tags, not annotated).
+            jq -n --arg ref "refs/tags/${TAG}" --arg sha "$SHA" '{ref:$ref, sha:$sha}' > payload.json
+            curl -sS -f -X POST "${auth[@]}" "${api}/git/refs" --data @payload.json > /dev/null
+            echo "created tag ${TAG} at ${SHA}"
+          fi
+
+          rel_id=$(curl -sS "${auth[@]}" "${api}/releases/tags/${TAG}" | jq -r '.id // empty')
+
+          # One payload for create and update; GitHub ignores tag_name on PATCH.
+          jq -n --arg tag "$TAG" --arg name "FCEUX11 v${VERSION}" --rawfile body notes.md                 '{tag_name:$tag, name:$name, body:$body}' > payload.json
+
+          if [ -z "${rel_id}" ]; then
+            rel_id=$(curl -sS -f -X POST "${auth[@]}" "${api}/releases" --data @payload.json | jq -r '.id')
+            echo "created release ${rel_id}"
+          else
+            curl -sS -f -X PATCH "${auth[@]}" "${api}/releases/${rel_id}" --data @payload.json > /dev/null
+            echo "updated release ${rel_id}"
+          fi
+
+          # Drop a previously uploaded asset of the same name (re-run after a
+          # partial failure must not produce duplicate assets).
+          existing=$(curl -sS "${auth[@]}" "${api}/releases/${rel_id}/assets")
+          for aid in $(printf '%s' "$existing" | jq -r --arg n "$asset" '.[] | select(.name == $n) | .id'); do
+            curl -sS -f -X DELETE "${auth[@]}" "${api}/releases/assets/${aid}" > /dev/null
+            echo "removed previous asset ${aid}"
+          done
+
+          upload_url="https://uploads.github.com/repos/${REPO}/releases/${rel_id}/assets?name=${asset}"
+          curl -sS -f -X POST "${auth[@]}" -H "Content-Type: application/zip" --data-binary "@${zip}" "$upload_url" > upload.json
+          jq -r '"uploaded: \(.name) (\(.size) bytes)"' upload.json
+
+          echo "::notice::released ${TAG}"

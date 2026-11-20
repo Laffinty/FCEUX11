@@ -150,7 +150,7 @@ $env:VCPKG_ROOT = "$PWD\vcpkg"
 .\scripts\copy_dependencies.ps1 -ExecutablePath .\build\src\fceux11.exe -OutputDir .\dist
 
 # 打包
-Compress-Archive -Path dist\* -DestinationPath FCEUX11-v2.0.6-win64.zip
+Compress-Archive -Path dist\* -DestinationPath fceux11-v2.0.6-windows-amd64.zip
 ```
 
 `dist` 目录可直接运行，复制到任意 Windows 11 电脑都能启动。
@@ -159,14 +159,54 @@ Compress-Archive -Path dist\* -DestinationPath FCEUX11-v2.0.6-win64.zip
 > 「Developer PowerShell for VS」启动）。脚本靠 `dumpbin` 分析依赖；没有它时**会直接
 > 报错退出**，而不是产出一个依赖未知的包。
 >
-> 脚本负责的内容（v2.0.6 起）：
-> - Qt 插件目录 `platforms` / `styles` / `imageformats`（缺 `qwindows.dll` 则启动即失败）；
+> 脚本产出的目录结构（与正式发布包一致）：
+> ```
+> fceux11.exe
+> qt.conf                  ← [Paths] Plugins = plugins
+> plugins\platforms\qwindows.dll       （缺它启动即失败）
+> plugins\styles\qmodernwindowsstyle.dll
+> plugins\imageformats\qgif.dll, qico.dll
+> *.dll                    （Qt / vcpkg 依赖的完整闭包）
+> MSVCP140.dll VCRUNTIME140.dll VCRUNTIME140_1.dll   （VC++ 运行时，app-local）
+> licenses\                （vcpkg 各 port 的 copyright / GBA 核 MIT / COPYING）
+> ```
+>
+> 要点：
 > - **完整依赖闭包**（不止一层传递依赖：如 `icudt78.dll`、brotlidec/brotlicommon、jpeg62）；
-> - **VC++ 运行时**（`MSVCP140.dll` / `VCRUNTIME140.dll` / `VCRUNTIME140_1.dll`）随包部署，
->   因此目标机器**无需预装** VC++ Redistributable；
+> - **VC++ 运行时随包部署** ⇒ 目标机器无需预装 VC++ Redistributable；
 > - 末尾自检：任何未解析的依赖都会让脚本**报错退出**，不会静默产出跑不起来的包。
 >
 > 在没装过 Visual Studio 的机器上验证过一次，才能把「解压即用」当作实测结论。
+
+---
+
+## 6b. 发布流程（CI 自动打 tag 与发布）
+
+发版走 `.github/workflows/release.yml`，**只能手动触发**（Actions → Release → Run workflow）：
+
+1. 把版本号、`CHANGELOG.md`、`web/` 12 个语言页更新好并推到 `main`；
+2. 等 `CI`、`F11QA`、`Deploy Pages` 跑完（发布门禁会等它们全绿，默认最多 90 分钟）；
+3. 手动触发 `Release`，先跑一次 `dry_run = true` 确认所有门禁通过（不会建 tag）；
+4. 再跑一次 `dry_run = false`，它会：建 tag `vX.Y.Z` → 建 Release →
+   把 `fceux11-vX.Y.Z-windows-amd64.zip` 作为资产上传。
+
+门禁顺序（任何一步红都不留 tag/Release）：
+
+| 顺序 | 门禁 | 判据 |
+|---|---|---|
+| 1 | 版本一致性 | `src/version.h` 的版本；**12 个 web 页全部含 `<h2>vX.Y.Z</h2>`**；`CHANGELOG` 有 `## [X.Y.Z] -` |
+| 2 | 发布说明可生成 | `scripts/extract_release_notes.py --check`（EN 取 `web/index.html`、ZH 取 `web/zh-CN/index.html`，条数必须一致） |
+| 3 | CI 全绿 | 同一 commit 上 `CI` / `F11QA` / `Deploy Pages` 均 success；若该 commit 未改动 `web/`（没有自己的 Pages run），则要求最近一次成功的部署内容与本 commit 的 `web/` 逐字节一致 |
+| 4 | 构建 | 完整 Release 构建 + `ctest -LE perf` 全绿 |
+| 5 | 打包 | `copy_dependencies.ps1` 产出后校验 `plugins\platforms\qwindows.dll`、`qt.conf`、`licenses\`、CRT 三件套，并实跑打包后的 `fceux11.exe --version`，输出必须等于本次版本号 |
+
+本地想单独检查某个门禁时：
+
+```powershell
+python scripts/extract_release_notes.py --version 2.0.6 --check   # 第 2 步
+$env:GITHUB_TOKEN = "<token>"
+python scripts/check_release_gates.py --repo Laffinty/FCEUX11 --sha <commit> --once
+```
 
 ---
 
