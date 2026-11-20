@@ -5,10 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.6] - 2026-11-20
 
 > 依据：`docs/history/plans/FCEUX11-遗留问题盘点与优化计划-2026-11-18.md` 批 1/批 2/批 3
-> 的执行批次（业主 2026-11-19 指示开工）。
+> 的执行批次（业主 2026-11-19 指示开工）；另含 v2.0.5「音视频异常缓慢」稳定性审计线的
+> 阶段 1–3（业主逐阶段开工，2026-11-19/20，
+> 见 `docs/history/plans/FCEUX11-v2.0.5_A1音频探测线程修复-构建计划.md`）。
 
 ### Fixed — 音频回退驱动的环境变量永久污染进程（v2.0.5 阶段 3 · A3）
 
@@ -88,7 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **门禁**：新锁 `audio_probe_gate_test`（5 腿：关闭不等待 / 委托关闭恰好一次 /
   同速率只探测一次 / 异速率续跑一轮 / `sdl-sound.cpp` 无 join），
   **ctest 45 → 46**；变异 M1–M5 逐腿实测转红，还原后源文件逐字节一致。
-  复核与三处结论更正见 `docs/plans/FCEUX11-v2.0.5_音视频异常缓慢-稳定性审计报告-2026-11-19.md` §十一。
+  复核与三处结论更正见 `docs/history/plans/FCEUX11-v2.0.5_音视频异常缓慢-稳定性审计报告-2026-11-19.md` §十一。
 - **诊断开关**（业主机器可自证）：`FCEUX11_AUDIO_TRACE=1` 打印门控事件（带毫秒戳）；
   `FCEUX11_TEST_AUDIO_OPEN_DELAY_MS=<ms>` 让设备探测至少耗时该值，用于在快机器上
   复现「探测慢」的条件。本机实测：探测 15 s 且期间关 ROM，**修复前窗口阻塞
