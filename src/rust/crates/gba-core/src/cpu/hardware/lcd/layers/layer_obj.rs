@@ -102,6 +102,33 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde_with::serde_as;
 
+/// Where OBJ tile data starts inside the flat 96 KiB `video_ram` array
+/// (VRAM address `06010000h`, GBATEK snapshot `:1184`).
+const OBJ_TILE_DATA_BASE: usize = 0x10000;
+/// The OBJ window's alias period: the bus maps `06018000h-0601FFFFh` onto
+/// `06010000h-06017FFFh` — "Bytes 0x06010000 - 0x06017FFF is mirrored from
+/// 0x06018000 - 0x0601FFFF" (gbadoc, VRAM section; the GBATEK snapshot's
+/// memory table `:439` only marks the region "Not used", without read
+/// semantics). Sprites whose `attr2` tile number plus their tile span run
+/// past the window end read the wrapped bytes on real hardware — the tile
+/// field is architecturally 0-1023, so offsets up to ~0x8060 occur, and
+/// Kurukuru Kururin (1D, tile 1004) and Fire Pro Wrestling A (2D, tile 992)
+/// both land there.
+const OBJ_TILE_DATA_WINDOW: usize = 0x8000;
+
+/// Read one byte of OBJ tile data, honouring the window alias.
+///
+/// Every OBJ tile-data access must go through this helper: a direct
+/// `video_ram[0x10000 + offset]` indexes past the end of the 96 KiB array
+/// once `offset` crosses 0x8000 and panics — which, with the release
+/// profile's `panic = "abort"`, kills the whole process. All four read sites
+/// in this file (render paths and the OBJ-window mask path, 4bpp and 8bpp)
+/// use it.
+#[inline]
+fn obj_tile_data(video_ram: &[u8], tile_data_offset: usize) -> u8 {
+    video_ram[OBJ_TILE_DATA_BASE + (tile_data_offset & (OBJ_TILE_DATA_WINDOW - 1))]
+}
+
 #[serde_as]
 #[derive(Serialize, Deserialize)]
 pub struct LayerObj {
@@ -418,7 +445,7 @@ impl LayerObj {
                         let tile_data_offset = (tile_number << 5) + (y_tile_idx << 3) + x_tile_idx;
 
                         // color_idx
-                        memory.video_ram[0x10000 + tile_data_offset as usize]
+                        obj_tile_data(&memory.video_ram[..], tile_data_offset as usize)
                     }
                     object_attributes::ColorMode::Palette4bpp => {
                         let tile_offset = match obj_character_vram_mapping {
@@ -442,7 +469,7 @@ impl LayerObj {
                             (tile_number << 5) + (y_tile_idx << 2) + (x_tile_idx >> 1);
 
                         // Read the byte containing the pixel data
-                        let pixel_byte = memory.video_ram[0x10000 + tile_data_offset as usize];
+                        let pixel_byte = obj_tile_data(&memory.video_ram[..], tile_data_offset as usize);
 
                         // Extract the correct nibble based on x position
                         // Odd x positions use high nibble, even use low nibble
@@ -651,7 +678,7 @@ impl LayerObj {
                         };
                         let tile_number = base_tile + tile_offset;
                         let tile_data_offset = (tile_number << 5) + (y_tile_idx << 3) + x_tile_idx;
-                        let color_idx = memory.video_ram[0x10000 + tile_data_offset as usize];
+                        let color_idx = obj_tile_data(&memory.video_ram[..], tile_data_offset as usize);
                         color_idx != 0
                     }
                     object_attributes::ColorMode::Palette4bpp => {
@@ -666,7 +693,7 @@ impl LayerObj {
                         let tile_number = obj.attribute2.tile_number + tile_offset;
                         let tile_data_offset =
                             (tile_number << 5) + (y_tile_idx << 2) + (x_tile_idx >> 1);
-                        let pixel_byte = memory.video_ram[0x10000 + tile_data_offset as usize];
+                        let pixel_byte = obj_tile_data(&memory.video_ram[..], tile_data_offset as usize);
                         let palette_offset_low = if (x_tile_idx & 1) != 0 {
                             pixel_byte >> 4
                         } else {

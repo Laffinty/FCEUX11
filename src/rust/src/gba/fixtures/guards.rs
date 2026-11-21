@@ -93,6 +93,26 @@ const PLANNED: &[(&str, &[&str])] = &[
         "oam_priority_affine_obj0_beats_normal_obj1_at_the_same_obj_priority",
         &["W4-MKSC"],
     ),
+    // OBJ 瓦片窗口跨度锁（修复计划 docs/plans/FCEUX11-GBA-OBJ瓦片越界
+    // panic修复计划-2026-11-21.md §三）：四腿各锁一处 OBJ 瓦片读取点
+    // （渲染 4bpp/8bpp + OBJ 窗口掩码 4bpp/8bpp），断言越窗读按总线镜像
+    // 回绕（gbadoc VRAM 节一手原文）而非 panic。
+    (
+        "obj_tile_span_1d_4bpp_reads_the_window_alias",
+        &["OBJ-SPAN"],
+    ),
+    (
+        "obj_tile_span_1d_8bpp_reads_the_window_alias",
+        &["OBJ-SPAN"],
+    ),
+    (
+        "obj_window_span_2d_4bpp_masks_through_the_alias",
+        &["OBJ-SPAN"],
+    ),
+    (
+        "obj_window_span_1d_8bpp_masks_through_the_alias",
+        &["OBJ-SPAN"],
+    ),
 ];
 
 /// The ones that must be red today, and only those.

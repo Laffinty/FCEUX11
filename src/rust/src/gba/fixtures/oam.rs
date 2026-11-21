@@ -573,3 +573,281 @@ mod tests {
         );
     }
 }
+
+// ---------------------------------------------------------------------------
+// OBJ 瓦片窗口跨度夹具（OBJ 越界 panic 修复，2026-11-21）
+//
+// 个案 B（0004 Kurukuru Kururin / 0015 Fire Pro Wrestling A）钉死的 vendor
+// 缺陷：OBJ 瓦片读取 4 处直索引 `video_ram[0x10000 + tile_data_offset]`，
+// 精灵 tile 跨过 OBJ 窗口（0x8000 字节界）时数组越界 panic；release
+// panic="abort" ⇒ 进程死亡（业主所见「卡死/白屏」）。真机行为 = 总线把
+// 0x06018000-0x0601FFFF 镜像到 0x06010000-0x06017FFF（gbadoc VRAM 节一手
+// 原文；GBATEK 快照 :439 只标 "Not used"，无读语义）⇒ 越窗读回绕。
+//
+// 四条腿各锁一处读取点（防「修一处漏三处」）：
+//
+//   | 腿 | 锁的读取点 | 精灵形态 |
+//   |---|---|---|
+//   | render 4bpp 1D | 渲染路径 4bpp | 0004 同款：1D 64×32 tile=1004 |
+//   | render 8bpp 1D | 渲染路径 8bpp | 同基座 8bpp |
+//   | winobj 4bpp 2D | OBJ 窗口掩码路径 4bpp | 0015 同款：2D 64×32 tile=992 |
+//   | winobj 8bpp 1D | OBJ 窗口掩码路径 8bpp | 同基座 8bpp |
+//
+// 断言三重：① 渲染全程无 panic（缺陷本体）；② 越窗像素读的是**回绕后**
+// 的数据（「越窗读零」类变异可红）；③ 回绕到受保护 tile 0 的段落保持透明
+// （区分镜像与「全不透明」的假实现）。期望值全部按位段手工推导（纪律 5），
+// 不调用被测公式。
+#[cfg(test)]
+mod window_span {
+    use super::{
+        BUDGET, Cartridge, Fixture, HALT, OBJ_PALETTE_ADDR, OBJ_PALETTE_WORD, OAM_BASE,
+        SCREEN_WIDTH, VCOUNT_ADDR, catch_panic_reading, swi,
+    };
+
+    /// 64×32 = Horizontal + Size 3（GBATEK 尺寸表；0004/0015 的精灵形态）。
+    const ATTR0_SHAPE_HORIZONTAL: u32 = 0x4000;
+    const ATTR1_SIZE_64X32: u32 = 0xC000;
+    /// attr0 bit 13 = 8bpp。
+    const ATTR0_8BPP: u32 = 0x2000;
+    /// gfx_mode = 2（OBJ Window，attr0 bits 10-11）：窗口精灵本体不渲染，
+    /// 只把它的不透明像素标进 OBJ 窗口区（GBATEK 快照 :1051-1054）。
+    const ATTR0_GFX_MODE_OBJ_WINDOW: u32 = 0x0800;
+    /// DISPCNT 位段（GBATEK 快照 :708-727 钉死）：bit 6 = OBJ 1D 映射、
+    /// bit 8 = BG0、bit 12 = OBJ、bit 15 = OBJ window display flag。
+    const DISPCNT_1D: u32 = 0x40;
+    const DISPCNT_BG0: u32 = 0x100;
+    const DISPCNT_OBJ_WINDOW_FLAG: u32 = 0x8000;
+    /// WINOUT（040004Ah，GBATEK 快照 :1038-1050）：bits 0-3 = 窗口外
+    /// BG0-BG3、bits 8-11 = OBJ 窗口内 BG0-BG3。窗口外只开 BG0、OBJ 窗口
+    /// 内全关 ⇒ 被窗口遮住的像素露 backdrop，掩码路径从帧缓冲可观测。
+    /// ⚠️ 字面量必须是 8 位有效数字：`0x0400_04A` = 0x4004A（错），要写
+    /// `0x0400_004A`——「分组看着对、少一位」这类错不报警（写进匹配黑洞
+    /// 静默消失），2026-11-21 实测踩过一次。
+    const WINOUT_ADDR: usize = 0x0400_004A;
+    const WINOUT_OUTSIDE_BG0_ONLY: u32 = 0x0001;
+    const BG0CNT_ADDR: usize = 0x0400_0008;
+    /// BG0CNT = SBB 8（本仓 screen-base 惯例 ⇒ 0x06004000）、char base 0、
+    /// size 0（32×32）、4bpp。
+    const BG0CNT_SBB8: u32 = 0x0800;
+    const BG0_MAP_ADDR: usize = 0x0600_4000;
+    const BG0_TILE1_ADDR: usize = 0x0600_0020;
+    const BG_PALETTE_ENTRY1_WORD: u32 = 0x7FFF_0000;
+    /// 4bpp 皆可的颜色指数 1（index 0 透明），一字铺 8 像素。
+    ///
+    /// ⚠️ 仅用于 **4bpp** 瓦片：8bpp 瓦片的字节**就是**调色板指数——铺 0x11
+    /// 会得到指数 17 而不是 1（未植入调色板 = 黑）。8bpp 腿用 [`OPAQUE_WORD_8BPP`]。
+    const OPAQUE_WORD: u32 = 0x1111_1111;
+    /// 8bpp 瓦片用：每字节 = 调色板指数 1。
+    const OPAQUE_WORD_8BPP: u32 = 0x0101_0101;
+    const COLOR_OPAQUE: u16 = 0x7FFF;
+    const COLOR_BACKDROP: u16 = 0x0000;
+    /// 精灵摆放：避开 OAM 清零留下的 127 个 (0,0) tile-0 精灵。
+    const SPRITE_X: u32 = 40;
+    const SPRITE_Y: u32 = 20;
+
+    fn plant_words(fixture: &mut Fixture, start: usize, byte_len: usize, word: u32) {
+        for i in 0..byte_len / 4 {
+            fixture.write_word(start + i * 4, word);
+        }
+    }
+
+    fn plant_oam(fixture: &mut Fixture, attr0: u32, attr1: u32, attr2: u32) {
+        fixture.write_word(OAM_BASE as usize, (attr1 << 16) | attr0);
+        fixture.write_word(OAM_BASE as usize + 4, attr2);
+    }
+
+    /// BG0 全屏白 + WINOUT「窗外 BG0、OBJ 窗内全关」：窗口掩码像素露 backdrop。
+    ///
+    /// ⚠️ WININ/WINOUT 是 0400048h 起的两个半字寄存器，而 `write_word` 会把
+    /// 非对齐地址向下对齐——直接写 040004Ah 会落进 WININ。所以一字写覆盖
+    /// 两者：低半字 = WININ（Win0 未启用，值无关），高半字 = WINOUT。
+    fn plant_bg0_backdrop_split(fixture: &mut Fixture) {
+        fixture.write_word(BG0CNT_ADDR, BG0CNT_SBB8);
+        for i in 0..512 {
+            fixture.write_word(BG0_MAP_ADDR + i * 4, 0x0001_0001);
+        }
+        plant_words(fixture, BG0_TILE1_ADDR, 32, OPAQUE_WORD);
+        fixture.write_word(0x0500_0000, BG_PALETTE_ENTRY1_WORD);
+        fixture.write_word(WINOUT_ADDR - 2, 0x0001_0001);
+    }
+
+    fn run_until_vcount(fixture: &mut Fixture, target: u16) {
+        for _ in 0..300 {
+            fixture.run_steps(1232);
+            if fixture.read_half_word(VCOUNT_ADDR) >= target {
+                return;
+            }
+        }
+        panic!("the LCD never reached VCOUNT {target}");
+    }
+
+    fn frame_row_at(fixture: &Fixture, y: usize) -> Vec<u16> {
+        let buffer = &fixture.gba.cpu.bus.lcd.buffer;
+        (0..SCREEN_WIDTH).map(|x| buffer[y][x].0).collect()
+    }
+
+    fn expect_columns(row: &[u16], x0: usize, x1: usize, color: u16, what: &str) {
+        for x in x0..=x1 {
+            assert_eq!(
+                row[x], color,
+                "{what}: column {x} expected {color:#06X}, got {:#06X}",
+                row[x]
+            );
+        }
+    }
+
+    /// 跑一个跨度用例：植入显示面与 OAM，跑到精灵最后一行之后；panic 一律
+    /// 转成带读数的测试失败（缺陷本体 = panic，腿 1 就靠它转红）。
+    fn run_span_case(
+        dispcnt: u32,
+        attr0: u32,
+        attr1: u32,
+        attr2: u32,
+        plant: impl FnOnce(&mut Fixture),
+    ) -> Fixture {
+        let mut cartridge = Cartridge::new();
+        cartridge.code(&[swi(HALT)]);
+        let rom = cartridge.build();
+        let mut fixture = Fixture::new(&rom);
+        fixture.write_word(super::DISPCNT_ADDR, dispcnt);
+        plant(&mut fixture);
+        plant_oam(&mut fixture, attr0, attr1, attr2);
+        catch_panic_reading(move || {
+            let _ = fixture.run_to_halt(BUDGET);
+            run_until_vcount(&mut fixture, SPRITE_Y as u16 + 32);
+            fixture
+        })
+        .unwrap_or_else(|reading| {
+            panic!(
+                "the vendor core panicked during the window-span render\n  \
+                 message: {}",
+                reading.message
+            )
+        })
+    }
+
+    /// 【腿 1 · 渲染路径 4bpp】0004 同款：1D 64×32 tile=1004。
+    ///
+    /// 瓦片跨度 1004..=1035：r=0/r=1（tile 1004-1019）在窗内；r=2 的
+    /// tile 1020-1023 在窗内、1024-1027 越窗 → 回绕到窗口 tile 0-3；
+    /// r=3 的 tile 1028-1035 越窗 → 回绕到窗口 tile 4-11。窗口 tile 0
+    /// 保留全零（既是回绕目标，也是 OAM 清零精灵的瓦片）⇒ r=2 的第 5 个
+    /// d-tile 透明——这段把「镜像」与「越窗读零」区分开。
+    #[test]
+    fn obj_tile_span_1d_4bpp_reads_the_window_alias() {
+        let fixture = run_span_case(
+            super::DISPCNT_OBJ_ENABLE | DISPCNT_1D,
+            ATTR0_SHAPE_HORIZONTAL | SPRITE_Y,
+            ATTR1_SIZE_64X32 | SPRITE_X,
+            1004,
+            |fixture| {
+                // 窗内：tile 1004-1023 = flat 0x17CE0-0x17FFF。
+                plant_words(fixture, 0x0601_7CE0, 0x320, OPAQUE_WORD);
+                // 越窗回绕目标：窗口 tile 1-15（0x20-0x1FF）；tile 0 保留全零。
+                plant_words(fixture, 0x0601_0020, 0x1E0, OPAQUE_WORD);
+                fixture.write_word(OBJ_PALETTE_ADDR, OBJ_PALETTE_WORD);
+            },
+        );
+        expect_columns(&frame_row_at(&fixture, 25), 40, 103, COLOR_OPAQUE, "r=0");
+        expect_columns(&frame_row_at(&fixture, 29), 40, 103, COLOR_OPAQUE, "r=1");
+        let r2 = frame_row_at(&fixture, 38);
+        expect_columns(&r2, 40, 71, COLOR_OPAQUE, "r=2 in-window d-tiles 0-3");
+        expect_columns(&r2, 72, 79, COLOR_BACKDROP, "r=2 aliased onto tile 0");
+        expect_columns(&r2, 80, 103, COLOR_OPAQUE, "r=2 wrapped past tile 0");
+        expect_columns(&frame_row_at(&fixture, 47), 40, 103, COLOR_OPAQUE, "r=3");
+    }
+
+    /// 【腿 2 · 渲染路径 8bpp】同基座 8bpp：s-tile 计数，跨窗位置不同。
+    ///
+    /// 1D 8bpp 的 d-tile k = s-tiles 1004+16r+2k/+2k+1。r=1 的 d-tile 2 =
+    /// s-tiles 1024/1025 → 回绕到窗口 s-tiles 0/1：上半（s-tile 0 = 受保护
+    /// 的 tile 0 区）透明、下半（s-tile 1 = 0x20-0x3F，已植入）不透明 ——
+    /// 同一个 d-tile 上下半各一态，是镜像语义最锐的断言。
+    #[test]
+    fn obj_tile_span_1d_8bpp_reads_the_window_alias() {
+        let fixture = run_span_case(
+            super::DISPCNT_OBJ_ENABLE | DISPCNT_1D,
+            ATTR0_SHAPE_HORIZONTAL | ATTR0_8BPP | SPRITE_Y,
+            ATTR1_SIZE_64X32 | SPRITE_X,
+            1004,
+            |fixture| {
+                plant_words(fixture, 0x0601_7CE0, 0x320, OPAQUE_WORD_8BPP);
+                // 回绕目标：窗口 0x20-0x57F 植入（r=3 最远到 s-tile 1066 =
+                // 0x8560+31 → 回绕 0x57F）；0x00-0x1F（tile 0）保留全零。
+                plant_words(fixture, 0x0601_0020, 0x560, OPAQUE_WORD_8BPP);
+                fixture.write_word(OBJ_PALETTE_ADDR, OBJ_PALETTE_WORD);
+            },
+        );
+        expect_columns(&frame_row_at(&fixture, 25), 40, 103, COLOR_OPAQUE, "r=0");
+        let r1a = frame_row_at(&fixture, 28);
+        expect_columns(&r1a, 40, 55, COLOR_OPAQUE, "r=1 d-tiles 0-1 in-window");
+        expect_columns(&r1a, 56, 63, COLOR_BACKDROP, "r=1 d-tile 2 top half");
+        expect_columns(&r1a, 64, 103, COLOR_OPAQUE, "r=1 d-tiles 3-7 wrapped");
+        expect_columns(&frame_row_at(&fixture, 32), 40, 103, COLOR_OPAQUE, "r=1 d-tile 2 bottom");
+        expect_columns(&frame_row_at(&fixture, 47), 40, 103, COLOR_OPAQUE, "r=3");
+    }
+
+
+
+
+
+
+    /// 【腿 3 · OBJ 窗口掩码路径 4bpp】0015 同款：2D 64×32 tile=992。
+    ///
+    /// 2D：tile_offset = y*32 + x → r=1 的 tile 1024-1031、r=3 的
+    /// 1088-1095 全部越窗，分别回绕到窗口 tile 0-7 / 32-39。窗口精灵不渲染
+    /// 本体，但它的不透明像素把 OBJ 窗口区内的 BG0 遮掉（WINOUT 窗内全关
+    /// ⇒ 露 backdrop）⇒ 掩码路径的执行与越窗读数都从帧缓冲可观测。
+    #[test]
+    fn obj_window_span_2d_4bpp_masks_through_the_alias() {
+        let fixture = run_span_case(
+            DISPCNT_BG0 | super::DISPCNT_OBJ_ENABLE | DISPCNT_OBJ_WINDOW_FLAG,
+            ATTR0_GFX_MODE_OBJ_WINDOW | SPRITE_Y,
+            ATTR1_SIZE_64X32 | SPRITE_X,
+            992,
+            |fixture| {
+                plant_bg0_backdrop_split(fixture);
+                // 窗内：tile 992-999 = flat 0x17C00-0x17DFF。
+                plant_words(fixture, 0x0601_7C00, 0x200, OPAQUE_WORD);
+                // 回绕（2D，tile_offset = y*32 + x）：r=1 → tile 1024-1031 =
+                // 窗口 tile 0-7（0x000-0x0FF，tile 0 保留全零）；r=2 →
+                // tile 1056-1063 = 窗口 tile 32-39（0x400-0x4FF）；r=3 →
+                // tile 1088-1095 = 窗口 tile 64-71（0x800-0x8FF）。
+                plant_words(fixture, 0x0601_0020, 0xE0, OPAQUE_WORD);
+                plant_words(fixture, 0x0601_0400, 0x100, OPAQUE_WORD);
+                plant_words(fixture, 0x0601_0800, 0x100, OPAQUE_WORD);
+            },
+        );
+        // 窗口外：BG0 白 —— 正向对照（BG0 管线与 WINOUT 都在工作）。
+        expect_columns(&frame_row_at(&fixture, 10), 0, 239, COLOR_OPAQUE, "outside sprite");
+        expect_columns(&frame_row_at(&fixture, 25), 40, 103, COLOR_BACKDROP, "r=0");
+        let r1 = frame_row_at(&fixture, 29);
+        expect_columns(&r1, 40, 47, COLOR_OPAQUE, "r=1 d-tile 0 = aliased onto tile 0");
+        expect_columns(&r1, 48, 103, COLOR_BACKDROP, "r=1 d-tiles 1-7");
+        expect_columns(&frame_row_at(&fixture, 45), 40, 103, COLOR_BACKDROP, "r=3");
+    }
+
+    /// 【腿 4 · OBJ 窗口掩码路径 8bpp】同基座 8bpp，掩码路径的越窗读。
+    #[test]
+    fn obj_window_span_1d_8bpp_masks_through_the_alias() {
+        let fixture = run_span_case(
+            DISPCNT_BG0 | super::DISPCNT_OBJ_ENABLE | DISPCNT_OBJ_WINDOW_FLAG | DISPCNT_1D,
+            ATTR0_GFX_MODE_OBJ_WINDOW | ATTR0_8BPP | SPRITE_Y,
+            ATTR1_SIZE_64X32 | SPRITE_X,
+            1004,
+            |fixture| {
+                plant_bg0_backdrop_split(fixture);
+                plant_words(fixture, 0x0601_7CE0, 0x320, OPAQUE_WORD);
+                plant_words(fixture, 0x0601_0020, 0x560, OPAQUE_WORD);
+            },
+        );
+        expect_columns(&frame_row_at(&fixture, 10), 0, 239, COLOR_OPAQUE, "outside sprite");
+        expect_columns(&frame_row_at(&fixture, 25), 40, 103, COLOR_BACKDROP, "r=0");
+        let r1 = frame_row_at(&fixture, 28);
+        expect_columns(&r1, 40, 55, COLOR_BACKDROP, "r=1 d-tiles 0-1 in-window");
+        expect_columns(&r1, 56, 63, COLOR_OPAQUE, "r=1 d-tile 2 top half");
+        expect_columns(&r1, 64, 103, COLOR_BACKDROP, "r=1 d-tiles 3-7 wrapped");
+        expect_columns(&frame_row_at(&fixture, 32), 40, 103, COLOR_BACKDROP, "r=1 d-tile 2 bottom");
+        expect_columns(&frame_row_at(&fixture, 47), 40, 103, COLOR_BACKDROP, "r=3");
+    }
+}
