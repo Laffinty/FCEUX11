@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed — GBA 帧缓冲像素含 bit15 颜色时 GUI 进程中止——大批 GBA 游戏打开即死（通用机制修复）
+
+- **症状**：Windows 上打开大量 GBA 游戏后数秒内窗口冻结/进程消失，冻结点固定在
+  开场动画播放数秒处；同一 ROM 在无头探针下完全正常。MKSC（美版）为首个报告
+  案例，但**机制与单个游戏无关**：任何调色板数据带 0x8000 位（bit15）的 GBA
+  游戏——数量众多——都会在同一条路径上死亡。业主实测：修复后「不止马里奥赛车，
+  很多 GBA 游戏都兼容了」。
+- **根因**：GUI 每帧经 `gba_frame_buffer` 拉帧，帧缓冲→RGBA 的转换 LUT 只有
+  32768 项（BGR555 的 15 位全空间），而 GBA 颜色的 bit15 未使用
+  （GBATEK :7336-7337）却被游戏调色板数据原样带进帧缓冲——0xF223 这类像素索引
+  越界 panic；release 的 `panic = "abort"` 直接杀进程。帧拉取只在 GUI 路径运行，
+  全部无头探针/测试直连 `Gba::step` 从不经过——这就是「探针全绿、GUI 必死」的
+  原因（纪律 10 的新形态：覆盖的路径 ≠ 生产走的路径）。
+- **修法**：LUT 索引前 `& 0x7FFF`（硬件语义：bit15 在颜色数据通路被忽略；
+  一行 + GBATEK 引注）。被替换的标量转换（v2.0.2 P1 之前）做位运算、容忍
+  bit15——所以 v2.0 时代 GUI 手测通过的 GBA 游戏，在转换表落地后陆续变死。
+- **无头复现手段**：研究区 harness 新增 FFI 模式（复刻 GUI 每帧序列
+  set_buttons→step_frame→frame_buffer→render_audio），帧 ~218 逐字复现
+  `index out of bounds (len 32768, index 61987)`——「GUI 冻结/异常但探针全绿」
+  类报告从此可无头定位，不再依赖手测碰运气。
+- **门禁**：新锁 `a_bit15_palette_pixel_converts_as_its_15bit_colour`（LUT 条目
+  与独立标量参照双断言）；变异腿（摘 mask）以与生产症状逐字相同的越界数字转红。
+  Rust 全套 + 全量重链后 ctest -LE perf 49/49。
+- **锚点**：修复 59f95c3；规程与 FFI 模式见 `docs/tech/gba-compat-methodology.md`
+  §五；AGENTS.md 长尾第 8 条。
+
 ## [2.0.6] - 2026-11-20
 
 > 依据：`docs/history/plans/FCEUX11-遗留问题盘点与优化计划-2026-11-18.md` 批 1/批 2/批 3
