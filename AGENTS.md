@@ -32,6 +32,7 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 | `docs/history/plans/FCEUX11-遗留问题盘点与优化计划-2026-11-18.md` | **已收口归档（2026-11-19；内容冻结）**：对 `CHANGELOG.md` [2.0.0]→[2.0.5] 全部未决项的**全量盘点 + 批次计划**（A~E 五类总表 + 逐项代码实读验证），含业主裁决 **C-1~C-7**（§六）。归档当刻：批 1 全清 + 批 2 三清 + 批 3 材料交付；**批 2.1（A-4 / D1 第一步）受阻**（v2.0.5+ exe 两条 Lua 加载路径静默失效，待小 RE）⇒ 该未决项见 CHANGELOG `[Unreleased]` Known limitations。配套：`docs/history/plans/FCEUX11-F11QA期望值变更-评审稿-2026-11-18.md`（**评审未放行**）、`docs/history/plans/FCEUX11-PGO发布策略立项材料-2026-11-19.md`（PGO 默认 OFF 维持） |
 | `docs/history/plans/FCEUX11-v2.0.5_音视频异常缓慢-稳定性审计报告-2026-11-19.md` | **已收口归档（2026-11-19，随阶段 3 收口；内容冻结）**：「音视频异常缓慢」的全量审计——静态 8 条候选（A1–A8）+ 13 组实测矩阵 + 否定证清单。**A1 机制钉死 + 触发门槛量化**（探测 >≈455 ms 才可达）；§十一 三处结论更正（A6 复用分支可达 / §5.4 可达 / 覆盖面收窄）；r3 追记 **A5 实测裁决 = 登记不修**（LQ ≈0.15% / HQ ≈1.1% 帧时间，用户不可感）。取证素材（脚本/截图）在 `.zcode/soundprobe/`（gitignored） |
 | `docs/history/plans/FCEUX11-v2.0.5_A1音频探测线程修复-构建计划.md` | **已收口归档（2026-11-19，r6；内容冻结）**：审计报告 §9.2 建议的修复线，业主逐阶段开工——**阶段 1** A1+A2（`audio_probe_gate.{h,cpp}`，窗口冻结 13 981 ms → 0 ms 实测消除）、**阶段 2** 停排空自旋（`audio_sink_wait.h`，0.5 fps → 60 fps 实测消除）、**阶段 3** A3（`SDL_AUDIODRIVER` 作用域化 + sticky，`audio_driver_fallback.h`）+ GBA 节流残留（翻转检测移出 GBA 分支，NES 不再被钉 59.7275 fps）+ A5 实测登记 + §5.4 登记不改。诊断开关：`FCEUX11_AUDIO_TRACE` / `FCEUX11_TEST_AUDIO_OPEN_DELAY_MS` / `FCEUX11_TEST_AUDIO_STALL`。门禁 `ctest -LE perf` 47 → 49 |
+| `docs/plans/FCEUX11-v2.0.8_许可证合规与崩溃韧性-构建计划.md` | **在途（2026-11-22 立项，r1）**：第三方调研报告三条主张的承接线——**批 1 许可证头**（341 个 C/C++ 文件实测无 GPL 文本，分 A 项目自建 / B 上游继承 / C 真第三方三桶，C 桶不盖章；盖章脚本保 BOM/CRLF + `--check` 进 CI；Rust 侧只补 Cargo.toml 元数据，gba-core 保持 MIT）/ **批 2 崩溃韧性**（SRAM 周期落盘根治「崩溃丢电池存档」——`FCEU_SaveGameSave` 此前仅 GI_CLOSE 调用；本地 minidump 崩溃转储，业主裁决 D1 不接 Sentry）/ **批 3 观测**（msgLogBuf_t 落盘升级——既有 `%TEMP%\fceux.log` sink 三缺陷 + addLine 无锁竞争；诊断对话框；D2 裁决 Advanced 下新增 Diagnostics 二级菜单）。⚠️ 报告本身有事实偏差，**§一 实测事实底座与 §六 偏差附录为准，别照报告抄** |
 | `src/rust/crates/gba-core/ATTRIBUTION.md` | 上游出处、本地补丁集**逐处**说明、重新 vendor 流程 |
 | `COPYRIGHT_AUDIT.md` §5 | Rust vendor 树在 `src/` C/C++ 扫描范围之外的归属声明 |
 
@@ -41,7 +42,7 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 > **未完成**部分见 `docs/history/plans/FCEUX11-v2.0.2_残留精度与调试待办-review报告.md`
 > ——⚠️ **那份是 2026-11-08 的快照**，已在 v2.0.3 收口后逐条复核，
 > **当前状态以 `docs/history/plans/FCEUX11-v2.0.4_残留精度与调试待办-构建计划.md` 为准**（已随 v2.0.4 发布归档，内容冻结）。
-> ⚠️ **`docs/plans/` 现已清空**（v2.0.5 已随发布归档，2026-11-18；遗留问题盘点 / F11QA 评审稿 / PGO 立项材料三份已于 2026-11-19 归档；v2.0.5 音视频稳定性两份亦于同日阶段 3 收口后归档，目录再次清空）；在途计划放 `docs/plans/`，收口即移 `docs/history/plans/`。
+> ⚠️ **`docs/plans/` 现有 1 份在途计划**：v2.0.8（许可证合规与崩溃韧性，2026-11-22 立项，见治理文档表）。此前已清空（v2.0.5 已随发布归档，2026-11-18；遗留问题盘点 / F11QA 评审稿 / PGO 立项材料三份已于 2026-11-19 归档；v2.0.5 音视频稳定性两份亦于同日阶段 3 收口后归档）；在途计划放 `docs/plans/`，收口即移 `docs/history/plans/`。
 > 三者与 GBA 线无关，别混。
 
 ## GBA 与本体的关系（用户裁决 2026-10-01，动 GBA 之前先读这段）
