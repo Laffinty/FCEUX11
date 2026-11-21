@@ -222,14 +222,14 @@
       <div class="wn-item">
         <div class="wn-num">02</div>
         <div class="wn-text">
-          <h3>Where the fixes land, and what is registered honestly</h3>
+          <h3>Where the GBA compatibility fixes land, and what is registered honestly</h3>
           <p>The fixes only touch the over-window behaviour that previously always crashed — a strictly improving change; verified after the fix, Kurukuru Kururin and Fire Pro Wrestling A are fully playable. The per-cart testing of the first 119-ROM batch has started in parallel: the first two EEPROM cartridges (Hot Potato!, Tang Tang) are fully compatible with saves landing as expected. Non-crashing issues registered honestly: Wai Wai Racing has no background music in its settings screen (the BIOS sound family is not implemented; both measured cartridges never call it), Power Pro Kun Pocket 3 sounds rough (a resampling-quality gap), and Advance GT's track and dial display depends on the game's on-track determination (the rendering chain verified faithful headless; the trigger is under investigation) — all three are registered as follow-up observations, with their write-ups in the changelog.</p>
         </div>
       </div>
       <div class="wn-item">
         <div class="wn-num">03</div>
         <div class="wn-text">
-          <h3>The BETA mark is removed from the game screen: an initial compatibility recognition; the project status is unchanged</h3>
+          <h3>The BETA mark is removed from the GBA game screen: an initial compatibility recognition; the project status is unchanged</h3>
           <p>The semi-transparent BETA watermark drawn in the top-left corner of every frame since v2.0 no longer appears — the first batch of compatibility work (two crash root causes fixed plus per-cart verification) constitutes that initial recognition. The project's BETA status itself is unchanged: known limitations stay registered and the accuracy work continues. gba_set_overlay's return-value semantics are unchanged, and old savestates remain compatible.</p>
         </div>
       </div>
