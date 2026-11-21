@@ -218,3 +218,14 @@ ctest-output.txt
 
 # r15: movie_roundtrip_test stage log (written by the test itself)
 movie_roundtrip_stages.log
+
+# ---------------------------------------------------------------------------
+# Local release-package builds and probe scratch — never commit (owner
+# ruling 2026-11-21). The release zip is produced by the packaging script /
+# release.yml and can be rebuilt at will; root-level probe_*.txt is throwaway
+# probe output. The owner's NES mapper test table
+# (docs/NES_Mapper_Compatibility_Test_List.xlsx), by contrast, is always
+# committed by default.
+# ---------------------------------------------------------------------------
+/fceux11-v*-windows-amd64.zip
+/probe_*.txt
