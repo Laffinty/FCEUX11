@@ -113,6 +113,19 @@ const PLANNED: &[(&str, &[&str])] = &[
         "obj_window_span_1d_8bpp_masks_through_the_alias",
         &["OBJ-SPAN"],
     ),
+    // Win0/Win1 全屏腿（业主 GUI 黑屏分歧探针 2026-11-21，0004 实机
+    // DISPCNT 0x3E40 含 bit13/bit14；Research_only/gba_batch1_survey/
+    // case0004_0015/gui_divergence）：现有四腿只锁 OBJ 窗口，WIN0/WIN1
+    // 两个矩形窗口此前零覆盖。绿锁出生（GBATEK 快照 :1008-1037 全屏
+    // 坐标 0x00F0/0x00A0 + WININ 全关 ⇒ 全屏 backdrop；窗外 BG0 是牙）。
+    (
+        "win0_fullscreen_with_winin_all_off_shows_backdrop",
+        &["WIN-SPAN"],
+    ),
+    (
+        "win1_fullscreen_with_winin_all_off_shows_backdrop",
+        &["WIN-SPAN"],
+    ),
 ];
 
 /// The ones that must be red today, and only those.

@@ -625,6 +625,23 @@ mod window_span {
     /// 静默消失），2026-11-21 实测踩过一次。
     const WINOUT_ADDR: usize = 0x0400_004A;
     const WINOUT_OUTSIDE_BG0_ONLY: u32 = 0x0001;
+    /// DISPCNT bit 13 = Win0 显示使能、bit 14 = Win1（GBATEK 快照 :708-727）。
+    /// 0004 实机点亮值 0x3E40 同时置 Win0/Win1（业主 GUI 黑屏分歧探针，
+    /// Research_only/gba_batch1_survey/case0004_0015/gui_divergence）。
+    const DISPCNT_WIN0: u32 = 0x2000;
+    const DISPCNT_WIN1: u32 = 0x4000;
+    /// WIN0H（0400040h，GBATEK 快照 :1008-1015）：bits 0-7 = X2（最右坐标
+    /// **+1**）、bits 8-15 = X1（最左坐标）。全屏 = X1 0 / X2 240 = 0x00F0
+    /// ——恰是 +1 语义的全屏值，不进「X2>240 或 X1>X2 钳到 240」的垃圾分支。
+    const WIN0H_ADDR: usize = 0x0400_0040;
+    const WIN_H_FULL: u32 = 0x00F0;
+    /// WIN0V（0400044h，GBATEK 快照 :1017-1024）：bits 0-7 = Y2（最下坐标
+    /// **+1**）、bits 8-15 = Y1（最上坐标）。全屏 = 0x00A0。
+    const WIN0V_ADDR: usize = 0x0400_0044;
+    const WIN_V_FULL: u32 = 0x00A0;
+    /// WININ（0400048h，GBATEK 快照 :1026-1037）：低半字 Win0、高半字 Win1，
+    /// 各 bits 0-4 = BG0-3/OBJ/特效应使能。全关 = 0x0000 ⇒ 窗内只剩 backdrop。
+    const WININ_ADDR: usize = 0x0400_0048;
     const BG0CNT_ADDR: usize = 0x0400_0008;
     /// BG0CNT = SBB 8（本仓 screen-base 惯例 ⇒ 0x06004000）、char base 0、
     /// size 0（32×32）、4bpp。
@@ -654,6 +671,35 @@ mod window_span {
     fn plant_oam(fixture: &mut Fixture, attr0: u32, attr1: u32, attr2: u32) {
         fixture.write_word(OAM_BASE as usize, (attr1 << 16) | attr0);
         fixture.write_word(OAM_BASE as usize + 4, attr2);
+    }
+
+    /// BG0 全屏白 + 双窗口全屏矩形 + WININ 全关 + WINOUT「窗外 BG0 开」。
+    ///
+    /// 与 [`plant_bg0_backdrop_split`] 的差别只在窗口寄存器面：这里
+    /// WININ 两个半字都全关（Win0/Win1 内什么都看不见），而 WINOUT 的
+    /// 窗外 BG0 位开着——它是这两条腿的**牙**：窗口若失效（空窗 /
+    /// 坐标字节序错 / 使能位读错半字）⇒ 窗外规则全屏生效 ⇒ BG0 白 ⇒ 红。
+    ///
+    /// 一字写覆盖成对寄存器（`write_word` 对齐语义，同上面 WININ/WINOUT
+    /// 的警示）：0400040h = WIN0H+WIN1H、0400044h = WIN0V+WIN1V、
+    /// 0400048h = WININ+WINOUT。两个窗口拿同一组全屏坐标，未启用的
+    /// 那个取值无关。
+    fn plant_bg0_with_fullscreen_windows(fixture: &mut Fixture) {
+        fixture.write_word(BG0CNT_ADDR, BG0CNT_SBB8);
+        for i in 0..512 {
+            fixture.write_word(BG0_MAP_ADDR + i * 4, 0x0001_0001);
+        }
+        plant_words(fixture, BG0_TILE1_ADDR, 32, OPAQUE_WORD);
+        fixture.write_word(0x0500_0000, BG_PALETTE_ENTRY1_WORD);
+        fixture.write_word(WIN0H_ADDR, (WIN_H_FULL << 16) | WIN_H_FULL);
+        fixture.write_word(WIN0V_ADDR, (WIN_V_FULL << 16) | WIN_V_FULL);
+        fixture.write_word(WININ_ADDR, WINOUT_OUTSIDE_BG0_ONLY << 16);
+    }
+
+    /// 跑一个 Win0/Win1 用例：无精灵面（OAM 交全零、OBJ 层不使能），
+    /// 其余流程同 [`run_span_case`]（panic 转失败 + 跑到采样行之后）。
+    fn run_window_case(dispcnt: u32, plant: impl FnOnce(&mut Fixture)) -> Fixture {
+        run_span_case(dispcnt, 0, 0, 0, plant)
     }
 
     /// BG0 全屏白 + WINOUT「窗外 BG0、OBJ 窗内全关」：窗口掩码像素露 backdrop。
@@ -849,5 +895,63 @@ mod window_span {
         expect_columns(&r1, 64, 103, COLOR_BACKDROP, "r=1 d-tiles 3-7 wrapped");
         expect_columns(&frame_row_at(&fixture, 32), 40, 103, COLOR_BACKDROP, "r=1 d-tile 2 bottom");
         expect_columns(&frame_row_at(&fixture, 47), 40, 103, COLOR_BACKDROP, "r=3");
+    }
+
+    /// 【腿 5 · Win0 全屏 + WININ 全关 ⇒ 全屏 backdrop】0004 实机 DISPCNT
+    /// 0x3E40 的 Win0 使能（bit 13）腿——现有四腿只锁 OBJ 窗口（WINOBJ），
+    /// WIN0/WIN1 两个矩形窗口此前零覆盖（业主 GUI 黑屏分歧探针
+    /// gui_divergence/notes.md，2026-11-21）。
+    ///
+    /// 依据（GBATEK 快照 :1008-1037）：WIN0H bits 8-15 = X1（左）、
+    /// bits 0-7 = X2 = 右坐标 **+1**；WIN0V 同构（Y1 上 / Y2 = 下坐标+1）。
+    /// 全屏 = 0x00F0 / 0x00A0（不进垃圾钳位分支）。WININ 低半字全关
+    /// ⇒ Win0 内 BG0 也看不见 ⇒ 全屏只剩 backdrop。
+    ///
+    /// 牙：WINOUT 窗外 BG0 开着——vendor 的 `is_in_win0`/`get_win0_enables`
+    /// 若有坐标字节序 / 使能半字 / 「left>=right 反转窗」语义缺陷，窗口
+    /// 变空 ⇒ 窗外规则全屏生效 ⇒ BG0 白 ⇒ 红。
+    #[test]
+    fn win0_fullscreen_with_winin_all_off_shows_backdrop() {
+        let fixture = run_window_case(DISPCNT_BG0 | DISPCNT_WIN0, |fixture| {
+            plant_bg0_with_fullscreen_windows(fixture);
+        });
+        expect_columns(
+            &frame_row_at(&fixture, 10),
+            0,
+            SCREEN_WIDTH - 1,
+            COLOR_BACKDROP,
+            "win0 covers row 10",
+        );
+        expect_columns(
+            &frame_row_at(&fixture, 51),
+            0,
+            SCREEN_WIDTH - 1,
+            COLOR_BACKDROP,
+            "win0 covers row 51",
+        );
+    }
+
+    /// 【腿 6 · Win1 全屏 + WININ 高半字全关 ⇒ 全屏 backdrop】0004 实机
+    /// DISPCNT 0x3E40 的 Win1 使能（bit 14）腿，对称于腿 5：WININ 高半字
+    /// 全关、WIN1H/WIN1V 全屏（与 WIN0H/WIN0V 同一字写），牙同（窗外 BG0）。
+    #[test]
+    fn win1_fullscreen_with_winin_all_off_shows_backdrop() {
+        let fixture = run_window_case(DISPCNT_BG0 | DISPCNT_WIN1, |fixture| {
+            plant_bg0_with_fullscreen_windows(fixture);
+        });
+        expect_columns(
+            &frame_row_at(&fixture, 10),
+            0,
+            SCREEN_WIDTH - 1,
+            COLOR_BACKDROP,
+            "win1 covers row 10",
+        );
+        expect_columns(
+            &frame_row_at(&fixture, 51),
+            0,
+            SCREEN_WIDTH - 1,
+            COLOR_BACKDROP,
+            "win1 covers row 51",
+        );
     }
 }
