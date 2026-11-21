@@ -1101,7 +1101,16 @@ const fn build_bgr555_to_rgba() -> [u32; 32768] {
 fn write_frame_bytes(machine: &Machine, out: &mut [u8]) {
     let buffer = &machine.gba.cpu.bus.lcd.buffer;
     for (chunk, pixel) in out.chunks_exact_mut(4).zip(buffer.as_flattened()) {
-        chunk.copy_from_slice(&BGR555_TO_RGBA[pixel.0 as usize].to_le_bytes());
+        // GBATEK `:7336-7337`: the colour is 15-bit and "the upper bit in each
+        // halfword is unused" — but palette RAM is game data, and a game may
+        // store 0x8000-set entries there (Mario Kart Super Circuit's boot
+        // sequence does). Hardware ignores the bit at the colour datapath, so
+        // mask before indexing: the table covers only the 15-bit space, and
+        // this mask is what stood between a single such pixel and a process
+        // abort on the GUI's per-frame frame pull. The scalar conversion this
+        // table replaced (C1, v2.0.2 P1) did bit arithmetic and tolerated
+        // bit-15 data, which is why the v2.0-era GUI tests never saw it.
+        chunk.copy_from_slice(&BGR555_TO_RGBA[(pixel.0 as usize) & 0x7FFF].to_le_bytes());
     }
 }
 
@@ -1388,6 +1397,40 @@ use gba_core::cpu::hardware::keypad::GbaButton;
             assert_eq!(
                 unsafe { gba_frame_buffer(std::ptr::null_mut(), FRAME_BYTES as u32) },
                 GBA_ERR_CAPACITY
+            );
+        });
+    }
+
+    /// A framebuffer pixel may carry bit 15 of the colour halfword (palette
+    /// RAM is game data and a game may store 0x8000-set entries there), while
+    /// the conversion table covers only the 15-bit colour space. Hardware
+    /// ignores the bit (GBATEK `:7336-7337`: "the upper bit in each halfword
+    /// is unused"), so the pull must mask before indexing — an unmasked index
+    /// panicked out of the GUI's per-frame pull and the process died with it.
+    #[test]
+    fn a_bit15_palette_pixel_converts_as_its_15bit_colour() {
+        exclusively(|| {
+            with_loaded_machine();
+            with_machine(|machine| {
+                machine.gba.cpu.bus.lcd.buffer[0][0] =
+                    gba_core::cpu::hardware::lcd::Color(0xF223);
+            })
+            .unwrap_or_else(|e| panic!("no machine to plant the pixel in: {e}"));
+            let mut out = vec![0u8; FRAME_BYTES];
+            assert_eq!(
+                unsafe { gba_frame_buffer(out.as_mut_ptr(), FRAME_BYTES as u32) },
+                GBA_OK,
+                "a bit-15 pixel must not kill the frame pull"
+            );
+            assert_eq!(
+                &out[0..4],
+                &BGR555_TO_RGBA[(0xF223 & 0x7FFF) as usize].to_le_bytes(),
+                "the pixel must convert as its 15-bit colour"
+            );
+            assert_eq!(
+                &out[0..4],
+                &bgr555_to_rgba_scalar(0xF223 & 0x7FFF),
+                "and the masked conversion must agree with the independent scalar reference"
             );
         });
     }
