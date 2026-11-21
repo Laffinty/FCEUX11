@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — GBA 精灵瓦片越过 OBJ 窗口末端时进程中止——滚滚棒/火炎摔跤等打开即死（通用机制修复）
+
+- **症状**：打开特定 GBA 游戏（实证：0004 滚滚棒 Kurukuru Kururin——黑屏约 1 秒后进程
+  消失；0015 火炎职业摔跤 A Fire Pro Wrestling A——白屏数秒后进程消失）数秒内窗口
+  冻结/进程消失；无头探针下同位置三方一致复现。机制与单个游戏无关：**任何精灵的
+  `attr2` 瓦片号加精灵跨度越过 OBJ 窗口末端（瓦片 1023 界）的 GBA 游戏都会死亡**
+  ——瓦片域按架构就是 0-1023，跨窗精灵合法存在。
+- **根因**：vendor 核的 OBJ 瓦片读取共 4 处（渲染路径 8bpp/4bpp + OBJ 窗口掩码路径
+  8bpp/4bpp）对 96 KB 平铺 VRAM 数组直索引，瓦片跨度越过 32 KB OBJ 窗口末端时
+  `index out of bounds` panic（首越界字节 index 98304 = 数组长）；release 的
+  `panic = "abort"` 直接杀进程。真机行为 = 总线把 `0x06018000-0x0601FFFF` 镜像到
+  OBJ 窗口 `0x06010000-0x06017FFF`（gbadoc VRAM 节一手原文；GBATEK 快照 :439 仅标
+  "Not used" 无读语义）⇒ 真机读回绕垃圾像素、不崩溃。
+- **修法**：四处读取收敛到一个带边界语义的助手函数 `obj_tile_data`（越窗回绕
+  `& 0x7FFF`，镜像语义 + 来源引注），不动任何非 OBJ 路径。这是 bit15 帧缓冲
+  （本 Unreleased 前一条）与 v2.0.3 S2-a OAM 禁止值之后 **vendor panic 家族第三例**
+  ——共同形态：硬件合法值 → vendor panic → release 杀进程。
+- **无头验证**：两卡 FFI 2500 帧全过（0004 首变帧 76 = 修前死亡点，1773 个变化帧；
+  0015 越过修前死亡帧 204，白屏按真机序列过渡到 VAILL logo 实拍确认）。
+- **门禁**：四条常驻夹具锁（渲染 4bpp/8bpp + OBJ 窗口掩码 4bpp/8bpp 各一，
+  注册进 G2 守卫集合）；变异三腿：还原 panic 4/4 红、透明语义 4/4 红（像素断言）、
+  只修一处 3/4 红在各自读取点。Rust 全套 + 双态 check + `ctest -LE perf` 全绿。
+- **已知限制**：越窗像素在真机上读的是镜像垃圾值，本实现读的是窗口内回绕数据——
+  视觉上两者通常都不可辨（跨窗段通常是精灵边缘），语义钉定过程与出处见修复计划
+  `docs/history/plans/FCEUX11-GBA-OBJ瓦片越界panic修复计划-2026-11-21.md`（收口后
+  随本条归档）。
+
 ### Fixed — GBA 帧缓冲像素含 bit15 颜色时 GUI 进程中止——大批 GBA 游戏打开即死（通用机制修复）
 
 - **症状**：Windows 上打开大量 GBA 游戏后数秒内窗口冻结/进程消失，冻结点固定在

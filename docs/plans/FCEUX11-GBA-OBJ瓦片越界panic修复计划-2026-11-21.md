@@ -1,6 +1,6 @@
 # FCEUX11 — GBA OBJ 瓦片越界 panic 修复计划
 
-> **状态：草案，待业主拍板**（拍板前不动任何代码；纪律 1）
+> **状态：已实施并收口（2026-11-21，业主拍板放行当日）**——见 §六 r2；主计划 §十 r5
 > 立项依据：批次 1 个案 B（0004+0015）取证，主计划 `docs/plans/FCEUX11-GBA兼容性批次1-测试分析与优化计划-2026-11-21.md` §5.3 / §十 r4
 > 方法论：`docs/tech/gba-compat-methodology.md`；修复纪律 = 主计划 §六（通用机制修复、锁测试双断言、变异双向可红、全门禁）
 > ⚠️ 本修属 vendor 改动：`src/rust/crates/gba-core/` 下，`ATTRIBUTION.md` §3.2 须新增条目
@@ -59,3 +59,4 @@
 ## §六 变更记录
 
 - **r1（2026-11-21）**：立项草案。依据 = 批次 1 个案 B 取证（坐标/触发形态/硬件语义引注见 §一）；**待业主拍板后动代码**；拍板即按 §二.1 → §三 → §四 顺序执行。
+- **r2（2026-11-21，同日实施收口）**：业主拍板放行后按 §二→§三→§四 全链落地。① **语义钉定**：gbadoc VRAM 节一手原文「Bytes 0x06010000 - 0x06017FFF is mirrored from 0x06018000 - 0x0601FFFF」（GBATEK 快照 :439 只标 Not used 无读语义）⇒ 镜像回绕 `& 0x7FFF`；Gekkio 无 GBA 内存映射公开文档（其文档以 DMG 为主），gbadoc 为 gbadev 社区维护的现代权威替代。② **修复**：`layer_obj.rs` 新增 `obj_tile_data` 助手（模块常量 `OBJ_TILE_DATA_BASE/WINDOW` + 引注），四处调用点收敛；提交 7d9c59d。③ **锁**：四腿夹具注册进 G2（`obj_tile_span_1d_{4,8}bpp_reads_the_window_alias` / `obj_window_span_{2d_4,1d_8}bpp_masks_through_the_alias`），期望值全手工推导；实施期夹具侧两坑（与核心无关，如实登记）：WINOUT 写入地址曾误植 `0x0400_04A`（=0x4004A，少一位）落进写匹配黑洞静默消失、8bpp 瓦片字节即调色板指数（铺 0x11 = 指数 17 黑屏）。④ **变异三腿全闭**：还原 panic 4/4 红（panic 落在变异行）；透明语义（越窗读零）4/4 红走像素断言（区分镜像与透明两类假实现）；只留 4bpp 渲染点用助手 1 绿 3 红在各自被退回的读取点（:448 等）。⑤ **门禁**：Rust 全套绿（root 306+20 / gba-core 249 / debug 94 / formats 158 / utils 51 / lua 54 / media 52 + 双态 check）；ctest -LE perf 全绿（读数见主计划 §十 r5）。⑥ **FFI 验证**：两卡 2500 帧全过——0004 首变帧 76（=修前死亡点）1773 个变化帧、帧 100 实拍 = 开场小鸟场景完整渲染；0015 越过修前死亡帧 204，帧 350 实拍 = VAILL logo（白屏按真机序列过渡）。⑦ **路② 补课**：两卡在 mGBA 社区兼容清单均 Works、无专门 issue（MGBAWii WikiTemp / RetroArch mGBA 清单）；mGBA 博客「Holy Grail bug」史提及 Kururin 族早年启动时序 bug——与本次 OBJ panic 不同族，如实区分。⑧ ATTRIBUTION §3.2.18 + 计数刷新（34 处/8 文件）；CHANGELOG [Unreleased] 新增 Fixed 段。

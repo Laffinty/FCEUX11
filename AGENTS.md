@@ -277,12 +277,13 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 > r54（**用户裁决 2026-10-03：接受 GBA 模块不完美**）解除，验证转 S4 长尾；
 > **GBA 长期 Alpha，不阻塞本体发版。**
 
-v2.0 对 vendor 树的本地修改是 **33 处、跨 7 个源文件**（文件清单用
+v2.0 对 vendor 树的本地修改是 **34 处、跨 8 个源文件**（文件清单用
 `git log --name-only --diff-filter=M -- src/rust/crates/gba-core/src/` 实测得出，
 不是手数；`Cargo.toml` 不算源改动；r56 增 1 处，
 v2.0.1 P0 增 1 处、P2 先行工作项增 1 处、r5 增 2 处、r12 计费修复增 1 处、
 r17 定时器分频增 1 处、r21/r22 定时器两项增 2 处、r34 预取命中判据增 1 处、r36 DMA 逐单元排水与起始延迟增 1 处、
 v2.0.3 r17 增 5 处（internal_memory.rs 4 + layer_2.rs 1）；
+2026-11-21 OBJ 越界修复增 1 处（layer_obj.rs 窗口别名助手）；
 被回退的 #24（r17）与 #27（r29 DMA 计数）保留编号但不计数）：
 
 | 文件 | 处数 | 内容 |
@@ -294,6 +295,7 @@ v2.0.3 r17 增 5 处（internal_memory.rs 4 + layer_2.rs 1）；
 | `src/cpu/hardware/internal_memory.rs` | 8 | S2-b3 的 `rtc()` / `rtc_mut()` 2 处 + S3-1 的 `backup_type()` / `set_backup_type()` 2 处 + v2.0.3 r17 的 **EEPROM D1 动态容量 3 处**（`buffer_size` 0x0200 / `ensure_eeprom_capacity` / `load_battery` 旧档迁移，**改变行为**：`.srm` 从恒 32 KB 变 512 B 起步懒扩 8 KB）+ **`try_read_word` 越界臂半字对快路径** 1 处（契约/性能，总线值不变）——见 ATTRIBUTION §3.2.13–§3.2.16 |
 | `src/cpu/hardware/lcd/object_attributes.rs` | 1 | v2.0.3 S2-a（r7）：OAM 禁止值（attr0 shape=3 / gfx mode=3）映射为 `ObjMode::Disabled`（**改变行为**：原每扫描线 panic ⇒ 闪退根因；现为真机语义「精灵不显示」）——见 ATTRIBUTION §3.2.12；⚠️ 重新 vendor 时新版上游大概率仍是 panic，**合并会静默把闪退带回来** |
 | `src/cpu/hardware/lcd/layers/layer_2.rs` | 1 | v2.0.3 S3-e（r17）：**mode 5 页面翻转**（`render_mode5` 补 `frame_offset = bit4 ? 0xA000 : 0`，与 mode 4 同式；**改变行为**：此前 mode 5 恒读第 0 页）——见 ATTRIBUTION §3.2.17；⚠️ GBATEK `:3198` 证实 mode 4 的 index 0 透明是**正确**行为，别当缺陷改（有防回归锁） |
+| `src/cpu/hardware/lcd/layers/layer_obj.rs` | 1 | 2026-11-21（OBJ 越界修复）：**OBJ 瓦片读取的窗口别名助手**——四处直索引（渲染 8bpp/4bpp + OBJ 窗口掩码 8bpp/4bpp）收敛到 `obj_tile_data`（越窗回绕 `& 0x7FFF`，gbadoc 镜像语义；**改变行为**：原越窗直索引 panic ⇒ release 杀进程，实证 0004/0015 两卡开卡即死）——见 ATTRIBUTION §3.2.18；⚠️ 重新 vendor 时上游仍是直索引 panic，**合并会静默把「大批精灵跨窗游戏开卡即死」带回来**，与 §3.2.12/§3.2.3 同级第一核对项 |
 
 **后三个文件里的改动都不改变「不覆盖时的行为」。** 但**补丁集已不再是「集中在一个
 文件」**（r38 ④ / r46 ①）—— 改动前先确认这一点是否仍成立，`rtc.rs`、
@@ -358,7 +360,7 @@ v2.0 GBA 计划建设期已收口归档（r57 用户裁决）。剩余长尾全�
    监视）。触发条件：业主人工触发一次存档后，跑 `.srm` 前后对照与重载读回即可
    闭环。SELECT 谜题若在 GUI 上复现（设置屏打不开）→ 另立 RE。方法论裁定
    （通用机制主线 / 不做逐卡 hack）见归档计划 §〇，约束所有后续 GBA 兼容性工作。
-   根 crate 测试现 **321 总**（301 passed + 20 ignored，含 W4 的 2 条新锁）。
+   根 crate 测试现 **326 总**（306 passed + 20 ignored，含 2026-11-21 OBJ 窗口跨度的 4 条新锁）。
    ⚠️ **GUI 每帧路径此前零覆盖**：帧拉取（`gba_frame_buffer`）只在 GUI 跑，全部
    无头探针直连 `Gba::step` 从不经过——bit15 帧缓冲崩溃（59f95c3 修复）恰好只
    在那条路径上。研究区 harness 新增 **FFI 模式**（`MKSC_FFI=1`，复刻 GUI 帧序列
