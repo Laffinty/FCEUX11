@@ -2,7 +2,7 @@
 
 # FCEUX11
 
-[![Version](https://img.shields.io/badge/version-v2.0.6-blue)](https://github.com/Laffinty/FCEUX11/releases)
+[![Version](https://img.shields.io/badge/version-v2.0.7-blue)](https://github.com/Laffinty/FCEUX11/releases)
 [![License](https://img.shields.io/badge/license-GPL--v2-green)](COPYING)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?logo=windows)](https://www.microsoft.com/windows/windows-11)
 [![Qt](https://img.shields.io/badge/Qt-6.8%20LTS-41CD52?logo=qt)](https://www.qt.io)
@@ -16,9 +16,9 @@
 
 ## 简介 / Introduction
 
-**FCEUX11** 是基于 [FCEUX](https://fceux.com) 的 NES/Famicom 模拟器衍生项目，针对 **Windows** 平台深度优化。在继承 FCEUX 卓越模拟精度的同时，采用 Qt6 图形界面重塑了现代 Windows 原生体验，并提供 12 种语言的多语言支持，以及面向开发者和速通玩家的调试与 TAS 工具集。项目持续推进内部核心重构与性能优化工作，致力于让模拟器在高负载场景下依旧保持高效、流畅与稳定。新增实验性 Game Boy Advance（GBA） 模拟支持，复用现有 UI、存档系统、热键与调试基础设施；GBA 功能处于 Beta 阶段，自带画面水印，部分硬件特性尚未完整实现。
+**FCEUX11** 是基于 [FCEUX](https://fceux.com) 的 NES/Famicom 模拟器衍生项目，针对 **Windows** 平台深度优化。在继承 FCEUX 卓越模拟精度的同时，采用 Qt6 图形界面重塑了现代 Windows 原生体验，并提供 12 种语言的多语言支持，以及面向开发者和速通玩家的调试与 TAS 工具集。项目持续推进内部核心重构与性能优化工作，致力于让模拟器在高负载场景下依旧保持高效、流畅与稳定。新增实验性 Game Boy Advance（GBA） 模拟支持，复用现有 UI、存档系统、热键与调试基础设施；GBA 功能处于 Beta 阶段（v2.0.7 起画面不再绘制 BETA 水印，兼容性获初步认可），部分硬件特性尚未完整实现。
 
-**FCEUX11** is a derivative of the [FCEUX](https://fceux.com) NES/Famicom emulator, optimized for **Windows**. It inherits FCEUX's renowned emulation accuracy while delivering a polished, modern Windows-native experience powered by Qt6, with 12-language localization and a full suite of debugging and TAS tools for developers and speedrunners. Ongoing internal refactoring and performance optimization keeps the emulator efficient, smooth, and stable even under heavy load. Experimental Game Boy Advance (GBA) emulation support has been added, reusing the existing UI, save-state system, hotkeys and debugging infrastructure; GBA features are in Beta, the picture carries a watermark, and some hardware features are not yet fully implemented.
+**FCEUX11** is a derivative of the [FCEUX](https://fceux.com) NES/Famicom emulator, optimized for **Windows**. It inherits FCEUX's renowned emulation accuracy while delivering a polished, modern Windows-native experience powered by Qt6, with 12-language localization and a full suite of debugging and TAS tools for developers and speedrunners. Ongoing internal refactoring and performance optimization keeps the emulator efficient, smooth, and stable even under heavy load. Experimental Game Boy Advance (GBA) emulation support has been added, reusing the existing UI, save-state system, hotkeys and debugging infrastructure; GBA features are in Beta (since v2.0.7 the screen no longer draws the BETA mark — an initial compatibility recognition), and some hardware features are not yet fully implemented.
 
 ---
 
@@ -27,7 +27,7 @@
 | 中文 | English |
 |------|---------|
 | **精确模拟**：完整支持 NES、Famicom 及各类 Mapper 扩展芯片，画面与音效高度还原。 | **Accurate Emulation**: Full NES / Famicom / mapper support with faithful graphics and audio. |
-| **实验性 GBA 模拟 (BETA)**：支持 ROM 加载、BIOS SWI 系统调用、音频输出、电池存档（`.srm`）、即时存档、手柄输入、整数倍画面缩放；内置诊断探针用于硬件行为定位，Beta 水印不可关闭。 | **Experimental GBA Emulation (BETA)**: ROM loading, BIOS SWI system calls, audio output, battery saves (`.srm`), save states, controller input, and integer-scaled display; a built-in diagnostic probe helps pinpoint hardware behaviour, and the Beta watermark cannot be disabled. |
+| **实验性 GBA 模拟 (BETA)**：支持 ROM 加载、BIOS SWI 系统调用、音频输出、电池存档（`.srm`）、即时存档、手柄输入、整数倍画面缩放；内置诊断探针用于硬件行为定位。 | **Experimental GBA Emulation (BETA)**: ROM loading, BIOS SWI system calls, audio output, battery saves (`.srm`), save states, controller input, and integer-scaled display; a built-in diagnostic probe helps pinpoint hardware behaviour. |
 | **调试工具**：内置 CPU/PPU 调试器、十六进制编辑器、内存搜索与监视、代码/数据日志。 | **Debugging Tools**: CPU/PPU debugger, hex editor, RAM search/watch, code/data logger. |
 | **TAS 编辑器**：逐帧录制并精确编辑按键输入，轻松制作工具辅助速通（TAS）录像。 | **TAS Editor**: Frame-by-frame recording and precise input editing for Tool-Assisted Speedruns. |
 | **Lua 脚本**：通过 Lua 接口编写脚本，实现自定义屏幕叠加显示、自动化操作、内存数据读取等高级玩法。 | **Lua Scripting**: Custom on-screen displays, automation, and memory access via Lua. |
@@ -79,11 +79,11 @@ Precompiled binaries are available on the **[GitHub Releases](https://github.com
 ## 快速开始 / Quick Start
 
 1. 启动 `fceux11.exe`。
-2. 通过 **File → Open ROM** 加载游戏（支持 `.nes` / `.fds` / `.nsf` / `.unf`）；实验性 GBA（Beta）可直接打开 `.gba` 卡带，画面带 `BETA` 水印，个别游戏存在已知问题。
+2. 通过 **File → Open ROM** 加载游戏（支持 `.nes` / `.fds` / `.nsf` / `.unf`）；实验性 GBA（Beta）可直接打开 `.gba` 卡带（v2.0.7 起画面无 BETA 水印），个别游戏存在已知问题。
 3. 键盘或手柄游戏；输入映射在 **Options → Input Config** 调整。
 4. **I** 快速存档，**P** 快速读档。
 
-Launch `fceux11.exe`, load a game via **File → Open ROM** (NES: `.nes` / `.fds` / `.nsf` / `.unf`; experimental GBA (Beta): `.gba` cartridges open from the same dialog, frames carry a `BETA` watermark, and a few games have known issues), play with keyboard or gamepad (remap in **Options → Input Config**). Press **I** to quick-save, **P** to quick-load.
+Launch `fceux11.exe`, load a game via **File → Open ROM** (NES: `.nes` / `.fds` / `.nsf` / `.unf`; experimental GBA (Beta): `.gba` cartridges open from the same dialog (no BETA watermark since v2.0.7), and a few games have known issues), play with keyboard or gamepad (remap in **Options → Input Config**). Press **I** to quick-save, **P** to quick-load.
 
 ---
 
