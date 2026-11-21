@@ -5,7 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.7] — 2026-11-21
+
+### Removed — GBA 游戏画面的 BETA 水印（初步认可兼容性；BETA 状态本身不变）
+
+- 自 v2.0 起每帧左上角绘制的半透明 `BETA` 标不再绘制（业主决定：批次 1 的
+  兼容性工作——OBJ 窗口越界修复与逐卡实证——足以构成初步认可）。**项目
+  BETA 状态本身不变**，已知限制照旧登记。
+- 实现面：帧路径上的单一合成点移除；`gba_set_overlay` 的 ABI 答案语义保留
+  （release 构建仍拒绝、返回 `GBA_ERR_STATE`——现在守的是簿记旗标）；
+  savestate 旗标字段形状不变，旧即时存档可读。
+- 行为锁：`the_watermark_no_longer_reaches_the_caller_buffer`（反转自原
+  「水印必达」锁；变异 = 重新引入绘制即红）。门禁：Rust 全套 + LTCG 全量重链
+  （-j 1）后 `ctest -LE perf` 49/49。
 
 ### Fixed — GBA 精灵瓦片越过 OBJ 窗口末端时进程中止——滚滚棒/火炎摔跤等打开即死（通用机制修复）
 

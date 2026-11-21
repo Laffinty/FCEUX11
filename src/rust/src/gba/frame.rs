@@ -331,9 +331,9 @@ pub unsafe extern "C" fn gba_frame_buffer_size(out_size: *mut u32) -> i32 {
 /// Copy the current frame into `dst` as RGBA.
 ///
 /// `dst` must be at least [`gba_frame_buffer_size`] bytes. The `BETA`
-/// watermark is drawn on the way out, so it lands in every copy this function
-/// produces — window, screenshot and recording alike, because there is only
-/// one place it is drawn.
+/// watermark is **no longer drawn** (removed in v2.0.7 by owner decision —
+/// initial compatibility recognition; the BETA *status* itself remains), so
+/// the frame this function produces is exactly the game's own output.
 ///
 /// # Safety
 /// `dst` must point to `cap` writable bytes, and the caller must be the
@@ -352,9 +352,6 @@ pub unsafe extern "C" fn gba_frame_buffer(dst: *mut u8, cap: u32) -> i32 {
             // no allocation where there used to be two Vecs per call.
             let frame = std::slice::from_raw_parts_mut(dst, overlay::FRAME_BYTES);
             write_frame_bytes(machine, frame);
-            if machine.overlay.enabled() {
-                overlay::draw(frame);
-            }
             GBA_OK
         })
     }
@@ -363,9 +360,9 @@ pub unsafe extern "C" fn gba_frame_buffer(dst: *mut u8, cap: u32) -> i32 {
 
 /// Ask for the `BETA` watermark to be turned off.
 ///
-/// A release build refuses with `GBA_ERR_STATE` and leaves it on. A caller
-/// that checked the return value is therefore never misled about whether the
-/// mark is present.
+/// Kept for ABI and savestate-flag compatibility: the watermark has not been
+/// drawn since v2.0.7, so the flag is bookkeeping only. The call is accepted
+/// in every build.
 #[unsafe(no_mangle)]
 pub extern "C" fn gba_set_overlay(enable: i32) -> i32 {
     let want = enable != 0;
@@ -1580,13 +1577,16 @@ use gba_core::cpu::hardware::keypad::GbaButton;
         });
     }
 
-    /// The watermark reaches the caller's buffer.
+    /// The watermark no longer reaches the caller's buffer.
     ///
-    /// This is the only assertion that proves the overlay is on the frame path
-    /// at all: a build that compiled the overlay but never called it would pass
-    /// every other test here.
+    /// Inverted in v2.0.7 (owner decision — initial compatibility recognition;
+    /// the BETA *status* remains): the mark was removed from the frame path, so
+    /// every pixel the caller receives carries the conversion's own opaque
+    /// alpha. This is the only assertion that proves the overlay is off the
+    /// frame path at all: a build that kept the draw call would pass every
+    /// other test here. Mutation = reintroducing the draw call goes red.
     #[test]
-    fn the_watermark_reaches_the_caller_buffer() {
+    fn the_watermark_no_longer_reaches_the_caller_buffer() {
         exclusively(|| {
             with_loaded_machine();
             let mut out = vec![0u8; FRAME_BYTES];
@@ -1597,10 +1597,10 @@ use gba_core::cpu::hardware::keypad::GbaButton;
                     GBA_OK
                 );
             }
-            // The watermark is the semi-transparent white; the game's own pixels
-            // are opaque. Anything that is neither is a bug, covered above.
+            // The conversion's own alpha is opaque (0xFF); the removed watermark
+            // was the semi-transparent white (alpha 240). Any 240 is the mark.
             let watermark = out.chunks_exact(4).filter(|p| p[3] == 240).count();
-            assert!(watermark > 0, "no watermark pixel reached the caller's buffer");
+            assert!(watermark == 0, "{watermark} watermark pixels reached the caller's buffer");
         });
     }
 
@@ -1621,37 +1621,28 @@ use gba_core::cpu::hardware::keypad::GbaButton;
         }
     }
 
-    /// Whether the watermark can be turned off depends on the build, and the
-    /// return value is what tells the caller.
+    /// Whether the watermark can be turned off used to depend on the build; it
+    /// still answers honestly either way, and since v2.0.7 the frame is clean
+    /// in both branches (the mark is no longer drawn at all — the refusal now
+    /// guards bookkeeping only).
     #[test]
     fn turning_the_watermark_off_answers_honestly() {
         exclusively(|| {
             with_loaded_machine();
             let result = gba_set_overlay(0);
-            if result == GBA_OK {
-                // A test build: the mark really is gone from the next frame.
-                let mut out = vec![0u8; FRAME_BYTES];
-                assert_eq!(
-                    unsafe { gba_frame_buffer(out.as_mut_ptr(), FRAME_BYTES as u32) },
-                    GBA_OK
-                );
-                assert!(
-                    out.chunks_exact(4).all(|p| p[3] == 0xFF),
-                    "the caller was told the watermark is off, and it is not"
-                );
-            } else {
-                // A release build: it refused, and the mark is still there.
-                assert_eq!(result, GBA_ERR_STATE, "an unexplained refusal");
-                let mut out = vec![0u8; FRAME_BYTES];
-                assert_eq!(
-                    unsafe { gba_frame_buffer(out.as_mut_ptr(), FRAME_BYTES as u32) },
-                    GBA_OK
-                );
-                assert!(
-                    out.chunks_exact(4).any(|p| p[3] != 0xFF),
-                    "a release build must keep the watermark"
-                );
-            }
+            assert!(
+                result == GBA_OK || result == GBA_ERR_STATE,
+                "an unexplained answer: {result}"
+            );
+            let mut out = vec![0u8; FRAME_BYTES];
+            assert_eq!(
+                unsafe { gba_frame_buffer(out.as_mut_ptr(), FRAME_BYTES as u32) },
+                GBA_OK
+            );
+            assert!(
+                out.chunks_exact(4).all(|p| p[3] == 0xFF),
+                "the frame must be clean of the watermark in every build"
+            );
             // Put it back so later tests are not order-dependent.
             assert_eq!(gba_set_overlay(1), GBA_OK);
         });

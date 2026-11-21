@@ -18,7 +18,7 @@ endif()
 # so the hotfix suffix ("_hotfix1") cannot be spelled here — this line tracks the
 # *numeric* base and is left untouched by hotfix releases; a full release bumps it
 # (v2.0.6 -> 2.0.6, released 2026-11-20).
-project(FCEUX11 VERSION 2.0.6 LANGUAGES CXX C)
+project(FCEUX11 VERSION 2.0.7 LANGUAGES CXX C)
 
 # v0.2.1: Enforce MSVC toolchain; MinGW-w64 / MSYS2 support removed.
 # v0.3.1: Locked to MSVC 19.36+ (Visual Studio 17.6+) to avoid C++23

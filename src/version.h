@@ -139,7 +139,7 @@
 // 从不拒绝比对（信息性字段）⇒ 旧存档/录像仍可读。
 inline constexpr int FCEU_VERSION_MAJOR = 2;
 inline constexpr int FCEU_VERSION_MINOR = 0;
-inline constexpr int FCEU_VERSION_PATCH = 6;
+inline constexpr int FCEU_VERSION_PATCH = 7;
 inline constexpr int FCEU_VERSION_TWEAK = 0;	// hotfix 计数；**不参与** NUMERIC
 
 inline constexpr int FCEU_VERSION_NUMERIC = (FCEU_VERSION_MAJOR * 10000) + (FCEU_VERSION_MINOR * 100) + FCEU_VERSION_PATCH;
@@ -152,7 +152,7 @@ inline constexpr int FCEU_VERSION_PATCH_DECODE(int x) { return x % 100; }
 #define FCEU_HOTFIX_TAG ""
 
 #define FCEU_VERSION_STRING "2.0.6" FCEU_HOTFIX_TAG " " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
-#define FCEU_DISPLAY_VERSION "v2.0.6" FCEU_HOTFIX_TAG
+#define FCEU_DISPLAY_VERSION "v2.0.7" FCEU_HOTFIX_TAG
 #define FCEU_NAME_AND_VERSION FCEU_NAME " " FCEU_DISPLAY_VERSION
 
 // FCEUX11 Contributors — Derivative work based on FCEUX
