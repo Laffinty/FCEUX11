@@ -297,3 +297,26 @@
     **50/50 全绿**（49→50，`sram_flush_test` 入列），CTEST_EXIT=0。
   - **P1 未含**：P2（cart.rs 原子写）与 P3（tick + 配置项）未动——当前 flush
     只有入口与分发，尚无周期触发与原子性，属预期中间态。
+- **r4（2026-11-22）P2 开工**：cart.rs 抽 `atomic_write_file(path, write_fn)` 助手
+  （`<path>.tmp` 同卷 rename、失败清 tmp 保原文件）+ `fceux11_rust_cart_battery_save`
+  改走助手 + M1（失败注入 writer）/ M2（成功对照）两锁。变异腿 = 助手改直写目标
+  ⇒ M1 红。锁放 cart.rs `#[cfg(test)]`（跟随既有模块）。GBA `.srm` 走
+  `gba_battery_*` 导出（root crate），与本改动零交集。
+- **r5（2026-11-22）P2 完成**：
+  - **落地**（仅 `src/rust/crates/fceux11-formats/src/cart.rs` 一个文件）：
+    `atomic_write_file(path, write_fn)` 助手——写 `<path>.tmp`（同卷）→
+    `fs::rename` 覆盖目标；失败（writer 返回 false / 建文件 / rename）⇒ 清 tmp、
+    目标分毫不动、返回 false；`fceux11_rust_cart_battery_save` 改走助手
+    （slice 物化前置，writer 闭包零 unsafe）。旧 `.sav` 直写缺陷（`File::create`
+    截断风险）就此根治；C ABI 签名零变化（无头文件重生成面）。
+  - **M1/M2 双锁出生即绿**（formats **158 → 160**，`cargo test -p
+    fceux11-formats --lib` 实跑）：M2 成功对照（旧内容→新内容、tmp 无残留）；
+    M1 原子性锁（writer 中途失败 ⇒ 目标字节逐字不变 + tmp 清理）。
+  - **M1 变异腿闭合**：助手改直写目标（`format!("{}", path)`，无 tmp）⇒
+    **M1 FAILED**（目标被截断，红点 = 预登记「直写 ⇒ 截断」）、**M2 绿**；
+    还原后 160/160。
+  - **终门禁**：全量构建 BUILD_EXIT=0（586 步；其间一次会话意外中断——按坑 12
+    处置：无孤儿进程、ninja 记账续跑完成）+ `ctest -LE perf` **50/50 全绿**
+    （CTEST_EXIT=0）。GBA `.srm` 路径（`gba_battery_*`）与 C3 零交集实证。
+  - **P2 未含**：P3（tick + `SDL.SRAMFlushInterval` 配置项）未动——原子性已就位，
+    周期触发仍缺（当前 flush 仅手动/分发路径可达），属预期中间态。

@@ -184,6 +184,38 @@ pub struct FceuSaveGameEntry {
     pub buflen: u32,
 }
 
+// ------------------------------------------------------------------
+// v2.0.8 C1 (P2): atomic file write for battery saves.
+//
+// Writes to `<path>.tmp` (same volume, so the final rename is atomic on
+// Windows) and only then renames over the destination. A crash mid-write
+// can therefore never leave a truncated battery file behind: the old file
+// survives intact, and the next save overwrites the leftover `.tmp`.
+// `write_fn` is the injected writer so tests can fail it mid-stream; on
+// any failure the temp file is removed and the destination is untouched.
+// ------------------------------------------------------------------
+fn atomic_write_file<F>(path: &str, write_fn: F) -> bool
+where
+    F: FnOnce(&mut File) -> bool,
+{
+    let tmp_path = format!("{}.tmp", path);
+    let mut file = match File::create(&tmp_path) {
+        Ok(f) => f,
+        Err(_) => return false,
+    };
+    if !write_fn(&mut file) {
+        drop(file);
+        let _ = std::fs::remove_file(&tmp_path);
+        return false;
+    }
+    drop(file);
+    if std::fs::rename(&tmp_path, path).is_err() {
+        let _ = std::fs::remove_file(&tmp_path);
+        return false;
+    }
+    true
+}
+
 /// Save battery-backed RAM to `path`.  Each non-null entry is written
 /// sequentially.  Returns `true` on success.
 /// # Safety
@@ -210,20 +242,24 @@ pub unsafe extern "C" fn fceux11_rust_cart_battery_save(
     }
     let entries = unsafe { std::slice::from_raw_parts(entries, count) };
 
-    let mut file = match File::create(path) {
-        Ok(f) => f,
-        Err(_) => return false,
-    };
-
+    // v2.0.8 C1 (P2): materialize the slices up front so the writer closure
+    // stays free of unsafe (the outer fn owns the raw-pointer contract).
+    let mut bufs: Vec<&[u8]> = Vec::with_capacity(entries.len());
     for entry in entries {
         if !entry.bufptr.is_null() && entry.buflen > 0 {
             let buf = unsafe { std::slice::from_raw_parts(entry.bufptr, entry.buflen as usize) };
+            bufs.push(buf);
+        }
+    }
+
+    atomic_write_file(path, |file| {
+        for buf in &bufs {
             if file.write_all(buf).is_err() {
                 return false;
             }
         }
-    }
-    true
+        true
+    })
 }
 
 /// Load battery-backed RAM from `path`.  Each non-null entry is read
@@ -577,5 +613,49 @@ mod tests {
             // clear with null / zero count should not crash
             unsafe { fceux11_rust_cart_battery_clear(std::ptr::null(), 0) };
         }
+    }
+
+    // v2.0.8 C1 (P2) M2 — green contrast: a successful atomic write replaces
+    // the destination with the new bytes and leaves no `.tmp` behind.
+    #[test]
+    fn atomic_write_success_replaces_destination_without_tmp_residue() {
+        let dir = std::env::temp_dir().join("f11_atomic_m2");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let dest = dir.join("probe.sav");
+        std::fs::write(&dest, b"OLD-CONTENT").unwrap();
+
+        let ok = atomic_write_file(dest.to_str().unwrap(), |f| {
+            f.write_all(b"NEW-CONTENT").is_ok()
+        });
+
+        assert!(ok);
+        assert_eq!(std::fs::read(&dest).unwrap(), b"NEW-CONTENT");
+        assert!(!dir.join("probe.sav.tmp").exists(), "tmp must be renamed away");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // v2.0.8 C1 (P2) M1 — the atomicity lock: a writer failing mid-stream
+    // must leave the destination byte-identical and clean up the `.tmp`.
+    // Mutation leg: rewrite the helper to write directly to the destination
+    // (no tmp) and this must go red (truncated destination).
+    #[test]
+    fn atomic_write_failing_writer_keeps_destination_and_cleans_tmp() {
+        let dir = std::env::temp_dir().join("f11_atomic_m1");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let dest = dir.join("probe.sav");
+        let original = b"PRECIOUS-0";
+        std::fs::write(&dest, original).unwrap();
+
+        let ok = atomic_write_file(dest.to_str().unwrap(), |f| {
+            let _ = f.write_all(b"PARTIAL"); // half-written, then the writer fails
+            false
+        });
+
+        assert!(!ok);
+        assert_eq!(std::fs::read(&dest).unwrap(), original, "destination must be untouched");
+        assert!(!dir.join("probe.sav.tmp").exists(), "tmp must be cleaned up");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
