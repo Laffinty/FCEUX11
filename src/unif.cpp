@@ -48,6 +48,10 @@ static void UNIFGI(GI h) {
 		if (UNIFCart.Power) UNIFCart.Power();
 		if (UNIFchrrama) memset(UNIFchrrama, 0, 8192);
 		break;
+	case GI_SAVESRAM:
+		// v2.0.8 C1 (P1): periodic flush -- save only, no Close teardown.
+		FCEU_SaveGameSave(&UNIFCart);
+		break;
 	case GI_CLOSE:
 		FCEU_SaveGameSave(&UNIFCart);
 		if (UNIFCart.Close) UNIFCart.Close();

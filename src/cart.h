@@ -159,6 +159,9 @@ struct CartInfo
 #define MI_1 static_cast<int>(fceu11::MirrorMode::Mode1)
 
 void FCEU_SaveGameSave(CartInfo *LocalHWInfo);
+// v2.0.8 C1 (P1): flush the active game's battery SRAM through its
+// GameInterface dispatcher (GI_SAVESRAM). Safe no-op when no game is loaded.
+void FCEU_FlushGameSave(void);
 void FCEU_LoadGameSave(CartInfo *LocalHWInfo);
 void FCEU_ClearGameSave(CartInfo *LocalHWInfo);
 

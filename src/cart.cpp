@@ -446,6 +446,16 @@ void FCEU_SaveGameSave(CartInfo *LocalHWInfo)
 	}
 }
 
+// v2.0.8 C1 (P1): periodic SRAM flush entry (fceuWrapper.cpp sram flush tick).
+// Routes through the active loader's GI dispatcher so each format keeps its
+// own CartInfo; FCEU_SaveGameSave itself no-ops on battery==0. A no game is
+// loaded (GBA session, load failure window), this is a safe no-op.
+void FCEU_FlushGameSave(void)
+{
+	if (GameInfo && GameInterface)
+		GameInterface(GI_SAVESRAM);
+}
+
 // hack, movie.cpp has to communicate with this function somehow
 int disableBatteryLoading = 0;
 

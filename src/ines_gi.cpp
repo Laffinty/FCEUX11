@@ -68,6 +68,11 @@ void iNESGI(GI h) {
 	case GI_POWER:
 		iNES_ExecPower();
 		break;
+	case GI_SAVESRAM:
+		// v2.0.8 C1 (P1): periodic flush -- save only, no Close teardown
+		// (that stays GI_CLOSE's job).
+		FCEU_SaveGameSave(&iNESCart);
+		break;
 	case GI_CLOSE:
 	{
 		FCEU_SaveGameSave(&iNESCart);

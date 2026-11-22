@@ -120,7 +120,13 @@ enum GI {
 	GI_RESETM2	=1,
 	GI_POWER =2,
 	GI_CLOSE =3,
-	GI_RESETSAVE = 4
+	GI_RESETSAVE = 4,
+	// v2.0.8 C1 (P1): flush battery SRAM to disk without tearing the game
+	// down. Handled by iNESGI / UNIFGI (the only dispatchers with a battery
+	// .sav surface); NSFGI / FDSGI / FCEUXGameInterface intentionally fall
+	// through to their default (no battery .sav -- FDS writes its disk image
+	// via GI_CLOSE instead). Callers: FCEU_FlushGameSave (cart.cpp).
+	GI_SAVESRAM = 5
 };
 
 extern void (*GameInterface)(GI h);

@@ -84,6 +84,14 @@ if(FCEUX11_BUILD_TESTS)
     )
     add_test(NAME smoke_test COMMAND fceux11_smoke_test)
 
+    # v2.0.8 C1 (P1) — SRAM flush dispatch test (legs M3/M4/M5,
+    # docs/plans/FCEUX11-v2.0.8-批2-崩溃韧性-构建计划.md §二)
+    fceux11_add_test_executable(fceux11_sram_flush_test
+        f11qa/sram_flush_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME sram_flush_test COMMAND fceux11_sram_flush_test)
+
     # Mapper regression tests (Task 1.1)
     fceux11_add_test_executable(fceux11_mapper_load_test
         f11qa/boards/mapper_load_test.cpp

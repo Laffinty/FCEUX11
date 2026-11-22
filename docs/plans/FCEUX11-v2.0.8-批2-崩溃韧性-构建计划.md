@@ -274,3 +274,26 @@
   （零新增锁、暂停不刷、墙钟限频）；测试策略按「核心直载 ROM 不可行」约束定为
   分发级 ctest + formats 注入锁 + 人工 e2e。C1 五步链路 / C2 四件套设计 / M1–M7
   变异腿与门禁总表（ctest 49→51、formats 158→160）落档。
+- **r2（2026-11-22）P1 开工**：业主改为**串行作业**（每 PHASE 完成即汇报）。P1 =
+  C1 步骤 1-2（GI_SAVESRAM 枚举 + iNESGI/UNIFGI case + `FCEU_FlushGameSave` +
+  M3/M4/M5 分发级 ctest）。实施备忘：M4/M5 变异腿用 **`cmake --build --target
+  fceux11_sram_flush_test` 目标级构建**降本（LTCG 全量重链 30–60 min，单目标
+  5–25 min）；M5 的 `.sav` 路径依赖 `FCEU_MakeFName`/FileBase，实施时钉锚点，
+  不可控则按计划降级为「写出被调用」断言 + 人工 e2e 兜底。
+- **r3（2026-11-22）P1 完成**：
+  - **落地五文件**：`fceu.h`（`GI_SAVESRAM=5` + 分发器处置注释）/ `cart.cpp`
+    （`FCEU_FlushGameSave`——`GameInfo && GameInterface` 判空后路由）/
+    `cart.h`（声明）/ `ines_gi.cpp` + `unif.cpp`（case GI_SAVESRAM = 仅存档、
+    无 Close teardown）；`tests/f11qa/sram_flush_test.cpp` + tests/CMakeLists
+    注册（smoke_test 模式同款）。numstat 全纯插入（fceu.h +7/−1 枚举体）。
+  - **正向绿**：目标构建 BUILD_EXIT=0（806 步，fceu.h 宽重编被单目标构建一次
+    吃下）；测试六腿全 PASS（M3 / M4 / M5a / M5b / M5c，TEST_EXIT=0）。
+  - **变异腿双闭合**（目标级构建实跑，每腿红/绿边界与预登记一致）：
+    M4（flush 改发 GI_CLOSE）⇒ **M4 红**、M3/M5 绿、EXIT=1；
+    M5（iNESGI 摘 case）⇒ **M5b 红**（`.sav` 不写出）、M4/M3/M5a 绿、EXIT=1。
+    还原后全绿。还原用 Edit 工具回放（不用 `git checkout`——HEAD 尚无 P1 改动，
+    checkout 会连批内成果一起丢，[[git-checkout-drops-uncommitted-work]]）。
+  - **终门禁**：全量构建 BUILD_EXIT=0（278 步收尾重链）+ `ctest -LE perf`
+    **50/50 全绿**（49→50，`sram_flush_test` 入列），CTEST_EXIT=0。
+  - **P1 未含**：P2（cart.rs 原子写）与 P3（tick + 配置项）未动——当前 flush
+    只有入口与分发，尚无周期触发与原子性，属预期中间态。
