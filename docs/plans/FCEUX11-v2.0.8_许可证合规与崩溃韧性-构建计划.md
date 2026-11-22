@@ -409,3 +409,13 @@
   - 产出物：`scripts/license_headers/{classify,stamp,check}.py` +
     `third_party_whitelist.json` + `manifest.json`（manifest 为生成物，不入库与
     否随业主）；COPYRIGHT_AUDIT.md §6；AGENTS.md 门禁节补录 + 治理表行更新。
+- **r4（2026-11-22）批 2 独立建档 + C3 前提作废**：业主指示批 2 相对复杂、独立
+  立项——专项文档 = `docs/plans/FCEUX11-v2.0.8-批2-崩溃韧性-构建计划.md`（r1）。
+  **§三 C3 的「另行实现」前提被调查作废**：`fceu11_gba_flush_battery`
+  （`gba_load.cpp:241`）已实现脏标志 + 限频 + 每帧调用 + 关闭强刷 ⇒ C3 转验证项
+  （零新代码）。C1 设计定型为五步链路（GI_SAVESRAM 枚举 → iNESGI/UNIFGI case →
+  `FCEU_FlushGameSave` → 驱动层 tick（steady_clock + `SDL.SRAMFlushInterval`
+  默认 30/0=关）→ cart.rs 原子写 tmp+rename）；C2 = `crash_handler.{h,cpp}`
+  （SEH + CRT 补丁族 + `MiniDumpWriteDump` + `FCEUMKF_CRASH` → `crashes/` +
+  探针 `FCEUX11_TEST_CRASH=1`）；变异腿 M1–M7、门禁 ctest 49→51 / formats
+  158→160、阶段编排 P1–P5、风险与止损线均以专项文档为准。
