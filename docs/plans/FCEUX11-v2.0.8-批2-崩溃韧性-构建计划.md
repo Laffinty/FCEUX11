@@ -250,6 +250,9 @@
 | P4 | C2 全部（crash_handler + 路径 + 探针 + M6/M7） | 无 |
 | P5 | C3 验证收尾 + CHANGELOG/AGENTS 登记 + 门禁全表 | P1-P4 |
 
+> **进度（2026-11-22，r6）**：P1 ✅（e0ff625）/ P2 ✅（c5b2a8a）/ P3 ⬜ / P4 ⬜ / P5 ⬜。
+> 最新门禁基线：ctest **50/50**、formats **160/0**、构建 BUILD_EXIT=0。
+
 每阶段收口跑 §五 全表；**push / 发版动作等业主明示**。
 
 ---
@@ -320,3 +323,16 @@
     （CTEST_EXIT=0）。GBA `.srm` 路径（`gba_battery_*`）与 C3 零交集实证。
   - **P2 未含**：P3（tick + `SDL.SRAMFlushInterval` 配置项）未动——原子性已就位，
     周期触发仍缺（当前 flush 仅手动/分发路径可达），属预期中间态。
+- **r6（2026-11-22）推送与最新构建情况**：
+  - **P1 已推送 `e0ff625`**（8 文件 +182/−1）、**P2 已推送 `c5b2a8a`**（2 文件
+    +110/−7），均入 `origin/main`；CI 结果未人工复核（本机无 gh CLI）——
+    e0ff625 起 Actions 页可见 `sram_flush_test`（ctest 50 项之一）与
+    License header check 的 CI 读数。
+  - **最新构建基线（P2 收口实测，2026-11-22）**：全量 Release `--parallel 1`
+    **BUILD_EXIT=0**（586 步，含一次意外中断按坑 12 处置续跑）；`ctest -LE perf`
+    **50/50**（CTEST_EXIT=0，`sram_flush_test` 入列）；`cargo test -p
+    fceux11-formats --lib` **160/0**（M1/M2 在列）。
+  - **阶段进度**：P1 ✅ / P2 ✅ / P3 ⬜（tick + 配置项 + 人工 e2e）/ P4 ⬜
+    （crash_handler 全件）/ P5 ⬜（C3 验证 + CHANGELOG/AGENTS 登记 + 全表收口）。
+    C1 五步链路已完成「分发（P1）+ 原子性（P2）」，仅余「触发（P3）」；
+    下一步开工前照例先记 r。

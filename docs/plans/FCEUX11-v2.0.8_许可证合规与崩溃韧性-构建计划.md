@@ -419,3 +419,19 @@
   （SEH + CRT 补丁族 + `MiniDumpWriteDump` + `FCEUMKF_CRASH` → `crashes/` +
   探针 `FCEUX11_TEST_CRASH=1`）；变异腿 M1–M7、门禁 ctest 49→51 / formats
   158→160、阶段编排 P1–P5、风险与止损线均以专项文档为准。
+- **r5（2026-11-22）最新构建情况（批 2 P1/P2 已落地并推送）**：
+  - **批 2 P1 已推送 `e0ff625`**（8 文件 +182/−1）：`GI_SAVESRAM=5` 分发 +
+    `FCEU_FlushGameSave` 入口 + `sram_flush_test`（六腿 PASS，M4/M5 变异腿双闭合），
+    `ctest -LE perf` **49 → 50**。
+  - **批 2 P2 已推送 `c5b2a8a`**（2 文件 +110/−7）：cart.rs `atomic_write_file`
+    （tmp+rename 原子写，根治 `File::create` 直写截断风险），formats **158 → 160**
+    （M1/M2 锁 + M1 变异腿可红）。
+  - **最新门禁基线（P2 收口实测）**：全量 Release（`--parallel 1`）BUILD_EXIT=0；
+    `ctest -LE perf` **50/50** 全绿；formats **160/0**；其余 Rust crate 计数不变
+    （批 1 读数：GBA 根 303+20i / vendor 249 / debug 94 / media 52 / utils 51 /
+    lua 54 / f11qa 184）；`check.py` EXIT=0。
+  - **进度总览**：批 1 ✅（29560c7）；批 2 = P1 ✅ / P2 ✅ / **P3 ⬜（tick +
+    `SDL.SRAMFlushInterval`）/ P4 ⬜（crash_handler）/ P5 ⬜（收口）**。
+    CI 读数未人工复核（本机无 gh CLI，Actions 页可看：e0ff625 起首次跑
+    `sram_flush_test` + License header check 第二次）。逐阶段细节见批 2 专项文档
+    r1–r6。
