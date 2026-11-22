@@ -212,16 +212,21 @@ jobs:
         # this makes a CI failure diagnosable without admin rights.
         # The original exit code is preserved (the step must still fail).
         run: |
+          "## CTest run" | Set-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding utf8
           ctest --test-dir build --build-config Release --output-on-failure -LE perf 2>&1 | Tee-Object -FilePath ctest-output.txt
           $ctestExit = $LASTEXITCODE
-          $lines = Get-Content ctest-output.txt -Tail 800
-          $summary = @("## CTest output", "") + $lines
-          Set-Content -Path $env:GITHUB_STEP_SUMMARY -Value $summary -Encoding utf8
-          Get-Content ctest-output.txt | Select-String -Pattern "movie.roundtrip|WATCHDOG|The following tests FAILED" | ForEach-Object { Write-Host ("::error::" + $_.Line) }
+          Get-Content ctest-output.txt -Tail 800 | Add-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding utf8
+          # v2.0.8: name the failing tests directly as annotations - the
+          # check-run output.summary proved unreliable in practice, but the
+          # annotations endpoint is readable without admin rights. ctest
+          # marks a failed/timed-out test line with "***" (e.g.
+          # "10/50 Test #10: name ...***Failed"). Cap at 10 annotations/step.
+          Get-Content ctest-output.txt | Select-String -Pattern "\*\*\*" | Select-Object -First 5 | ForEach-Object { Write-Host ("::error::FAILED-TEST " + $_.Line) }
+          Get-Content ctest-output.txt | Select-String -Pattern "movie.roundtrip|WATCHDOG|The following tests FAILED" | Select-Object -First 3 | ForEach-Object { Write-Host ("::error::" + $_.Line) }
           $stageLog = "tests/movie_roundtrip_stages.log"
           if (Test-Path $stageLog) {
             Write-Host ("::error::--- {0} ---" -f $stageLog)
-            Get-Content $stageLog | ForEach-Object { Write-Host ("::error::STAGE " + $_) }
+            Get-Content $stageLog | Select-Object -First 2 | ForEach-Object { Write-Host ("::error::STAGE " + $_) }
           } else {
             Write-Host ("::error::stage log missing: {0} (test never started, or cwd differs)" -f $stageLog)
           }

@@ -336,3 +336,31 @@
     （crash_handler 全件）/ P5 ⬜（C3 验证 + CHANGELOG/AGENTS 登记 + 全表收口）。
     C1 五步链路已完成「分发（P1）+ 原子性（P2）」，仅余「触发（P3）」；
     下一步开工前照例先记 r。
+- **r7（2026-11-22）CI 红灯修复（P1 引入的测试缺陷 + 可观测性双修）**：
+  - **定位**（check-runs API 免 admin 通道，坑 16 r14 的用法）：9aeae92 的
+    build-windows failure = **CTest 步骤**（Build 绿、跑 25 分钟后红）；
+    注解显示 movie_roundtrip_test **本身 0.35s Passed**、六阶段齐全 ⇒ 真凶名
+    不在 grep 模式内。二分定位：**29560c7（批 1）绿 → e0ff625（P1）起红**，
+    P1/P2/9aeae92 连红 ⇒ 唯一新测试面 = sram_flush_test。
+  - **根因钉死**：`BaseDirectory` 是**全局空串**（`file.cpp:64`，只有 Qt config
+    初始化 `drivers/Qt/config.cpp:509` 会设）⇒ 测试里 `FCEU_MakeFName(SAV)`
+    拼出 **`\sav\sram_flush_probe.sav` 当前盘根路径**；本机 `D:\sav` 有**历史
+    残留目录** ⇒ `create_directories` no-op ⇒ 本地假绿；干净 runner 上
+    `create_directories("\sav")` 走 UNC 语义 ⇒ `filesystem_error` ⇒ 测试崩。
+    ——「环境残留让门禁变哑弹」（纪律 13 家族）活例；此前 `D:\sav` 里已有
+    其它工具的 sav，证明该坑先于本测试存在。
+  - **修复**：sram_flush_test 开头 `fceu11::SetBaseDirectory(临时目录)`
+    （`io_api.h:137`）自包含 + 结束 `remove_all` 清理 ⇒ 路径确定、隔离、
+    与残留无关；temp 基目录建/清实测生效。⚠️ 附带发现并修正：首版误写
+    `std::filesystem::temp_path`（**标准库无此函数**，正确名
+    `temp_directory_path`）——最小独立探针当场钉死，目标级构建 BUILD_EXIT=2
+    但旧 exe 仍在跑出假绿（「产物与源不一致」变体），两坑一并记档。
+  - **可观测性修复（r14 的 summary 镜像其实从未生效）**：成功 run（29560c7）
+    的 check-run `output.summary` 也为空 ⇒ r14 的 `Set-Content` 写法有缺陷且
+    此前无人验证。改为**注解主通道**（ctest 只对失败测试行输出 `***` ⇒
+    `FAILED-TEST` 注解直接给测试名，上限 10/step 内分配 5+3+2）+ summary
+    两段式（开头头行 + tail 追加）。本地 pwsh 5.1 桩跑管线正文验证（纪律：
+    run 块无反引号/无单引号断言 0/0）。
+  - **门禁**：目标构建六腿 PASS + 全量 BUILD_EXIT=0 + `ctest -LE perf`
+    **50/50**（CTEST_EXIT=0）。推送后以 CI 注解定谳（若非本测试将直接给出
+    `***Failed` 名字）。

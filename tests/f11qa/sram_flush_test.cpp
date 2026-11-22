@@ -40,6 +40,7 @@
 #include "git.h"
 #include "cart.h"
 #include "file.h"
+#include "io_api.h"
 
 extern void iNESGI(GI h);
 extern CartInfo iNESCart;
@@ -61,6 +62,20 @@ static int failures = 0;
 
 int main()
 {
+	// Pin the global base directory to a temp dir of our own. BaseDirectory
+	// defaults to an EMPTY string and is normally set by the Qt config init
+	// (drivers/Qt/config.cpp), which never runs here: with it empty,
+	// FCEU_MakeFName(FCEUMKF_SAV, ...) builds "\sav\<name>.sav" -- a
+	// drive-relative ROOT path. On a machine that happens to have a leftover
+	// "\sav" directory the test then passes silently (CI caught exactly
+	// that), and on a clean runner create_directories("\sav") resolves as a
+	// UNC prefix and throws. A pinned per-test directory removes both traps.
+	std::filesystem::path base =
+		std::filesystem::temp_directory_path() / "f11_sram_flush_test";
+	std::filesystem::remove_all(base);
+	std::filesystem::create_directories(base);
+	fceu11::SetBaseDirectory(base.string());
+
 	// ---- M3: no game -> safe no-op ----
 	GameInfo = nullptr;
 	GameInterface = nullptr;
@@ -111,6 +126,8 @@ int main()
 	{
 		failures++;
 	}
+
+	std::filesystem::remove_all(base);
 
 	if (failures == 0)
 	{
