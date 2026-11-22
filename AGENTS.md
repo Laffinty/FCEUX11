@@ -32,7 +32,7 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 | `docs/history/plans/FCEUX11-遗留问题盘点与优化计划-2026-11-18.md` | **已收口归档（2026-11-19；内容冻结）**：对 `CHANGELOG.md` [2.0.0]→[2.0.5] 全部未决项的**全量盘点 + 批次计划**（A~E 五类总表 + 逐项代码实读验证），含业主裁决 **C-1~C-7**（§六）。归档当刻：批 1 全清 + 批 2 三清 + 批 3 材料交付；**批 2.1（A-4 / D1 第一步）受阻**（v2.0.5+ exe 两条 Lua 加载路径静默失效，待小 RE）⇒ 该未决项见 CHANGELOG `[Unreleased]` Known limitations。配套：`docs/history/plans/FCEUX11-F11QA期望值变更-评审稿-2026-11-18.md`（**评审未放行**）、`docs/history/plans/FCEUX11-PGO发布策略立项材料-2026-11-19.md`（PGO 默认 OFF 维持） |
 | `docs/history/plans/FCEUX11-v2.0.5_音视频异常缓慢-稳定性审计报告-2026-11-19.md` | **已收口归档（2026-11-19，随阶段 3 收口；内容冻结）**：「音视频异常缓慢」的全量审计——静态 8 条候选（A1–A8）+ 13 组实测矩阵 + 否定证清单。**A1 机制钉死 + 触发门槛量化**（探测 >≈455 ms 才可达）；§十一 三处结论更正（A6 复用分支可达 / §5.4 可达 / 覆盖面收窄）；r3 追记 **A5 实测裁决 = 登记不修**（LQ ≈0.15% / HQ ≈1.1% 帧时间，用户不可感）。取证素材（脚本/截图）在 `.zcode/soundprobe/`（gitignored） |
 | `docs/history/plans/FCEUX11-v2.0.5_A1音频探测线程修复-构建计划.md` | **已收口归档（2026-11-19，r6；内容冻结）**：审计报告 §9.2 建议的修复线，业主逐阶段开工——**阶段 1** A1+A2（`audio_probe_gate.{h,cpp}`，窗口冻结 13 981 ms → 0 ms 实测消除）、**阶段 2** 停排空自旋（`audio_sink_wait.h`，0.5 fps → 60 fps 实测消除）、**阶段 3** A3（`SDL_AUDIODRIVER` 作用域化 + sticky，`audio_driver_fallback.h`）+ GBA 节流残留（翻转检测移出 GBA 分支，NES 不再被钉 59.7275 fps）+ A5 实测登记 + §5.4 登记不改。诊断开关：`FCEUX11_AUDIO_TRACE` / `FCEUX11_TEST_AUDIO_OPEN_DELAY_MS` / `FCEUX11_TEST_AUDIO_STALL`。门禁 `ctest -LE perf` 47 → 49 |
-| `docs/plans/FCEUX11-v2.0.8_许可证合规与崩溃韧性-构建计划.md` | **在途（2026-11-22 立项，r1）**：第三方调研报告三条主张的承接线——**批 1 许可证头**（341 个 C/C++ 文件实测无 GPL 文本，分 A 项目自建 / B 上游继承 / C 真第三方三桶，C 桶不盖章；盖章脚本保 BOM/CRLF + `--check` 进 CI；Rust 侧只补 Cargo.toml 元数据，gba-core 保持 MIT）/ **批 2 崩溃韧性**（SRAM 周期落盘根治「崩溃丢电池存档」——`FCEU_SaveGameSave` 此前仅 GI_CLOSE 调用；本地 minidump 崩溃转储，业主裁决 D1 不接 Sentry）/ **批 3 观测**（msgLogBuf_t 落盘升级——既有 `%TEMP%\fceux.log` sink 三缺陷 + addLine 无锁竞争；诊断对话框；D2 裁决 Advanced 下新增 Diagnostics 二级菜单）。⚠️ 报告本身有事实偏差，**§一 实测事实底座与 §六 偏差附录为准，别照报告抄** |
+| `docs/plans/FCEUX11-v2.0.8_许可证合规与崩溃韧性-构建计划.md` | **在途（2026-11-22 立项，r1/r2；批 1 已落地见 r3）**：第三方调研报告三条主张的承接线——**批 1 许可证头**（341 个 C/C++ 文件实测无 GPL 文本，分 A 项目自建 / B 上游继承 / C 真第三方三桶，C 桶不盖章；盖章脚本保 BOM/CRLF + `check.py` 进 CI；Rust 侧只补 Cargo.toml 元数据，gba-core 保持 MIT）/ **批 2 崩溃韧性**（SRAM 周期落盘根治「崩溃丢电池存档」——`FCEU_SaveGameSave` 此前仅 GI_CLOSE 调用；本地 minidump 崩溃转储，业主裁决 D1 不接 Sentry）/ **批 3 观测**（msgLogBuf_t 落盘升级——既有 `%TEMP%\fceux.log` sink 三缺陷 + addLine 无锁竞争；诊断对话框；D2 裁决 Advanced 下新增 Diagnostics 二级菜单）。⚠️ 报告本身有事实偏差，**§一 实测事实底座与 §六 偏差附录为准，别照报告抄**；批 1 成果记录见 COPYRIGHT_AUDIT.md §6 |
 | `src/rust/crates/gba-core/ATTRIBUTION.md` | 上游出处、本地补丁集**逐处**说明、重新 vendor 流程 |
 | `COPYRIGHT_AUDIT.md` §5 | Rust vendor 树在 `src/` C/C++ 扫描范围之外的归属声明 |
 
@@ -527,6 +527,13 @@ cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo tes
 # **Lua 绑定 crate（r11 补录，2026-11-14）**：V25/V22 之前 `fceux11-lua` 的测试**不在任何门禁里**
 # （纪律 10 又一例）；V25/V22 落地时基线 49 → **54 项全绿**（+5 锁 +4 迁移）。动该 crate 必跑。
 cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p fceux11-lua --lib"
+
+# **许可证头门禁（v2.0.8 批 1 补录，2026-11-22）**：src/ 下所有 C/C++ 必须含 GPL 文本或在
+# 白名单（第三方/生成文件）⇒ 期望 EXIT=0，红时逐文件点名。CI 在 Checkout 后同步执行
+# （ci.yml "License header check"）。白名单登记表 =
+# scripts/license_headers/third_party_whitelist.json（58 条，逐族依据见 COPYRIGHT_AUDIT.md §6.3）。
+# ⚠️ 新增源文件没带头 → 本地与 CI 都红；**新 vendor 第三方代码必须登记进白名单，绝不盖章**。
+python scripts/license_headers/check.py
 
 # 两态 feature 检查（第二态同时复核不变式 8：关 feature 时 vendor 树退出编译图）
 cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo check --workspace --no-default-features"

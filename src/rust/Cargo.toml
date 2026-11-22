@@ -5,6 +5,7 @@ resolver = "3"
 [workspace.package]
 version = "0.3.5"
 edition = "2024"
+license = "GPL-2.0-or-later"
 
 [profile.release]
 panic = "abort"
@@ -14,6 +15,7 @@ lto = true
 name = "fceux11-rust"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 
 [lib]
 crate-type = ["staticlib"]

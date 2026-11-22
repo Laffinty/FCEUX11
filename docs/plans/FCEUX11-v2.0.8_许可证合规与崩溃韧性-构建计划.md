@@ -147,13 +147,14 @@
 
 - **目标**：桶 A/B 文件获得许可头；**行尾与 BOM 分毫不动**（AGENTS 坑 11）。
 - **模板**：
-  - 桶 A：`SPDX-License-Identifier: GPL-2.0-or-later` 行 + FSF 标准 GPLv2+
-    通知段（版权行 `Copyright (C) 2026 FCEUX11 Contributors`）。
-  - 桶 B：上游 FCEUX 标准 banner（「FCE Ultra - NES/Famicom Emulator」+
-    「Copyright notice for this file:」+ **原文件既有版权行原样保留**）+ GPLv2+
-    通知段 + SPDX 行。
-- **实现约束**：Python `open(..., newline='')` 读写保持原行尾；检测 UTF-8 BOM
-  并保留；插在 BOM 之后、一切代码之前；幂等（已含 SPDX 行即跳过）；
+  - （r2 修订：取消 SPDX 行——全仓 660 文件零 SPDX 先例；A/B 统一用仓库既有
+    「FCE Ultra」banner 形状，差异只在版权段。）桶 A 版权段 = `Copyright (C)
+    2026 FCEUX11 Contributors`；桶 B = **原文件既有版权行原样保留**（现文缺失时
+    从 fork 基线 `git show 1c35642:<path>` 回溯提取；两处皆无则省略版权段，零编造）。
+- **实现约束（r2 修订）**：**字节级前置插入**——读字节、原内容逐字节不动、
+  EOL 取首行行尾、检测 UTF-8 BOM 并保留（插在 BOM 之后）；幂等（首 2 KB 已含
+  GPL 文本即跳过）；既有前导 banner 含版权行的文件做**整块替换**（防标题/版权行
+  双重堆叠），形状不识别则退化为纯 GPL 块前插；
   **`src/rust/crates/gba-core/**` 绝对不碰**（vendor 树，ATTRIBUTION 红线）。
 - **验收**：全量构建 EXIT=0；`git diff --numstat` 抽查 ≥20 个文件——
   增删行数 = 头行数，无整文件重写特征；重扫「无 GPL 文本」计数 = 白名单大小。
@@ -366,3 +367,45 @@
 - **r1（2026-11-22）立项**：第三方报告三条主张逐条核验（§一 实测 + §六 偏差
   附录）；业主四项裁决落档（D1 本地 minidump / D2 新增 Diagnostics 二级菜单 /
   D3 Rust 只补元数据 / D4 批准计划）；本计划创建于 `docs/plans/`。
+- **r2（2026-11-22）批 1 实施口径细化（开工前定稿）**：① 取消 SPDX 行——全仓
+  660 文件零 SPDX 先例，统一采用既有「FCE Ultra」banner 形状（`206.cpp` /
+  `core_api.h` / `471.cpp` 同款）；② `src/archived/fir/*` 7 文件改归桶 B——内容
+  在 fork 基线老路径 `src/fir/`（路径成员规则按内容来源修正）；③ 盖章机制改
+  **字节级前置插入**（原内容逐字节不动、EOL 取首行行尾、保 BOM）——机制性根绝
+  坑 11 行尾污染；既有前导 banner 含版权行 → 整块替换防堆叠；④ 桶 C 白名单定格
+  **7 条**：minizip 4（`ioapi.{cpp,h}` / `unzip.{cpp,h}`，zlib 条款文内自声明）+
+  emu2413 2（文内无许可声明，纪律 4 不猜）+ 生成文件 `src/rust/fceux11_rust.h`
+  （cbindgen 重生成会覆盖）⇒ 盖章 334；⑤ 量化：A ≈128 / B ≈207 / C 7（最终以
+  `classify.py` manifest 为准）；⑥ 业主批准批 1 开工并允许多 agent 并行（Rust L5
+  与 emu2413 考证外派并行，盖章与构建主线串行）。
+- **r3（2026-11-22）批 1 全落地（待业主提交/推送指令）**：
+  - **盖章 283 文件**（A=152 项目头 / B=131 上游头保版权行 / C=58 白名单不盖）；
+    **字节级前置插入**实证：保真审计 **283/283**（工作树规范化内容 = HEAD blob +
+    头，零内容丢失、零行尾混合）；BOM 4 例首行改写为「BOM+头」属正确搬家；
+    stamp 幂等（二次运行 0 改动）。
+  - **白名单自审的关键捕获**：按报告口径「直接补 GPL 头」会**错误标注 50 个
+    第三方文件**——自审抓出四族自带许可：LGPL-2.1（MaxSt hq2x/hq3x + blargg
+    nes_ntsc 共 8）· MIT（DeSmuME emufile.h + AnS TAS Editor 36）· BSD-3
+    （gwavi/avi 4）· Unicode Inc（ConvertUTF.h）；伴生无文本头按族一致白名单。
+    白名单终 **58 条**（第三方 57 + 生成 1）。
+  - **emu2413 考证收口**（外派 agent 联机取证）：文内从无许可声明、许可随发行包
+    readme 走——2001 一句式自由使用声明（Mednafen 文档逐字背书）→ 2004 zlib 式
+    （vst2413 保存原包）→ 作者现仓 MIT（2001-2019）；全部宽松、方向一致、可安全
+    再分发；残余「2002 v0.60 当年 readme 原件未找到」按部分未决登记。全文与信源
+    见 COPYRIGHT_AUDIT.md §6.5。
+  - **L5（外派 agent）**：`license = "GPL-2.0-or-later"` 入 `[workspace.package]`
+    + root 包与 7 crate 的 `license.workspace = true`（gba-core 保持 MIT 未动）；
+    numstat +9/0 无行尾污染；两态 `cargo check` EXIT=0。
+  - **check.py**：660 扫描 / 58 白名单 / EXIT=0；四条变异腿闭合（无头→红、带头→绿、
+    白名单键不匹配→红、白名单命中→绿）+ 幂等腿；跨盘 `--root` relpath 缺陷已在
+    测试中暴露并修复；已入 `ci.yml`（Checkout 后第一步，vcpkg 之前）。
+  - **门禁终读数**：全量 Release 构建 **BUILD_EXIT=0**（710 步，`--parallel 1`）；
+    `ctest -LE perf` **49/49 全绿**（CTEST_EXIT=0）；Rust 八条全绿：GBA 根
+    **303+20i** / vendor 249 / debug 94 / media 52 / formats **158** / utils 51 /
+    lua 54 / f11qa **184**（formats 158 与 f11qa 184 为 v2.0.7 后新基线读数，
+    本批 Rust 源码零改动——仅 8 个 Cargo.toml +9 行）。
+  - **坑补录**：`cmd /c` 交互陷阱再次实证——Git Bash 下必须 `cmd //c`，否则 cmd
+    打印 banner 即退出（首次构建假绿被日志抽查识破，空输出≠通过）。
+  - 产出物：`scripts/license_headers/{classify,stamp,check}.py` +
+    `third_party_whitelist.json` + `manifest.json`（manifest 为生成物，不入库与
+    否随业主）；COPYRIGHT_AUDIT.md §6；AGENTS.md 门禁节补录 + 治理表行更新。

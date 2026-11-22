@@ -6,6 +6,7 @@
 > **Methodology note**: the 2026-10-07 rescan re-classified every file from its *current* content with the same header-text rule as the original audit (a file is GPL-family when its text contains "GNU General Public License"; "any later version" makes it GPLv2+). Content that changed since 2026-05-17 — including files whose old GPL headers were replaced by rewritten project code — is therefore reclassified accordingly.
 > **Total Files Scanned**: 
 650
+> ⚠️ **2026-11-22 (v2.0.8 batch 1)**: GPL banners were stamped across the tree — see **§6** for the post-stamp distribution; §1–§4 above are the **pre-stamp snapshots** (frozen history).
 
 ## 1. License Distribution
 
@@ -1079,3 +1080,90 @@ build plan (section 11 item 3) points at instead.
 Local modifications are the project's own work and carry FCEUX11's licence;
 the upstream terms continue to apply to the vendored files they are applied to.
 
+
+## 6. 2026-11-22 Stamp Record (v2.0.8 Batch 1)
+
+> Trigger: third-party research report P0 finding (332 stale count -> 341 re-scanned
+> on 2026-11-22). Plan: `docs/plans/FCEUX11-v2.0.8_许可证合规与崩溃韧性-构建计划.md`
+> §二 (r1/r2). Owner decisions D1-D4 recorded there (§〇).
+
+### 6.1 What was done
+
+- Standard "FCE Ultra" GPL banner (GPLv2+, upstream FCEUX shape; **no SPDX lines** -
+  the tree had zero SPDX identifiers, so none were introduced) prepended to
+  **283** C/C++ files: bucket A (project-original, `Copyright (C) 2026
+  FCEUX11 Contributors`) = 152; bucket B (fork-base 1c35642 / content-origin,
+  original copyright lines preserved, none -> no copyright section) = 131.
+- Mechanics: byte-level prepend only - original content bytes never rewritten;
+  UTF-8 BOM kept as first bytes; per-file EOL taken from the first line.
+  Fidelity audit: **283/283** worktree content (EOL-normalized) = HEAD blob +
+  header, zero content lost. Idempotency + red/green/whitelist mutation legs
+  closed (plan §二 验收).
+- Gate: `python scripts/license_headers/check.py` (stdlib-only) - every file
+  must carry GPL text or be whitelisted; wired into `ci.yml` as a fast step
+  right after checkout. Registry:
+  `scripts/license_headers/third_party_whitelist.json` (58 entries).
+
+### 6.2 Post-stamp distribution
+
+| Bucket | Count | Treatment |
+|---|---:|---|
+| GPL text present (319 pre-existing + 283 stamped) | 602 | - |
+| Whitelisted - own license text inside | 31 | NOT stamped (see §6.3) |
+| Whitelisted - family headers / no text inside | 26 | NOT stamped (family-consistent; incl. emu2413 x2) |
+| Whitelisted - generated | 1 | NOT stamped (cbindgen regen would overwrite) |
+| **Total scanned** | **660** | .cpp/.h/.c under src/, excl. src/rust/target; 602 + 58 = 660 |
+
+### 6.3 Third-party families recorded (inside whitelist)
+
+| Family | Files | Own licence (evidence) |
+|---|---:|---|
+| minizip (`src/utils/ioapi.*`, `unzip.*`) | 4 | zlib condition - declared inside the files |
+| emu2413 (`src/boards/emu2413.*`) | 2 | no text inside; Okazaki 2001 provenance tracked below (do-not-guess discipline) |
+| hq2x/hq3x (`src/drivers/common/hq2x*`, `hq3x*`) | 4 | LGPL-2.1 - declared inside hq2x.cpp/hq3x.cpp (MaxSt 2003); headers whitelisted family-consistently |
+| nes_ntsc (`src/drivers/common/nes_ntsc*`) | 4 | LGPL-2.1 - declared inside nes_ntsc.c / nes_ntsc_impl.h (Shay Green 2006-2007); headers whitelisted family-consistently |
+| emufile (`src/emufile.h`, `emufile_types.h`) | 2 | MIT - declared inside emufile.h (DeSmuME team) |
+| TAS Editor (`src/drivers/Qt/TasEditor/*`, 36 B-bucket files) | 36 | MIT - declared inside the 17 AnS 2011-2013 .cpp files; .h companions whitelisted family-consistently |
+| gwavi/avi (`src/drivers/Qt/avi/*`) | 4 | BSD-3-Clause - declared inside the files (Michael Kohn / Robin Hahling) |
+| ConvertUTF.h | 1 | Unicode, Inc. disclaimer - declared inside the file (its .c is now a project Rust shim and IS stamped) |
+| `src/rust/fceux11_rust.h` | 1 | generated (cbindgen) |
+
+### 6.4 Rust side (owner decision D3: metadata only)
+
+- `license = "GPL-2.0-or-later"` added to `[workspace.package]` +
+  `license.workspace = true` to fceux11-rust and the 7 member crates
+  (f11qa, fceux11-core/debug/formats/lua/media/utils). `cargo check
+  --workspace` passes in both feature states.
+- `gba-core` stays `license = "MIT"` (vendored - §5 above).
+
+### 6.5 emu2413 provenance (researched 2026-11-22)
+
+`src/boards/emu2413.c/.h` (Okazaki 2001) carry no licence text — the licence
+travelled with the distribution readme, in three eras, all permissive and
+mutually consistent (no LGPL/GPL claim found anywhere):
+
+1. **2001** original: one-line free-use grant — "Permission is granted to anyone
+   to use this software for any purpose, including commercial applications. To
+   alter this software and redistribute it freely, if the origin of this
+   software is not misrepresented." (recorded verbatim in the Mednafen
+   documentation VRC7 section; the original slurp.org/~okazaki page is offline
+   and has no Wayback snapshot, so the 2001 page itself is unrecoverable).
+2. **2004** (vst2413-era package readme, preserved verbatim by downstream
+   repos): zlib-style licence, "Copyright (C) Mitsutaka Okazaki 2004".
+3. **Author's current GitHub** (okaxaki / digital-sound-antiques/emu2413):
+   standard **MIT**, "Copyright (c) 2001-2019 Mitsutaka Okazaki" — the author
+   covers the whole lineage since 2001 under MIT.
+
+Our vendor copy is v0.60 (2002) + the xodnizel 2004 VRC7 variant, same lineage
+upstream FCEUX ships; upstream COPYING registers no third-party entry. Verdict:
+permissively licensed, safe to redistribute; the files stay whitelisted and
+unstamped (their own permissive terms apply, not GPL). Residual caveat: the
+2002 v0.60-era package readme itself was not located (original page
+unarchivable) — provenance is "partially resolved", with every seen licence
+pointing the same permissive direction.
+
+Sources: [author's LICENSE](https://github.com/digital-sound-antiques/emu2413/blob/master/LICENSE) ·
+[2004 package readme preserved by keijiro/vst2413](https://github.com/keijiro/vst2413/blob/master/source/emu2413/readme.txt) ·
+[Mednafen third-party licence documentation](https://mednafen.github.io/documentation/) ·
+[VGMPlay downstream registry](https://github.com/vgmrips/vgmplay-legacy/blob/master/VGMPlay/licenses/List.txt) ·
+[upstream FCEUX COPYING](https://github.com/TASEmulators/fceux/blob/master/COPYING)

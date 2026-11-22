@@ -1,0 +1,2748 @@
+{
+ "already_with_gpl_text": 319,
+ "counts": {
+  "A": 152,
+  "B": 131,
+  "C": 58
+ },
+ "files": {
+  "src/apu.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/apu.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/archived/fir/c44100ntsc.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-content (base: src/fir/c44100ntsc.h)"
+  },
+  "src/archived/fir/c44100pal.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-content (base: src/fir/c44100pal.h)"
+  },
+  "src/archived/fir/c48000ntsc.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-content (base: src/fir/c48000ntsc.h)"
+  },
+  "src/archived/fir/c48000pal.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-content (base: src/fir/c48000pal.h)"
+  },
+  "src/archived/fir/c96000ntsc.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-content (base: src/fir/c96000ntsc.h)"
+  },
+  "src/archived/fir/c96000pal.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-content (base: src/fir/c96000pal.h)"
+  },
+  "src/archived/fir/toh.c": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-content (base: src/fir/toh.c)"
+  },
+  "src/asm.cpp": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/asm.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/boards/_cart_helpers.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/boards/_cart_helpers.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/boards/datalatch_carts.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/boards/emu2413.c": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "emu2413 YM2413 emulator (Mitsutaka Okazaki 2001) - no license text inside; provenance tracked in COPYRIGHT_AUDIT.md (project discipline 4: do not guess)",
+   "rule": "R1-whitelist"
+  },
+  "src/boards/emu2413.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "emu2413 YM2413 emulator (Mitsutaka Okazaki 2001) - no license text inside; provenance tracked in COPYRIGHT_AUDIT.md (project discipline 4: do not guess)",
+   "rule": "R1-whitelist"
+  },
+  "src/boards/irem_txc_bit_carts.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/boards/legacy_expansion_audio.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/boards/mapinc_audio.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/boards/mapinc_base.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/boards/mapinc_bus.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/boards/mapinc_mmc3.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/boards/mapinc_state.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/boards/mapper_strategy_a.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/boards/mmc1_cart.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/boards/mmc3.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/boards/mmc3_base_cart.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/boards/mmc3_base_cart.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/boards/mmc3_cart.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/boards/mmc3_variants_carts.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/boards/nrom_cart.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/boards/registry.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/boards/registry.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/boards/simple_carts.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/boards/smb2j_carts.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/boards/vrc2and4_carts.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/boards/vrc6_cart.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/bus.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/bus.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/cart.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/cart_class.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/cart_class.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/cheat.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/compiler_attrs.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/config.cpp": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/core_state.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/core_state.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/cpu.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/cpu.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/debug.cpp": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/debug.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/debugsymboltable.cpp": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/debugsymboltable.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drawing.cpp": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drawing.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/driver_callbacks.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/driver_callbacks.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/AboutWindow.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/AviAudioCodec.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/AviAudioCodec.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/AviOptionsDialog.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/AviRecord.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/AviRecordContext.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/AviRecordDiskThread.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/AviRiffViewer.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/AviVideoCodec.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/AviVideoCodec.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/CheatsConf.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/CodeDataLogger.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/ColorMenu.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/ConfigStore.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/ConsoleActions.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/ConsoleCursor.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/ConsoleDebugWindows.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/ConsoleDebugger.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/ConsoleEmuControl.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/ConsoleEmulatorThread.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/ConsoleFile.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/ConsoleHotKeys.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/ConsoleMenu.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/ConsoleMenuBar.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/ConsoleRecentRom.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/ConsoleRecording.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/ConsoleSoundConf.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/ConsoleTranslation.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/ConsoleUtilities.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/ConsoleVideo.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/ConsoleVideoConf.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/ConsoleVideoSetup.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/ConsoleViewerGL.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/ConsoleViewerInterface.cpp": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/ConsoleViewerInterface.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/ConsoleViewerQWidget.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/ConsoleViewerSDL.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/ConsoleWindow.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/ConsoleWindowContext.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/FamilyKeyboard.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/FrameTimingStats.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/GameGenie.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/GamePadConf.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/GuiConf.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/HelpPages.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/HexEditor.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/HotKeyConf.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/InputConf.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/LuaControl.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/MenuCatalog.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/MovieOptions.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/MoviePlay.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/MovieRecord.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/MsgLogViewer.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/NameTableViewer.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/PaletteConf.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/PaletteEditor.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/RamSearch.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/RamWatch.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/SplashScreen.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/StateRecorderConf.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/SymbolicDebug.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/TasEditor/TasColors.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) family header - .cpp files carry the MIT license; no license text inside; family-consistent whitelist",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/TasEditorContext.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/TasEditor/TasEditorTimeline.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/TasEditor/TasEditorWindow.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) family header - .cpp files carry the MIT license; no license text inside; family-consistent whitelist",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/TasFindNoteWindow.cpp": {
+   "bom": true,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/TasEditor/TasFindNoteWindow.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/TasEditor/bookmark.cpp": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) - MIT license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/bookmark.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) family header - MIT family; no license text inside; family-consistent whitelist",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/bookmarkPreviewPopup.cpp": {
+   "bom": true,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/TasEditor/bookmarkPreviewPopup.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/TasEditor/bookmarks.cpp": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) - MIT license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/bookmarks.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) family header - MIT family; no license text inside; family-consistent whitelist",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/branches.cpp": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) - MIT license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/branches.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) family header - MIT family; no license text inside; family-consistent whitelist",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/greenzone.cpp": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) - MIT license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/greenzone.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) family header - MIT family; no license text inside; family-consistent whitelist",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/history.cpp": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) - MIT license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/history.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) family header - MIT family; no license text inside; family-consistent whitelist",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/inputlog.cpp": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) - MIT license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/inputlog.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) family header - MIT family; no license text inside; family-consistent whitelist",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/laglog.cpp": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) - MIT license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/laglog.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) family header - MIT family; no license text inside; family-consistent whitelist",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/markerDragPopup.cpp": {
+   "bom": true,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/TasEditor/markerDragPopup.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/TasEditor/markers.cpp": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) - MIT license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/markers.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) family header - MIT family; no license text inside; family-consistent whitelist",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/markers_manager.cpp": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) - MIT license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/markers_manager.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) family header - MIT family; no license text inside; family-consistent whitelist",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/playback.cpp": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) - MIT license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/playback.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) family header - MIT family; no license text inside; family-consistent whitelist",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/recorder.cpp": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) - MIT license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/recorder.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) family header - MIT family; no license text inside; family-consistent whitelist",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/selection.cpp": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) - MIT license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/selection.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) family header - MIT family; no license text inside; family-consistent whitelist",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/snapshot.cpp": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) - MIT license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/snapshot.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) family header - MIT family; no license text inside; family-consistent whitelist",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/splicer.cpp": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) - MIT license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/splicer.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) family header - MIT family; no license text inside; family-consistent whitelist",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/taseditor_config.cpp": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) - MIT license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/taseditor_config.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) family header - MIT family; no license text inside; family-consistent whitelist",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/taseditor_lua.cpp": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) - MIT license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/taseditor_lua.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) family header - MIT family; no license text inside; family-consistent whitelist",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/taseditor_project.cpp": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) - MIT license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TasEditor/taseditor_project.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "TAS Editor (AnS 2011-2013) family header - MIT family; no license text inside; family-consistent whitelist",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/TimingConf.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/TraceLogger.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/audio_driver_fallback.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/audio_probe_gate.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/audio_probe_gate.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/audio_sink_wait.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/avi/avi-utils.cpp": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "gwavi family (Michael Kohn 2008-2011 / Robin Hahling 2013) - BSD-3-Clause license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/avi/fileio.cpp": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "gwavi family (Michael Kohn) - BSD-3-Clause license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/avi/gwavi.cpp": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "gwavi (Michael Kohn / Robin Hahling) - BSD-3-Clause license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/avi/gwavi.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "gwavi (Michael Kohn / Robin Hahling) - BSD-3-Clause license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/Qt/config.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/dface.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/fceuWrapper.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/fceu_callbacks.cpp": {
+   "bom": true,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/fceux_git_info.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/iNesHeaderEditor.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/input.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/input/input_backend.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/input/input_device.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/input/input_manager.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/input/input_manager.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/input/sdl_backend.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/input/sdl_backend.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/input/wgi_backend.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/input/wgi_backend.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/input/xinput_backend.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/input/xinput_backend.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/keyscan.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/ppuViewer.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/ppuViewerContext.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/ppuViewerContext.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/ppuViewerPalette.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/ppuViewerPalette.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/ppuViewerPatternTables.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/ppuViewerPatternTables.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/ppuViewerSpriteViewer.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/ppuViewerSpriteViewer.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/ppuViewerTileEditor.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/ppuViewerTileEditor.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/Qt/sdl-joystick.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/sdl-video.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/sdl.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/Qt/throttle.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/common/args.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/common/config.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/common/configSys.cpp": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/common/configSys.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/common/hq2x.cpp": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "hq2x filter (MaxSt 2003) - LGPL-2.1 license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/common/hq2x.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "hq2x family header (MaxSt LGPL) - no license text inside; family-consistent whitelist",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/common/hq3x.cpp": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "hq3x filter (MaxSt 2003) - LGPL-2.1 license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/common/hq3x.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "hq3x family header (MaxSt LGPL) - no license text inside; family-consistent whitelist",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/common/nes_ntsc.c": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "nes_ntsc 0.2.2 (Shay Green / blargg) - LGPL-2.1 license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/common/nes_ntsc.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "nes_ntsc family header (blargg LGPL) - no license text inside; family-consistent whitelist",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/common/nes_ntsc_config.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "nes_ntsc family header (blargg LGPL) - no license text inside; family-consistent whitelist",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/common/nes_ntsc_impl.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "nes_ntsc 0.2.2 (Shay Green / blargg) - LGPL-2.1 license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/drivers/common/nes_shm.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-content (base: src/drivers/Qt/nes_shm.h)"
+  },
+  "src/drivers/common/os_utils.cpp": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/common/os_utils.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/drivers/null/null_driver.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/drivers/null/null_driver.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/emufile.cpp": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": [
+    "Copyright (C) 2009-2010 DeSmuME team"
+   ],
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path +copyright-from-fork-base"
+  },
+  "src/emufile.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "emufile (DeSmuME team) - MIT license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/emufile_types.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "emufile family header (DeSmuME team, emufile.h is MIT) - no license text inside; family-consistent whitelist",
+   "rule": "R1-whitelist"
+  },
+  "src/expansion_audio.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/expansion_audio.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/f11qa_bridge.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/f11qa_bridge.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/fceu.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/fceu11_core_types.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/fceulua.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/fds.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/fds_sound.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/file.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/filter.cpp": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/filter.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/gba_load.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/gba_load.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/git.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/headless_trace.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/headless_trace.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/ines-bad.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/ines-correct.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/ines.cpp": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": [
+    "Copyright (C) 1998 BERO",
+    "Copyright (C) 2002 Xodnizel"
+   ],
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path +copyright-from-fork-base"
+  },
+  "src/ines_bmap.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/ines_gi.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/ines_init.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/ines_load.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/ines_save.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/input.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/input/cursor.cpp": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/input/fkb.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/input/share.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/input/suborkb.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/input/zapper.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/lua-engine.cpp": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/movie.cpp": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/movie.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/movie_fm2.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/movie_io.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/movie_playback.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/movie_record.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/movie_settings.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/movie_subtitles.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/movie_taseditor_bridge.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/netplay.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/nsf_load.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/nsf_runtime.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/nsf_ui.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/oldmovie.cpp": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/oldmovie.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/ops_table_variant.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/palette.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/palettes/conv.c": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/palettes/palettes.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/palettes/rp2c04001.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/palettes/rp2c04002.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/palettes/rp2c04003.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/palettes/rp2c05004.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/platform/win11/DirectStorageProbe.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/platform/win11/DirectStorageProbe.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/platform/win11/TaskbarProgress.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/platform/win11/TaskbarProgress.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/ppu.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/ppu_class.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/ppu_class.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/ppu_core.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/ppu_rendering.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/ppu_sprite_lut.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/ppu_sprite_lut.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/ppu_state.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/pputile_template.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/pputile_template.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/rust/fceux11_rust.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\n",
+   "evidence": "cbindgen-generated at build time; a stamped header would be overwritten on the next regeneration",
+   "rule": "R1-whitelist"
+  },
+  "src/tests/boards/mapper_load_test.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/tests/boards/mapper_reset_test.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/tests/git_info_stub.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/tests/rom_regression_test.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/tests/smoke_test.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/trace_common.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/trace_common.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/unif.cpp": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": [
+    "Copyright (C) 2002 Xodnizel"
+   ],
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path +copyright-from-fork-base"
+  },
+  "src/unif_bmap.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/unif_load.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/utils/ConvertUTF.c": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/utils/ConvertUTF.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "ConvertUTF (Unicode, Inc. 2001-2004) - Unicode Inc. disclaimer/license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/utils/backward.cpp": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/utils/cache.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/utils/crc32.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/utils/endian.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/utils/enum_class_bitflags.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/utils/fceu11_expected.cpp": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/utils/fceu11_expected.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/utils/fceu11_format.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/utils/format.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/utils/general.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/utils/guid.cpp": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/utils/guid.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/utils/ioapi.cpp": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "minizip (Gilles Vollant / Even Rouault / Mathias Svensson) - zlib-condition license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/utils/ioapi.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "minizip - zlib-condition license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/utils/md5.cpp": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/utils/md5.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/utils/mutex.cpp": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/utils/mutex.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/utils/platform_compat.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/utils/safe_string.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/utils/simd_fill.h": {
+   "bom": false,
+   "bucket": "A",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R3-project-original"
+  },
+  "src/utils/timeStamp.cpp": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/utils/timeStamp.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/utils/unzip.cpp": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "minizip - zlib-condition license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/utils/unzip.h": {
+   "bom": false,
+   "bucket": "C",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": "minizip (Gilles Vollant) - zlib-condition license declared inside the file; do not stamp GPL",
+   "rule": "R1-whitelist"
+  },
+  "src/utils/valuearray.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/video.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/vsuni.cpp": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": [
+    "Copyright (C) 2003 Xodnizel"
+   ],
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path +copyright-from-fork-base"
+  },
+  "src/vsuni.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/wave.cpp": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/wave.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/x6502abbrev.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  },
+  "src/x6502struct.h": {
+   "bom": false,
+   "bucket": "B",
+   "copyright_lines": null,
+   "eol": "\r\n",
+   "evidence": null,
+   "rule": "R2-base-path"
+  }
+ },
+ "fork_base": "1c35642"
+}
