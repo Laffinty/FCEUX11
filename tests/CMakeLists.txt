@@ -91,6 +91,12 @@ if(FCEUX11_BUILD_TESTS)
         git_info_stub.cpp
     )
     add_test(NAME sram_flush_test COMMAND fceux11_sram_flush_test)
+    # v2.0.8 r8: this test hung for the full ctest timeout on CI with no
+    # output at all (stdout block-buffered, lost with the killed process).
+    # The test now carries its own 60 s watchdog (stderr phase markers), so
+    # a much shorter ctest timeout is enough to fail fast and still show
+    # the phase the run got stuck in.
+    set_tests_properties(sram_flush_test PROPERTIES TIMEOUT 180)
 
     # Mapper regression tests (Task 1.1)
     fceux11_add_test_executable(fceux11_mapper_load_test

@@ -222,7 +222,12 @@ jobs:
           # marks a failed/timed-out test line with "***" (e.g.
           # "10/50 Test #10: name ...***Failed"). Cap at 10 annotations/step.
           Get-Content ctest-output.txt | Select-String -Pattern "\*\*\*" | Select-Object -First 5 | ForEach-Object { Write-Host ("::error::FAILED-TEST " + $_.Line) }
-          Get-Content ctest-output.txt | Select-String -Pattern "movie.roundtrip|WATCHDOG|The following tests FAILED" | Select-Object -First 3 | ForEach-Object { Write-Host ("::error::" + $_.Line) }
+          Get-Content ctest-output.txt | Select-String -Pattern "movie.roundtrip|WATCHDOG|sram_flush|The following tests FAILED" | Select-Object -First 3 | ForEach-Object { Write-Host ("::error::" + $_.Line) }
+          # v2.0.8 r8: the sram_flush_test watchdog prints its phase markers
+          # on stderr; ctest captures them into the test output, so surface
+          # them as annotations too (stderr is unbuffered, so the markers
+          # survive a kill - unlike stdout, which is block-buffered).
+          Get-Content ctest-output.txt | Select-String -Pattern "sram_flush" | Select-Object -First 12 | ForEach-Object { Write-Host ("::error::PHASE " + $_.Line) }
           $stageLog = "tests/movie_roundtrip_stages.log"
           if (Test-Path $stageLog) {
             Write-Host ("::error::--- {0} ---" -f $stageLog)
