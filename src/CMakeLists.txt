@@ -166,6 +166,7 @@ set(SRC_CORE
   	${CMAKE_CURRENT_SOURCE_DIR}/conddebug.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/config.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/core_state.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/crash_handler.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/cpu.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/debug.cpp
   	${CMAKE_CURRENT_SOURCE_DIR}/debugsymboltable.cpp
@@ -590,6 +591,11 @@ target_include_directories(fceux11_boards PUBLIC ${CMAKE_SOURCE_DIR}/src)
 
 add_library(fceux11_core STATIC ${SRC_CORE})
 target_link_libraries(fceux11_core PUBLIC fceux11_boards fceux11_utils ${ZLIB_LIBRARIES} SDL2::SDL2)
+# v2.0.8 C2: the local crash reporter (crash_handler.cpp) writes Windows
+# minidumps through dbghelp. PUBLIC so every consumer of core inherits it.
+if(WIN32)
+    target_link_libraries(fceux11_core PUBLIC dbghelp)
+endif()
 target_include_directories(fceux11_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 # v2.0.4 V8 (A7 alias experiment): when enabled, x6502.cpp includes the
 # experiment table src/ops_table_a7.inc (register macros routed through the

@@ -104,6 +104,11 @@ docs/history/unpacked/
 # the CI workflow's job log — see .github/workflows/f11qa.yml).
 /logs_r*/
 
+# v2.0.8 C2: local crash dumps (minidumps + crash_log.txt). Written next to
+# the emulator's base directory or next to the executable; never committed.
+/crashes/
+crashes/
+
 # Claude Code
 .claude/
 

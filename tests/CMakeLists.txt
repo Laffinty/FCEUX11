@@ -107,6 +107,15 @@ if(FCEUX11_BUILD_TESTS)
     add_test(NAME sram_flush_tick_test COMMAND fceux11_sram_flush_tick_test)
     set_tests_properties(sram_flush_tick_test PROPERTIES TIMEOUT 180)
 
+    # v2.0.8 C2 (P4) — local crash reporter (legs M6/M7). Writes a real
+    # minidump into a temp directory and checks that it is not empty.
+    fceux11_add_test_executable(fceux11_crash_dump_test
+        f11qa/crash_dump_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME crash_dump_test COMMAND fceux11_crash_dump_test)
+    set_tests_properties(crash_dump_test PROPERTIES TIMEOUT 180)
+
     # Mapper regression tests (Task 1.1)
     fceux11_add_test_executable(fceux11_mapper_load_test
         f11qa/boards/mapper_load_test.cpp

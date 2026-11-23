@@ -437,3 +437,44 @@
     ② `SDL.SRAMFlushInterval=5` ⇒ mtime 约每 5 秒更新；
     ③ `SDL.SRAMFlushInterval=0` ⇒ 游玩期间 mtime **不**更新（仅关闭游戏时写）；
     ④ 关掉游戏 ⇒ `.sav` 内容与周期刷盘一致（原子写，tmp 无残留）。
+- **r13（2026-11-23）P4 开工（C2 本地 minidump）**：
+  - **落点**：新文件 `src/crash_handler.{h,cpp}`（**core 层、零 Qt 依赖、头文件不
+    含 windows.h** ⇒ 平台类型不外泄、可测）；安装点 = `main()` 里
+    `fceux_diag::install()` 之后、QApplication 之前（**启动期崩溃正是本设施的
+    目标场景**）。
+  - **产出**：`<crash dir>/fceux11_<yyyymmdd_hhmmss>_<pid>.dmp`（Windows
+    minidump，`MiniDumpNormal`）+ `<crash dir>/crash_log.txt`（每次崩溃追加一行：
+    时间 / version / source / code / address / pid / dump 名）。
+  - **覆盖面**：`SetUnhandledExceptionFilter`（SEH filter）+ CRT 失败族
+    （`_set_invalid_parameter_handler` / `_set_purecall_handler` /
+    `std::set_terminate` / `signal(SIGABRT)`）——后者没有异常上下文，写
+    「当前进程快照」dump 并以 source 字段区分（terminate/abort/purecall/…）。
+  - **崩溃目录解析**：优先 `<base dir>/crashes`（与 fcs/sav/snaps 同层），
+    **base 未知时回落 exe 目录**（启动期崩溃正是此时），再回落 %TEMP%。
+  - **纪律要点**：filter 内**零 UI、最小分配**、重入守卫（`g_inCrash`）——
+    崩溃处理自身再崩不得递归；返回 `EXCEPTION_CONTINUE_SEARCH` 把异常交还
+    WER（不吞进程）。
+  - **D1 口径复核**：本地文件、不外发、无遥测；`.gitignore` 加 `/crashes/`。
+- **r14（2026-11-23）P4 完成**：
+  - **新 ctest `crash_dump_test`（9 腿，M6/M7）**：M6 写盘成功 + **`.dmp` 存在
+    且 size > 0**（纪律 13：断言捕获内容非空，否则是哑弹门禁）+ `crash_log.txt`
+    落盘 + 摘要含 source/code/version；M7 不可用目录 ⇒ 干净失败、进程存活。
+  - **变异腿闭合**：去掉 dump 写入（`ok = false`）⇒ **M6a/M6b/M6c 红**、
+    其余绿、EXIT=1；还原后九腿全绿。
+  - **真实探针实跑（人工项本机完成）**：`FCEUX11_TEST_CRASH=1` 启动真 exe ⇒
+    进程以 **0xE0000001** 终止、`build/src/crashes/` 产出 **61 362 字节**的
+    `.dmp`（魔数 **MDMP** 校验通过 ⇒ WinDbg 可直接打开）+ 摘要行逐字：
+    `2026-11-23 14:28:38 | version=v2.0.7 | source=seh | code=0xE0000001 |
+    address=0x53C5569A | pid=16648 | dump=fceux11_20261123_142838_16648.dmp`。
+    ⚠️ dump 落在 **exe 目录**而非 base 目录 ⇒ **正是「启动期 base 未初始化」的
+    回落路径被实测命中**（设计意图得到验证）。
+  - **接线**：`src/CMakeLists.txt` 加 `crash_handler.cpp` 进 `SRC_CORE` +
+    `dbghelp` 链接（PUBLIC ⇒ 所有 core 消费者继承）；`main.cpp` 加
+    `install_crash_handler()` 与探针分支。
+  - **门禁**：目标构建 + 全量 BUILD_EXIT=0 + `ctest -LE perf` **52/52 全绿**
+    （51→52，+`crash_dump_test`），CTEST_EXIT=0。
+  - **留给 P5 的登记**：① 用户可感知变化 = 崩溃后 exe 目录/base 目录多出
+    `crashes/`（minidump + 摘要），**内容含用户 ROM 数据 ⇒ 属本地敏感文件，
+    不得自动上传**；② 摘要里的 version 仍为 `v2.0.7`（v2.0.8 版本号在发布
+    步骤才动，届时自动带出）；③ 转储目录未做「保留最近 N 份」的清理策略
+    （长期使用会累积）——登记为长尾观察项。

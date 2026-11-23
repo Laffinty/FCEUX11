@@ -24,6 +24,8 @@
 #include <string>
 #include <typeinfo>
 #include <vector>
+// v2.0.8 C2: local crash reporter (core header, no platform types leak).
+#include "crash_handler.h"
 #include <SDL.h>
 #include <QApplication>
 #include <QSplashScreen>
@@ -334,6 +336,22 @@ int main( int argc, char *argv[] )
 	int retval = 0;
 
 	fceux_diag::install();
+
+	// v2.0.8 C2: install the local crash reporter before anything else can
+	// fail -- a crash during start-up is exactly the case it exists for.
+	// It writes a minidump plus a one-line summary into <base>/crashes (or
+	// the executable's directory); nothing is uploaded anywhere.
+	fceux11::install_crash_handler();
+
+	// v2.0.8 C2: manual acceptance probe -- FCEUX11_TEST_CRASH=1 raises a
+	// controlled, non-continuable exception right after the handler is
+	// installed, so the whole dump path can be exercised by hand.
+	if (getenv("FCEUX11_TEST_CRASH") != nullptr)
+	{
+		fprintf(stderr, "FCEUX11_TEST_CRASH set: raising a controlled crash\n");
+		fflush(stderr);
+		fceux11::trigger_test_crash();
+	}
 
 	// Set the default QSurfaceFormat BEFORE creating QApplication. The v0.3.14
 	// OpenGL backend uses QOpenGLWindow + #version 330 core shaders, which
