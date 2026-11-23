@@ -450,3 +450,18 @@
   动作，等业主明示**（本批未擅自改 `src/version.h`）。
   **下一步**：批 3（观测能力：`msgLogBuf_t` 落盘升级 + 诊断对话框 + Diagnostics
   二级菜单）。
+- **r7（2026-11-23）批 3 独立建档**：业主指示参照批 2 模式立专项文档——
+  `docs/plans/FCEUX11-v2.0.8-批3-观测能力-构建计划.md`（r1）。只读调查钉死三组坐标：
+  ① **日志 sink 四缺陷**（`MsgLogViewer.cpp`）：`%TEMP%\fceux.log` 不可寻（`:56`）、
+  `"w+"` 每次启动截断（`:69`）、`addLine` **无锁**（`:99`；`FCEUD_Message` 确来自
+  模拟线程与 GUI 线程 ⇒ 竞争真实）、环形 256 行与文件无限增长脱节；**关键约束**：
+  全局 `msgLog` 是静态初始化对象 ⇒ 文件在 `main()` 前已开，而 base 目录要到
+  `InitConfig()`（`fceuWrapper.cpp:763`）才就绪 ⇒ **必须「延迟打开 + 初始化后
+  重定向」**。② **诊断数据面全部已存在**（`nes_shm->render_count`/`blit_count`、
+  `sndBuf.starveCounter`、`getBaseFrameRate()`、`GameInfo`）⇒ **O2 无需新增埋点**；
+  对话框范式 = `MsgLogViewDialog_t`；开目录 = `QDesktopServices`（`AboutWindow.cpp:123`）。
+  ③ **菜单与 i18n 约束**：`AdvancedSub`/`advancedSubTitle`/`MenuPathId` 三处各 +1
+  （`MenuPathId` 目前零消费者）；CI 硬门禁 = `check_menu_slots.py` +
+  `i18n_coverage.ps1`（zh_CN/zh_TW ≥95%、其余 ≥90%）+ `check_simp_trad.ps1`；
+  **i18n 源串冻结规则** ⇒ O3 的约 5–9 个新源串**必须走 `[i18n-string-add]` 全流程**。
+  阶段编排 P1–P5（O1 两段 + O2 + O3 + 收口），门禁预期 ctest 52 → 55。
