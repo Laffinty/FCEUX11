@@ -392,3 +392,11 @@
   - **旁证**：`f11qa.yml` 的 ctest 步带 `continue-on-error: true` ⇒ 同一挂死
     在 f11qa job 被静默吞掉（job 仍报 success）——**该 job 的 ctest 结论因此
     不可信**，登记为观察项。
+- **r10（2026-11-23）CI 定谳：转绿**：`a8096cc` 的 **build-windows = success**
+  （check-run 137413802293）⇒ 根因判定与修复成立：PATH 注入覆盖全部测试后，
+  `sram_flush_test` 在 CI 上正常跑完（不再超时、不再挂死）。
+  ⇒ **批 2 的 CI 红灯闭环**。⚠️ 遗留观察项两条：① `check-run.output.summary`
+  至今仍为空（r14 的 `Set-Content` 写法确实无效；**注解通道是当前唯一可用
+  的免 admin 读数口**，已由本次事故反向验证其价值）；② **CI 无 cargo 环节**
+  ⇒ formats 160 / GBA 303 等 Rust 锁测试从不在 CI 跑（纪律 10 同族，建议
+  单独立项补一条 cargo 门禁步骤）。
