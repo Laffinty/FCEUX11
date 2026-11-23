@@ -250,8 +250,10 @@
 | P4 | C2 全部（crash_handler + 路径 + 探针 + M6/M7） | 无 |
 | P5 | C3 验证收尾 + CHANGELOG/AGENTS 登记 + 门禁全表 | P1-P4 |
 
-> **进度（2026-11-22，r6）**：P1 ✅（e0ff625）/ P2 ✅（c5b2a8a）/ P3 ⬜ / P4 ⬜ / P5 ⬜。
-> 最新门禁基线：ctest **50/50**、formats **160/0**、构建 BUILD_EXIT=0。
+> **进度（2026-11-23，r15 收口）**：P1 ✅（e0ff625）/ P2 ✅（c5b2a8a）/
+> P3 ✅（5994dab）/ P4 ✅（cb2cd7c）/ P5 ✅（d9effa1）——**批 2 全部完成**。
+> 最新门禁基线：ctest **52/52**、formats **160/0**、构建 EXIT=0、Rust 八条全绿；
+> CI：P3/P4 两提交 build-windows + f11qa 均 success。
 
 每阶段收口跑 §五 全表；**push / 发版动作等业主明示**。
 
