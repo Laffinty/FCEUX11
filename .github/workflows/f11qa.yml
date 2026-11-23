@@ -299,7 +299,23 @@ jobs:
       # Internal Logic Check — CTest regression suite
       # -----------------------------------------------------------------------
       - name: Internal Logic Check — CTest
-        run: ctest --test-dir build --build-config Release --output-on-failure -LE perf
+        # v2.0.8 r9: prepend the vcpkg runtime dir so the test exes can
+        # resolve SDL2.dll / Qt6*.dll. Without it the Windows loader raises
+        # the missing-DLL dialog, which blocks forever on a runner without
+        # an interactive desktop (the test then dies at the ctest timeout
+        # with no output) -- and `continue-on-error: true` below would
+        # swallow exactly that. ctest also injects the dir via
+        # ENVIRONMENT_MODIFICATION (all tests, since v2.0.8 r9); this line
+        # keeps the step independent of that mechanism.
+        run: |
+          $env:PATH = "${{ github.workspace }}/vcpkg_installed/x64-windows/bin;${{ github.workspace }}/vcpkg_installed/x64-windows/debug/bin;$env:PATH"
+          ctest --test-dir build --build-config Release --output-on-failure -LE perf 2>&1 | Tee-Object -FilePath ctest-output.txt
+          # v2.0.8 r9: `continue-on-error` keeps this step green, so a failed
+          # or hung test would otherwise be invisible in the job summary.
+          # Surface the failing test names as annotations (readable without
+          # repo admin rights) so the job report carries the evidence.
+          Get-Content ctest-output.txt | Select-String -Pattern "\*\*\*" | Select-Object -First 5 | ForEach-Object { Write-Host ("::error::FAILED-TEST " + $_.Line) }
+          Get-Content ctest-output.txt | Select-String -Pattern "WATCHDOG|sram_flush" | Select-Object -First 12 | ForEach-Object { Write-Host ("::error::PHASE " + $_.Line) }
         continue-on-error: true  # capture results even if some tests fail
 
       # -----------------------------------------------------------------------

@@ -364,3 +364,31 @@
   - **门禁**：目标构建六腿 PASS + 全量 BUILD_EXIT=0 + `ctest -LE perf`
     **50/50**（CTEST_EXIT=0）。推送后以 CI 注解定谳（若非本测试将直接给出
     `***Failed` 名字）。
+- **r8（2026-11-23）CI 二次红灯：加诊断（stderr 阶段标记 + watchdog）**：
+  9aeae92 的 CI 仍红，且 **CTest 步骤跑了 25 分钟才失败** ⇒ 不是快速失败而是
+  **挂死**。按仓库先例（AGENTS.md r14 的 movie_roundtrip 事故：stdout 块缓冲
+  随被杀进程丢失 ⇒ 零输出）给 sram_flush_test 加：**stderr 阶段标记**（无缓冲，
+  被杀也留得住）+ **60s watchdog**（打印卡住的阶段并 `_Exit(3)`）+ stdout 无缓冲
+  + `ctest TIMEOUT 180`（不再烧 1500s）；ci.yml 加 `PHASE` 注解通道。推送
+  **68f49fa**。
+- **r9（2026-11-23）CI 挂死根因钉死 + 系统化修复**：
+  - **根因**：`tests/CMakeLists.txt` 的 vcpkg 运行时 PATH 注入是**按测试名单**
+    手工维护的（`set_tests_properties(smoke_test mapper_load_test ...)`），
+    **`sram_flush_test` 不在名单里** ⇒ CI 上该 exe 运行时 PATH 无 vcpkg bin
+    目录 ⇒ 它动态导入的 **SDL2.dll / Qt6*.dll 解析不到** ⇒ **Windows 原生
+    加载器弹出「找不到 DLL」消息框** ⇒ **runner 无交互桌面 ⇒ 对话框永久阻塞**
+    ⇒ ctest 1500s 后被杀 ⇒ **进程从未进入 main ⇒ 零输出**。
+  - **本地实证**：去掉 PATH 的 vcpkg 目录后本地直接运行该 exe ⇒
+    `error while loading shared libraries: SDL2.dll`（本地是 Git Bash 的 POSIX
+    loader ⇒ 报错退出；CI 是原生 loader ⇒ 弹框阻塞 ⇒ 同一根因的两种表现）。
+    **四次 CI 全挂（e0ff625/c5b2a8a/9aeae92/853086b，CTest 步骤 1512–1521s）
+    与本根因逐项吻合**；本地全绿是因为本地 bat 手动设了 PATH。
+  - **修复（系统化，非补名单）**：文件末尾加
+    `get_property(_FCEUX11_ALL_TESTS DIRECTORY ... PROPERTY TESTS)` +
+    `set_tests_properties(${_FCEUX11_ALL_TESTS} PROPERTIES ENVIRONMENT_MODIFICATION ...)`
+    ⇒ **PATH 注入对全部测试生效**，今后新增测试不再漏项（名单形式是「静默失效」
+    陷阱，同纪律 10 家族）。实测 `ctest --show-only=json-v1`：**51/51 测试
+    全部带 PATH 注入**（修复前仅手工名单内的那批有）。
+  - **旁证**：`f11qa.yml` 的 ctest 步带 `continue-on-error: true` ⇒ 同一挂死
+    在 f11qa job 被静默吞掉（job 仍报 success）——**该 job 的 ctest 结论因此
+    不可信**，登记为观察项。

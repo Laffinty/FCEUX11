@@ -1081,4 +1081,28 @@ if(FCEUX11_BUILD_TESTS)
                     "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
         endif()
     endif()
+
+    # v2.0.8 r9 -- apply the vcpkg runtime PATH to EVERY test in this
+    # directory instead of to a hand-maintained name list.
+    #
+    # Why: the list form silently excluded newly added tests. The
+    # sram_flush_test (added by v2.0.8 batch 2 P1) was not in it, so on CI
+    # the exe ran without the vcpkg bin dir on PATH. It imports SDL2.dll /
+    # Qt6*.dll, and the Windows loader raises the "missing DLL" dialog when
+    # it cannot resolve them -- on a runner with no interactive desktop that
+    # dialog blocks forever, so ctest killed the test after its 1500 s
+    # timeout with NO output at all (the process never reached main()).
+    # Every other test passed only because it happened to be on the list.
+    #
+    # The TESTS directory property is populated by add_test(), so this must
+    # stay after the last add_test() call in this file.
+    if(WIN32 AND DEFINED _FCEUX11_TEST_PATH_MODIFICATIONS)
+        get_property(_FCEUX11_ALL_TESTS
+                     DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" PROPERTY TESTS)
+        if(_FCEUX11_ALL_TESTS)
+            set_tests_properties(${_FCEUX11_ALL_TESTS}
+                PROPERTIES ENVIRONMENT_MODIFICATION
+                        "${_FCEUX11_TEST_PATH_MODIFICATIONS}")
+        endif()
+    endif()
 endif()
