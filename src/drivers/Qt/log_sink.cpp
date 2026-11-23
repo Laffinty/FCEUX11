@@ -31,7 +31,8 @@ namespace fceux11 {
 
 namespace {
 
-constexpr std::size_t kMaxLines = 256;
+/// How many messages the in-memory ring keeps for the viewer.
+constexpr std::size_t kMaxRingLines = 256;
 /// Upper bound for the memory buffer that holds messages written before
 /// the file could be opened. Beyond this the oldest pending messages are
 /// dropped -- the file is the product, not the buffer.
@@ -57,6 +58,12 @@ std::string temp_dir_path()
 		return std::string(t);
 	return std::string("/tmp");
 #endif
+}
+
+/// "<path>.1", "<path>.2", ... -- the rotated generations.
+std::string generation_path(const std::string& path, std::size_t generation)
+{
+	return path + "." + std::to_string(generation);
 }
 
 } // anonymous namespace
@@ -127,26 +134,19 @@ void LogSink::open_for_base(const std::string& base_dir)
 
 	fp = f;
 	path = target;
+	writtenBytes = 0;
 
 	// Flush whatever was buffered before the base directory was known.
 	if (!pending.empty())
 	{
-		// The ring needs an entry for the flushed block as well, otherwise
-		// the viewer would not show the start-up messages (they would be
-		// in the file but outside the ring's window).
-		std::fseek(f, 0L, SEEK_END);
-		const long ofs = std::ftell(f);
-		std::fwrite(pending.data(), 1, pending.size(), f);
-		fpOfsList[head] = ofs;
-		head = (head + 1) % kMaxLines;
-		if (head == tail)
-			tail = (tail + 1) % kMaxLines;
+		const std::size_t n = std::fwrite(pending.data(), 1, pending.size(), f);
+		writtenBytes += n;
 		pending.clear();
 		std::fflush(f);
 	}
 }
 
-void LogSink::append(const char* text, bool newline)
+void LogSink::append(const char* text, bool newline, bool urgent)
 {
 	if (!text)
 		return;
@@ -157,26 +157,71 @@ void LogSink::append(const char* text, bool newline)
 	if (newline)
 		line += '\n';
 
+	// The in-memory ring always keeps the message: the message-log view
+	// must keep working even when the file sink is switched off.
+	ring.push_back(line);
+	while (ring.size() > kMaxRingLines)
+		ring.pop_front();
+	totalLines++;
+
+	if (!enabled_)
+		return;
+
 	if (!fp)
 	{
 		// Not open yet: buffer it (bounded) instead of losing it.
 		pending += line;
 		if (pending.size() > kMaxPendingBytes)
 			pending.erase(0, pending.size() - kMaxPendingBytes);
-		totalLines++;
 		return;
 	}
 
 	FILE* f = static_cast<FILE*>(fp);
-	std::fseek(f, 0L, SEEK_END);
-	const long ofs = std::ftell(f);
-	std::fwrite(line.data(), 1, line.size(), f);
+	const std::size_t n = std::fwrite(line.data(), 1, line.size(), f);
+	writtenBytes += n;
 
-	fpOfsList[head] = ofs;
-	head = (head + 1) % kMaxLines;
-	if (head == tail)
-		tail = (tail + 1) % kMaxLines;
-	totalLines++;
+	if (urgent)
+		std::fflush(f); // errors must reach the disk right away
+
+	if (writtenBytes >= maxFileBytes)
+		rotate_locked();
+}
+
+void LogSink::rotate_locked()
+{
+	if (!fp)
+		return;
+
+	// Windows cannot rename an open file, so the handle has to go first.
+	std::fclose(static_cast<FILE*>(fp));
+	fp = nullptr;
+
+	std::error_code ec;
+	// Drop the oldest generation, then shift the others down -- highest
+	// first, so a generation is never overwritten before it was moved.
+	std::filesystem::remove(generation_path(path, kRotatedGenerations), ec);
+	for (std::size_t g = kRotatedGenerations; g >= 2; g--)
+	{
+		std::filesystem::rename(generation_path(path, g - 1),
+		                        generation_path(path, g), ec);
+		if (ec)
+			ec.clear();
+	}
+	std::filesystem::rename(path, generation_path(path, 1), ec);
+	if (ec)
+		ec.clear();
+
+	// Re-open for appending: the fresh file starts empty.
+	FILE* f = std::fopen(path.c_str(), "a");
+	if (f)
+	{
+		fp = f;
+		writtenBytes = 0;
+	}
+	else
+	{
+		path.clear();
+	}
 }
 
 void LogSink::flush()
@@ -194,29 +239,28 @@ void LogSink::close()
 	std::fclose(static_cast<FILE*>(fp));
 	fp = nullptr;
 	path.clear();
-	head = tail = 0;
+	writtenBytes = 0;
 }
 
-std::string LogSink::tail_text(std::size_t maxBytes) const{
+std::string LogSink::tail_text(std::size_t maxBytes) const
+{
 	std::lock_guard<std::mutex> lock(mtx);
 
-	if (!fp || head == tail)
-		return std::string();
-
-	FILE* f = static_cast<FILE*>(fp);
-	std::fseek(f, fpOfsList[tail], SEEK_SET);
-
 	std::string out;
-	out.resize(maxBytes);
-	const std::size_t n = std::fread(&out[0], 1, maxBytes, f);
-	out.resize(n);
+	// Walk backwards so that the cap keeps the newest messages.
+	for (auto it = ring.rbegin(); it != ring.rend(); ++it)
+	{
+		if (out.size() + it->size() > maxBytes)
+			break;
+		out.insert(0, *it);
+	}
 	return out;
 }
 
 void LogSink::clear()
 {
 	std::lock_guard<std::mutex> lock(mtx);
-	head = tail = 0;
+	ring.clear();
 }
 
 std::size_t LogSink::line_count() const
@@ -235,6 +279,30 @@ bool LogSink::is_open() const
 {
 	std::lock_guard<std::mutex> lock(mtx);
 	return fp != nullptr;
+}
+
+void LogSink::set_enabled(bool on)
+{
+	std::lock_guard<std::mutex> lock(mtx);
+	enabled_ = on;
+}
+
+bool LogSink::enabled() const
+{
+	std::lock_guard<std::mutex> lock(mtx);
+	return enabled_;
+}
+
+void LogSink::set_max_file_bytes(std::size_t bytes)
+{
+	std::lock_guard<std::mutex> lock(mtx);
+	maxFileBytes = bytes;
+}
+
+std::size_t LogSink::max_file_bytes() const
+{
+	std::lock_guard<std::mutex> lock(mtx);
+	return maxFileBytes;
 }
 
 } // namespace fceux11

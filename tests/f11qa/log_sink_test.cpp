@@ -32,6 +32,7 @@
 #include <atomic>
 #include <cstdio>
 #include <cstring>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <set>
@@ -197,6 +198,84 @@ int main()
 		// Close before removing the directory: Windows refuses to delete a
 		// file that is still open (the removal would throw and abort the
 		// test process).
+		sink.close();
+		std::filesystem::remove_all(dir);
+	}
+
+	// ---- O1c: the log file rotates ----
+	{
+		const std::filesystem::path dir =
+			std::filesystem::temp_directory_path() / "f11_log_sink_rot";
+		std::filesystem::remove_all(dir);
+		std::filesystem::create_directories(dir);
+
+		fceux11::LogSink& sink = fceux11::LogSink::instance();
+		// The default threshold is 5 MB (asserted here); the test lowers it
+		// so it does not have to write megabytes.
+		CHECK(sink.max_file_bytes() == 5u * 1024u * 1024u,
+			  "O1c1 the default rotation threshold is 5 MB");
+		sink.set_max_file_bytes(64 * 1024);
+		sink.open_for_base(dir.string());
+
+		const std::string path = sink.current_path();
+		const std::string gen1 = path + ".1";
+		const std::string gen2 = path + ".2";
+		const std::string gen3 = path + ".3";
+
+		// 300 lines of ~1000 bytes = ~300 KB, which crosses the 64 KB
+		// threshold four times -- enough for three rotated generations to
+		// exist next to the current file.
+		const std::string chunk(1000, 'x');
+		for (int i = 0; i < 300; i++)
+			sink.append(chunk.c_str(), true);
+
+		sink.flush();
+		CHECK(std::filesystem::exists(gen1),
+			  "O1c2 rotation produced a .1 generation");
+		CHECK(std::filesystem::exists(gen2),
+			  "O1c3 a second generation was kept");
+		CHECK(std::filesystem::exists(gen3),
+			  "O1c4 a third generation was kept");
+		CHECK(std::filesystem::file_size(path) <
+		      static_cast<std::uintmax_t>(64 * 1024),
+			  "O1c5 the current file is below the threshold again");
+
+		sink.close();
+		std::filesystem::remove_all(dir);
+		sink.set_max_file_bytes(5u * 1024u * 1024u);
+	}
+
+	// ---- O1d: the file sink can be switched off ----
+	{
+		const std::filesystem::path dir =
+			std::filesystem::temp_directory_path() / "f11_log_sink_off";
+		std::filesystem::remove_all(dir);
+		std::filesystem::create_directories(dir);
+
+		fceux11::LogSink& sink = fceux11::LogSink::instance();
+		sink.open_for_base(dir.string());
+		const std::string path = sink.current_path();
+
+		sink.set_enabled(false);
+		CHECK(!sink.enabled(), "O1d1 the sink reports itself disabled");
+		sink.append("this line must not reach the file", true);
+		sink.flush();
+
+		const bool fileEmpty = !std::filesystem::exists(path) ||
+		                       std::filesystem::file_size(path) == 0;
+		CHECK(fileEmpty, "O1d2 no file content was written while disabled");
+		// The view must keep working: the messages live in memory.
+		CHECK(sink.tail_text(65536).find("must not reach the file") !=
+		          std::string::npos,
+		      "O1d3 the log view still shows the message");
+
+		sink.set_enabled(true);
+		sink.append("this line must reach the file", true);
+		sink.flush();
+		const bool fileHasIt = std::filesystem::exists(path) &&
+		                       std::filesystem::file_size(path) > 0;
+		CHECK(fileHasIt, "O1d4 writing resumes when the sink is enabled again");
+
 		sink.close();
 		std::filesystem::remove_all(dir);
 	}

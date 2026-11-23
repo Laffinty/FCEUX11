@@ -696,6 +696,9 @@ InitConfig()
 
 	// Code Data Logger Options
 	config->addOption("autoSaveCDL"  , "SDL.AutoSaveCDL", 1);
+	// v2.0.8 C2/C3 O1: write the message log to <base>/logs/. 0 keeps the
+	// messages in the log view only (no file is produced).
+	config->addOption("logToFile", "SDL.LogToFile", 1);
 	config->addOption("autoLoadCDL"  , "SDL.AutoLoadCDL", 1);
 	config->addOption("autoResumeCDL", "SDL.AutoResumeCDL", 0);
 

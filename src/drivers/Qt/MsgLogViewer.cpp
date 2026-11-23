@@ -199,7 +199,7 @@ void msgLog_PrintError(const char *errormsg)
 {
 	fprintf(stderr, "%s\n", errormsg);
 
-	msgLog.append(errormsg, true);
+	msgLog.append(errormsg, true, true);
 
 	if (consoleWindow)
 	{

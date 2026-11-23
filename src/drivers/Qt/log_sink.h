@@ -38,6 +38,9 @@
 //     InitConfig(), which runs inside fceuWrapperInit()) are kept in a
 //     bounded memory buffer and flushed into the file when it opens -- so
 //     there is exactly ONE log file and no early message is lost;
+//   * the recent messages live in an in-memory ring, NOT as offsets into
+//     the file. The message-log view therefore keeps working when the file
+//     sink is switched off, and it never shows a lagging file;
 //   * every access to the file and to the ring goes through one mutex.
 //     It is deliberately NOT the wrapper lock: taking that here would
 //     deadlock against the GUI thread's own use of it.
@@ -46,6 +49,7 @@
 #define __FCEUX11_LOG_SINK_H_
 
 #include <cstddef>
+#include <deque>
 #include <mutex>
 #include <string>
 
@@ -55,7 +59,7 @@ namespace fceux11 {
 /// Pure function (no side effects) so it can be asserted directly.
 std::string derive_log_path(const std::string& base_dir);
 
-/// The message-log file sink: one file, one lock, one ring of offsets.
+/// The message-log file sink: one file, one lock, one in-memory ring.
 class LogSink
 {
 public:
@@ -67,20 +71,20 @@ public:
 	/// file. Calling it again with the same base is a no-op.
 	void open_for_base(const std::string& base_dir);
 
-	/// Appends one message. `newline` adds a line break.
-	void append(const char* text, bool newline);
+	/// Appends one message. `newline` adds a line break. `urgent` forces the
+	/// message out to disk immediately (used for errors).
+	void append(const char* text, bool newline, bool urgent = false);
 
 	/// Pushes whatever is buffered in the C runtime out to the file, so a
-	/// reader (the diagnostic dialog, the user tailing the file) sees the
-	/// messages that were written so far.
+	/// reader (the user tailing the file) sees the messages written so far.
 	void flush();
 
-	/// Closes the file. Further appends are dropped until the sink is
-	/// pointed at a base directory again. Needed before the log directory
-	/// can be removed on Windows (an open file cannot be deleted).
+	/// Closes the file. Needed before the log directory can be removed on
+	/// Windows (an open file cannot be deleted).
 	void close();
 
-	/// The text the viewer shows: the tail of the log, at most `maxBytes`.
+	/// The text the viewer shows: the most recent messages, at most
+	/// `maxBytes` (taken from the end).
 	std::string tail_text(std::size_t maxBytes) const;
 
 	/// Forgets the ring (the file keeps its content).
@@ -95,16 +99,33 @@ public:
 	/// True when a file is open.
 	bool is_open() const;
 
+	/// Whether messages are written to the file at all. The in-memory ring
+	/// (and therefore the message-log view) keeps working either way.
+	void set_enabled(bool on);
+	bool enabled() const;
+
+	/// Size at which the log file is rotated. The default is 5 MB; the
+	/// test lowers it so it does not have to write megabytes.
+	void set_max_file_bytes(std::size_t bytes);
+	std::size_t max_file_bytes() const;
+
+	/// How many rotated generations are kept next to the current file
+	/// (the current file plus these = 4 files at most).
+	static constexpr std::size_t kRotatedGenerations = 3;
+
 private:
 	LogSink() = default;
+
+	void rotate_locked();
 
 	mutable std::mutex mtx;
 	std::string path;
 	void* fp = nullptr;          ///< FILE*, kept opaque so <cstdio> stays out of the header
 	std::size_t totalLines = 0;
-	std::size_t head = 0;
-	std::size_t tail = 0;
-	long fpOfsList[256] = { 0 };
+	std::size_t writtenBytes = 0;
+	std::size_t maxFileBytes = 5u * 1024u * 1024u;
+	bool enabled_ = true;
+	std::deque<std::string> ring;  ///< the most recent messages, in order
 	std::string pending;         ///< messages written before the file was open
 };
 

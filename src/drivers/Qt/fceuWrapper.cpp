@@ -778,6 +778,14 @@ int  fceuWrapperInit( int argc, char *argv[] )
 	// file now.
 	fceux11::LogSink::instance().open_for_base(fceu11::GetBaseDirectory());
 
+	// The file sink can be switched off (the log view keeps working either
+	// way -- it reads the in-memory ring, not the file).
+	{
+		int logToFile = 1;
+		g_config->getOption("SDL.LogToFile", &logToFile);
+		fceux11::LogSink::instance().set_enabled(logToFile != 0);
+	}
+
 	// initialize the infrastructure
 	error = fceu11::Initialize();
 
