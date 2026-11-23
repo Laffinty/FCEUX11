@@ -38,6 +38,8 @@
 #include "Qt/config.h"
 #include "Qt/dface.h"
 #include "Qt/fceuWrapper.h"
+#include "Qt/sram_flush.h"
+#include <chrono>
 #include "gba_load.h"
 #include "Qt/input.h"
 #include "input/input_manager.h"
@@ -61,6 +63,10 @@
 
 #include "common/cheat.h"
 #include "../../fceu.h"
+// v2.0.8 C1 (P3): FCEU_FlushGameSave (the periodic SRAM flush entry).
+// cart.h expands DECLFR/DECLFW, which fceu.h defines above -- so this
+// include has to stay after it.
+#include "../../cart.h"
 #include "../../cheat.h"
 #include "../../movie.h"
 #include "../../state.h"
@@ -1580,6 +1586,35 @@ int  fceuWrapperUpdate( void )
 			DoFun(frameskip, periodic_saves);
 
 			hexEditorUpdateMemoryValues();
+
+			// v2.0.8 C1 (P3): periodic battery-SRAM flush. Until now the
+			// .sav file was written only when the game was closed
+			// (iNESGI/UNIFGI GI_CLOSE), so a crash lost every byte the game
+			// had written since it was loaded.
+			//
+			// This runs on the emulation thread inside the wrapper lock --
+			// the same thread that writes the SaveGame buffers, so the
+			// snapshot that gets written is consistent without taking any
+			// extra lock. The GBA branch above is deliberately not involved:
+			// GBA sessions have their own dirty-flag + rate-limited flush
+			// (fceu11_gba_flush_battery), and they leave GameInfo null
+			// anyway, which makes FCEU_FlushGameSave() a no-op.
+			//
+			// The interval is a wall-clock period (SDL.SRAMFlushInterval,
+			// default 30 s, 0 = off), so turbo does not turn it into "N
+			// frames" and hammer the disk.
+			{
+				static std::chrono::steady_clock::time_point sramFlushLast;
+				static bool sramFlushArmed = false;
+				int sramFlushInterval = 30;
+				g_config->getOption("SDL.SRAMFlushInterval", &sramFlushInterval);
+				if (fceux11::sram_flush_due(std::chrono::steady_clock::now(),
+				                            sramFlushLast, sramFlushInterval,
+				                            sramFlushArmed))
+				{
+					FCEU_FlushGameSave();
+				}
+			}
 		}
 
 		if ( consoleWindow && !fceu11_gba_active() )

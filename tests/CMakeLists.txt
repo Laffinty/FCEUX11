@@ -98,6 +98,15 @@ if(FCEUX11_BUILD_TESTS)
     # the phase the run got stuck in.
     set_tests_properties(sram_flush_test PROPERTIES TIMEOUT 180)
 
+    # v2.0.8 C1 (P3) — periodic SRAM flush decision (the wall-clock gating
+    # the emulation thread applies each frame).
+    fceux11_add_test_executable(fceux11_sram_flush_tick_test
+        f11qa/sram_flush_tick_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME sram_flush_tick_test COMMAND fceux11_sram_flush_tick_test)
+    set_tests_properties(sram_flush_tick_test PROPERTIES TIMEOUT 180)
+
     # Mapper regression tests (Task 1.1)
     fceux11_add_test_executable(fceux11_mapper_load_test
         f11qa/boards/mapper_load_test.cpp

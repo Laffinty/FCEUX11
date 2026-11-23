@@ -699,6 +699,12 @@ InitConfig()
 	config->addOption("autoLoadCDL"  , "SDL.AutoLoadCDL", 1);
 	config->addOption("autoResumeCDL", "SDL.AutoResumeCDL", 0);
 
+	// v2.0.8 C1 (P3): periodic battery-SRAM flush period, in seconds.
+	// The .sav file used to be written only when the game was closed, so a
+	// crash lost everything the game had written since it was loaded. 0
+	// disables the periodic flush (the close-time save still happens).
+	config->addOption("sramFlushInterval", "SDL.SRAMFlushInterval", 30);
+
 	// Trace Logger Options
 	config->addOption("SDL.TraceLogSaveToFile", 0);
 	config->addOption("SDL.TraceLogSaveFilePath", "");

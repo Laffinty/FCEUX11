@@ -400,3 +400,40 @@
   的免 admin 读数口**，已由本次事故反向验证其价值）；② **CI 无 cargo 环节**
   ⇒ formats 160 / GBA 303 等 Rust 锁测试从不在 CI 跑（纪律 10 同族，建议
   单独立项补一条 cargo 门禁步骤）。
+- **r11（2026-11-23）P3 开工**：C1 步骤 3+5（周期 tick + `SDL.SRAMFlushInterval`
+  配置项）+ 人工 e2e 清单。设计要点（实施期钉定）：① tick 落点 = `fceuWrapper.cpp`
+  的 **NES 分支**（`DoFun` 之后、wrapper 锁内）⇒ 与写 SaveGame 缓冲的是同一
+  线程 ⇒ 快照一致、**零新增锁**；② **GBA 会话不走这条路径**（GBA 有既有
+  `fceu11_gba_flush_battery` 机制，且 GBA 会话 `GameInfo==NULL` ⇒ flush 入口
+  自带 no-op）；③ 决策逻辑抽成**可单测的纯函数**（驱动层头文件）——
+  `sram_flush_due(now, last, interval_seconds, armed)`：interval≤0 ⇒ 恒不
+  （并解除 armed）；首次调用**只立基准不刷盘**（armed 语义：装载后不该在第 0
+  帧就写盘）；④ 计时用 `steady_clock`（墙钟）⇒ turbo 不导致高频写盘；
+  ⑤ 每帧读一次配置（map 查找，开销可忽略，且只在有游戏时读）。
+- **r12（2026-11-23）P3 完成**：
+  - **落地四件**：`src/drivers/Qt/sram_flush.h`（**可单测的纯决策函数**
+    `sram_flush_due(now, last, interval_seconds, armed)`）/ `fceuWrapper.cpp`
+    的 NES 分支 tick（`DoFun` 之后、wrapper 锁内 ⇒ 与写 SaveGame 缓冲同线程、
+    零新增锁、快照一致）/ `config.cpp` 注册 `SDL.SRAMFlushInterval`（默认 30 秒，
+    0 = 关）/ 新 ctest `sram_flush_tick_test`（13 腿）+ CMake 注册。
+  - **决策语义**：interval≤0 ⇒ 恒不刷且**解除 armed**；首次调用**只立基准不刷**
+    （armed：装载后第 0 帧不写盘）；到期才刷且**基准随刷移动**（不会连刷）；
+    重新启用 interval ⇒ 重新 armed 而非立刻刷。
+  - **变异腿闭合**：删掉 armed 语义（首帧即刷）⇒ **T2a + T6b 红**、其余绿、
+    EXIT=1；还原后全绿。
+  - **实施期踩坑两则**：① `cart.h` 必须在 `fceu.h` **之后**包含（`DECLFR/DECLFW`
+    宏定义在 fceu.h，顺序反了 ⇒ cart.h:170 报「缺少类型说明符」）；② 驱动层
+    首次引入 `cart.h` 需连带 `types.h`——已按既有惯例（ConsoleDebugger 等同款）。
+  - **门禁**：目标构建 + 全量 BUILD_EXIT=0 + `ctest -LE perf` **51/51 全绿**
+    （49→50→51：+`sram_flush_test` +`sram_flush_tick_test`），CTEST_EXIT=0。
+  - **⚠️ 行为变更登记（CHANGELOG 须写，v2.0.8 发布时）**：游戏运行中 `.sav` 的
+    **mtime 会每 30 秒更新一次**（默认开；`SDL.SRAMFlushInterval=0` 可关，
+    关闭时行为与改前逐字相同 = 反向守卫）。⚠️ **NES 侧无「脏标志」**（GBA 侧
+    有 `gba_battery_take_dirty`）⇒ 即使游戏没写存档也会定期写一次盘（8 KB
+    量级，开销可忽略，但**不是零写**）——若将来要消除，需给 CartInfo 加脏标记，
+    属长尾。
+  - **人工 e2e 清单（业主侧，需真电池卡带；本仓 exe 不吃命令行 ROM）**：
+    ① 默认 30 秒：装载电池 ROM 游玩 >40 秒 ⇒ `.sav` mtime 有更新；
+    ② `SDL.SRAMFlushInterval=5` ⇒ mtime 约每 5 秒更新；
+    ③ `SDL.SRAMFlushInterval=0` ⇒ 游玩期间 mtime **不**更新（仅关闭游戏时写）；
+    ④ 关掉游戏 ⇒ `.sav` 内容与周期刷盘一致（原子写，tmp 无残留）。
