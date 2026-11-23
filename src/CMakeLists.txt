@@ -585,6 +585,13 @@ add_library(fceux11_utils STATIC ${SRC_UTILS})
 target_link_libraries(fceux11_utils PUBLIC Qt6::Widgets ${ZLIB_LIBRARIES})
 target_include_directories(fceux11_utils PUBLIC ${CMAKE_SOURCE_DIR}/src)
 
+# v2.0.8 C2/C3 O1 -- the message-log file sink. Deliberately its own tiny
+# library with NO Qt dependency: the GUI driver and the headless unit test
+# must exercise the very same code (the old sink lived inside the Qt driver
+# and could not be tested at all).
+add_library(fceux11_log_sink STATIC ${CMAKE_CURRENT_SOURCE_DIR}/drivers/Qt/log_sink.cpp)
+target_include_directories(fceux11_log_sink PUBLIC ${CMAKE_SOURCE_DIR}/src)
+
 add_library(fceux11_boards STATIC ${SRC_BOARDS})
 target_link_libraries(fceux11_boards PUBLIC fceux11_utils ${ZLIB_LIBRARIES})
 target_include_directories(fceux11_boards PUBLIC ${CMAKE_SOURCE_DIR}/src)
@@ -643,6 +650,7 @@ add_library(fceux11_drivers_qt STATIC ${SRC_DRIVERS_QT})
 target_link_libraries(fceux11_drivers_qt PUBLIC
     fceux11_core
     fceux11_drivers_common
+    fceux11_log_sink
     Qt6::Widgets
     Qt6::OpenGL
     Qt6::OpenGLWidgets

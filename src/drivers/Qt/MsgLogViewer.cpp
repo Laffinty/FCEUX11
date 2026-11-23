@@ -42,150 +42,12 @@
 #include "Qt/fceuWrapper.h"
 #include "Qt/MsgLogViewer.h"
 #include "Qt/ConsoleWindow.h"
+// v2.0.8 C2/C3 O1: the log file sink (Qt-free, so it can be unit tested).
+#include "Qt/log_sink.h"
 
-#define MSG_LOG_MAX_LINES 256
+// v2.0.8 C2/C3 O1: one sink for the whole process.
+static fceux11::LogSink& msgLog = fceux11::LogSink::instance();
 
-class msgLogBuf_t
-{
-public:
-	msgLogBuf_t(void)
-	{
-		char filename[512];
-
-#ifdef WIN32
-		if (GetTempPathA(sizeof(filename), filename) > 0)
-		{
-			//printf("PATH: %s \n", filename );
-			safe_strcat( filename, sizeof(filename), "fceux.log");
-		}
-		else
-		{
-			FCEU_strlcpy( filename, sizeof(filename), "fceux.log");
-		}
-#else
-		FCEU_strlcpy( filename, sizeof(filename), "/tmp/fceux.log");
-#endif
-
-		fp = ::fopen(filename, "w+");
-
-		if (fp == NULL)
-		{
-			printf("Error: Failed to open message log file: '%s'\n", filename);
-		}
-		maxLines = MSG_LOG_MAX_LINES;
-		totalLines = 0;
-		head = tail = 0;
-
-		for (int i = 0; i < MSG_LOG_MAX_LINES; i++)
-		{
-			fpOfsList[i] = 0;
-		}
-	}
-
-	~msgLogBuf_t(void)
-	{
-		if (fp != NULL)
-		{
-			::fclose(fp);
-			fp = NULL;
-		}
-	}
-
-	void clear(void)
-	{
-		head = tail = 0;
-	}
-
-	void addLine(const char *txt, bool NewLine = false)
-	{
-		long ofs;
-
-		if (fp == NULL)
-			return;
-
-		::fseek(fp, 0L, SEEK_END);
-
-		ofs = ::ftell(fp);
-
-		if (NewLine)
-		{
-			::fprintf(fp, "%s\n", txt);
-		}
-		else
-		{
-			::fprintf(fp, "%s", txt);
-		}
-
-		fpOfsList[head] = ofs;
-
-		head = (head + 1) % MSG_LOG_MAX_LINES;
-
-		if (head == tail)
-		{
-			tail = (tail + 1) % MSG_LOG_MAX_LINES;
-		}
-
-		totalLines++;
-	}
-
-	size_t getTotalLineCount(void)
-	{
-		return totalLines;
-	}
-
-	size_t size(void)
-	{
-		size_t s;
-
-		s = head - tail;
-
-		if (s < 0)
-		{
-			s += MSG_LOG_MAX_LINES;
-		}
-		return s;
-	}
-
-	void loadTextViewer(QPlainTextEdit *viewer)
-	{
-		long ofs, nbytes;
-
-		if (fp == NULL)
-		{
-			return;
-		}
-
-		if (head == tail)
-		{
-			return;
-		}
-		char buf[65536];
-
-		ofs = fpOfsList[tail];
-
-		::fseek(fp, ofs, SEEK_SET);
-
-		//printf("Seek: %li \n", ofs );
-
-		if ((nbytes = ::fread(buf, 1, sizeof(buf), fp)) > 0)
-		{
-			//printf("READ: %li \n", nbytes );
-			buf[nbytes] = 0;
-			viewer->setPlainText(buf);
-		}
-	}
-
-private:
-	FILE *fp;
-	size_t maxLines;
-	size_t totalLines;
-	size_t head;
-	size_t tail;
-
-	long fpOfsList[MSG_LOG_MAX_LINES];
-};
-
-static msgLogBuf_t msgLog;
 //----------------------------------------------------------------------------
 MsgLogViewDialog_t::MsgLogViewDialog_t(QWidget *parent)
 	: QDialog(parent)
@@ -233,9 +95,11 @@ MsgLogViewDialog_t::MsgLogViewDialog_t(QWidget *parent)
 
 	FCEU_WRAPPER_LOCK();
 
-	msgLog.loadTextViewer(txtView);
+	// v2.0.8 C2/C3 O1: the sink owns the file and the ring; the dialog only
+	// asks for the tail text.
+	txtView->setPlainText(QString::fromStdString(msgLog.tail_text(65536)));
 
-	totalLines = msgLog.getTotalLineCount();
+	totalLines = msgLog.line_count();
 
 	FCEU_WRAPPER_UNLOCK();
 
@@ -294,13 +158,13 @@ void MsgLogViewDialog_t::clearLog(void)
 //----------------------------------------------------------------------------
 void MsgLogViewDialog_t::updatePeriodic(void)
 {
-	if (msgLog.getTotalLineCount() != totalLines)
+	if (msgLog.line_count() != totalLines)
 	{
 		FCEU_WRAPPER_LOCK();
 
-		msgLog.loadTextViewer(txtView);
+		txtView->setPlainText(QString::fromStdString(msgLog.tail_text(65536)));
 
-		totalLines = msgLog.getTotalLineCount();
+		totalLines = msgLog.line_count();
 
 		FCEU_WRAPPER_UNLOCK();
 
@@ -320,7 +184,7 @@ void msgLog_Message(const char *text)
 	fputs(text, stdout);
 	//fprintf(stdout, "\n");
 	//
-	msgLog.addLine(text, false);
+	msgLog.append(text, false);
 }
 //----------------------------------------------------------------------------
 /**
@@ -335,7 +199,7 @@ void msgLog_PrintError(const char *errormsg)
 {
 	fprintf(stderr, "%s\n", errormsg);
 
-	msgLog.addLine(errormsg, true);
+	msgLog.append(errormsg, true);
 
 	if (consoleWindow)
 	{

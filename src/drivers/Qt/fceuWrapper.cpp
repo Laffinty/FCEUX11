@@ -40,6 +40,10 @@
 #include "Qt/fceuWrapper.h"
 #include "Qt/sram_flush.h"
 #include <chrono>
+// v2.0.8 C2/C3 O1: the message-log sink (Qt-free) and the core API that
+// exposes the base directory.
+#include "Qt/log_sink.h"
+#include "io_api.h"
 #include "gba_load.h"
 #include "Qt/input.h"
 #include "input/input_manager.h"
@@ -767,6 +771,12 @@ int  fceuWrapperInit( int argc, char *argv[] )
 		printf("Error: Could not initialize configuration system\n");
 		exit(-1);
 	}
+
+	// v2.0.8 C2/C3 O1: the base directory only exists from here on, so this
+	// is where the message-log sink gets pointed at <base>/logs/. Anything
+	// logged before this point was kept in memory and is flushed into the
+	// file now.
+	fceux11::LogSink::instance().open_for_base(fceu11::GetBaseDirectory());
 
 	// initialize the infrastructure
 	error = fceu11::Initialize();

@@ -263,3 +263,34 @@
   设计要点：O1 抽 `log_sink.{h,cpp}` 无 Qt 依赖部分以便可测；O2 拆「数据组装
   纯函数」与「对话框外壳」以便单测；O3 顺序 O1→O3→O2 调整为 **O1→O2→O3**
   （对话框先落地，菜单才有入口可挂）。
+- **r2（2026-11-23）P1 开工（O1 步骤 1-3 + O1a/O1b 锁）**。
+- **r3（2026-11-23）P1 完成**：**落地五件**：`src/drivers/Qt/log_sink.{h,cpp}`
+  （**零 Qt 依赖**的 sink：路径推导 / 延迟打开 / 互斥量 / 环形缓冲 / `flush()` /
+  `close()`）、`src/CMakeLists.txt`（新增 `fceux11_log_sink` 静态库，drivers_qt
+  PUBLIC 依赖 ⇒ GUI 与测试**跑同一份代码**）、`MsgLogViewer.cpp`（删旧
+  `msgLogBuf_t` 143 行，改用 LogSink；viewer 改为读 `tail_text()`）、
+  `fceuWrapper.cpp`（`InitConfig()` 之后 `open_for_base(GetBaseDirectory())`
+  ⇒ **base 目录就绪即重定向**，早期消息进内存缓冲后一次性刷入，**只有一个日志
+  文件**）、新 ctest `log_sink_test`（**15 腿**）。
+  - **行为变化**：日志落点 `%TEMP%\fceux.log` → `<base>/logs/fceux11_log.txt`；
+    **打开模式 `"w+"` → `"a"`（重启不再截断）**；文件名去掉上游的 `fceux.log`。
+  - **测试抓出两个真缺陷（锁的价值）**：① **sink 从不 flush** ⇒ 文件内容滞后，
+    读者看到旧数据（O1b5/O1b6 红）⇒ 补 `flush()`；② **收尾 `remove_all` 时
+    文件仍被打开** ⇒ Windows 共享冲突抛异常 ⇒ terminate（0xC0000409）⇒ 补
+    `close()` 并在测试里先 close 再删。
+  - **⚠️ 两条哑弹腿的教训（纪律 3 的又一次）**：初版 O1b **去掉锁后仍全绿**——
+    原因：**MSVC 的 stdio 内部自带每-FILE 锁**，文件写不撕；真正的竞争在环形
+    状态与读侧 ⇒ 强化为「并发读者校验尾文本每行完整」+「文件内容逐行计数」；
+    初版 O1a5/O1a6 **破回落后仍全绿**——断言只查「路径非空 + 含文件名」，
+    相对路径也满足 ⇒ 改为断言「**绝对路径** +「父目录名为 `fceux11`」。
+    **最终两条变异腿均可靠红**：去锁 ⇒ O1b5/O1b6 红（**5/5 次复现**）；破回落
+    ⇒ O1a6/O1a7 红。
+  - **⚠️ 一次误判的更正**：初见目标 exe 仅 76 KB 且无导入，我判为「坑 13 的 LTCG
+    病态」并按先例加了 `/GL-`；**实测该 exe 正常**——测试只用 sink、不引用任何
+    Qt 符号 ⇒ 静态链接**不拉** Qt 导入，80 KB 是正常结果；真因是上面的运行时
+    崩溃（stdout 管道缓冲 ⇒ 崩溃时输出全丢，误判为「崩在 main 之前」）。
+    **`/GL-` 已撤销**（不需要），并记：「本机没有 `strings`/`dumpbin` ⇒ 用
+    `strings` 判「exe 无内容」会得出假结论；改用 Python 读字节验证」。
+  - **另一条实测教训**：`cmd` 的 `%ERRORLEVEL%` 之外，**stdout 管道缓冲**会让
+    崩溃前的输出全部消失 ⇒ 新的 C++ 测试一律 `setvbuf(stdout, nullptr, _IONBF, 0)`
+    （与 `sram_flush_test` / `crash_dump_test` 一致）。

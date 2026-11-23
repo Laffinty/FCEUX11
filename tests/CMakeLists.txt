@@ -116,6 +116,15 @@ if(FCEUX11_BUILD_TESTS)
     add_test(NAME crash_dump_test COMMAND fceux11_crash_dump_test)
     set_tests_properties(crash_dump_test PROPERTIES TIMEOUT 180)
 
+    # v2.0.8 C2/C3 O1 (P1) — message-log sink: path derivation and
+    # concurrent-write safety (legs O1a/O1b).
+    fceux11_add_test_executable(fceux11_log_sink_test
+        f11qa/log_sink_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME log_sink_test COMMAND fceux11_log_sink_test)
+    set_tests_properties(log_sink_test PROPERTIES TIMEOUT 180)
+
     # Mapper regression tests (Task 1.1)
     fceux11_add_test_executable(fceux11_mapper_load_test
         f11qa/boards/mapper_load_test.cpp
