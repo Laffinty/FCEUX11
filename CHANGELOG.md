@@ -5,6 +5,114 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — v2.0.8 批次进行中
+
+> 本节收录 **v2.0.8 批次**（许可证合规 + 崩溃韧性）已落地但**尚未发布**的变更。
+> 发布时由维护者改写为 `## [2.0.8]` 并同步 `src/version.h`；**tag 与发布流水线
+> dispatch 不在本批次范围内**。
+
+### Added — 本地崩溃报告：崩溃后留下 minidump 与摘要行（零外发）
+
+- **动机**：此前任何崩溃都是**静默进程死亡**——无转储、无记录，用户手里没有
+  任何可上报的材料。业主裁决 **D1 = 本地 minidump**（不接 Sentry、不做任何
+  云端遥测；文件不离开本机，除非用户自己复制）。
+- **实现**：新增 `src/crash_handler.{h,cpp}`（core 层、零 Qt 依赖、头文件不
+  含 windows.h）。安装点 = `main()` 内 `fceux_diag::install()` 之后、
+  QApplication 之前——**启动期崩溃正是本设施的目标场景**。
+  覆盖面 = `SetUnhandledExceptionFilter`（SEH filter）**加上** CRT 失败族
+  （`_set_invalid_parameter_handler` / `_set_purecall_handler` /
+  `std::set_terminate` / `signal(SIGABRT)`）；后者没有异常上下文，写当前进程
+  快照并以 `source` 字段区分（terminate / abort / purecall / invalid-parameter）。
+- **产出**：`<crash dir>/fceux11_<yyyymmdd_hhmmss>_<pid>.dmp`（Windows minidump，
+  `MiniDumpNormal`，可用 WinDbg 直接打开）＋ `<crash dir>/crash_log.txt`
+  （每次崩溃追加一行：时间 / 版本 / source / 异常码 / 异常地址 / pid / dump 名）。
+  崩溃目录优先取 `<base dir>/crashes`（与 `fcs`/`sav`/`snaps` 同层），**base
+  目录未知时回落 exe 目录**，再回落 `%TEMP%`。
+- **纪律**：filter 内零 UI、最小分配、重入守卫（崩溃处理自身再崩不会递归）；
+  返回 `EXCEPTION_CONTINUE_SEARCH` 把异常**交还 Windows Error Reporting**
+  （不吞进程）。`.gitignore` 已加 `/crashes/`。
+- **人工验收探针**：`FCEUX11_TEST_CRASH=1` 启动即受控崩溃一次（release 构建
+  亦可用），用于手工验证整条链路；实测产出 61 KB 的 `MDMP` 转储 + 摘要行。
+- **门禁**：新 ctest `crash_dump_test`（9 腿）——断言转储**存在且非空**（捕获
+  内容非零，防哑弹门禁）、摘要含 source/code/version、不可用目录干净失败。
+
+### Added — NES 电池存档周期落盘：崩溃不再清零存档进度
+
+- **动机**：`.sav` 此前**只在关闭游戏时写盘**（`iNESGI`/`UNIFGI` 的
+  `GI_CLOSE`）⇒ 进程崩溃 = 丢失自装载以来的全部电池存档进度。第三方调研
+  报告把它列为 P0「数据丢失」，经核实属实。
+- **实现**（五步链路）：① `GI_SAVESRAM = 5` 枚举（`fceu.h`）＋ iNESGI /
+  UNIFGI 两个分发器加 case（**只存档、不做 Close 拆除**）；② core 入口
+  `FCEU_FlushGameSave()`（`GameInfo`/`GameInterface` 判空后路由，GBA 会话与
+  装载失败窗口天然 no-op）；③ 驱动层 tick（`fceuWrapper.cpp` 的 NES 分支、
+  `DoFun` 之后、wrapper 锁内——与写 SaveGame 缓冲的是同一线程 ⇒ 快照一致、
+  零新增锁）；④ Rust 侧 `atomic_write_file`（写 `<path>.tmp` 再 rename）——
+  **崩溃写一半不再留下截断的 `.sav`**；⑤ 配置项 `SDL.SRAMFlushInterval`
+  （默认 **30 秒**，`0` = 关闭）。
+- **语义**：计时用墙钟（`steady_clock`）⇒ turbo 不会把周期变成「N 帧」而狂写
+  盘；首次调用只立基准不写盘（装载后第 0 帧不落盘）；到期才写且基准随写移动
+  （不会连写）。
+- **门禁**：新 ctest `sram_flush_test`（分发语义 6 腿：no-op / 分发路由 /
+  电池门）与 `sram_flush_tick_test`（周期决策 13 腿：禁用 / armed / 到期 /
+  基准移动 / 重启用重新 armed），另有 formats crate 的原子写锁 2 条
+  （失败注入 writer ⇒ 目标文件分毫不动 + tmp 清理）。全部做过**双向变异验证**
+  （把修复前的值改回去必须转红）。
+
+### Added — 源码许可证头补全（283 个文件）＋ CI 门禁
+
+- **动机**：第三方调研报告的 P0「合规风险」。核实结论：属实但数字过时——报告称
+  332 个文件缺声明，2026-11-22 实测为 **341** 个（660 个 C/C++ 文件中）。
+- **做法**：把文件分为三桶——**A 项目自建**（152）补项目头、**B 上游继承**
+  （131）补上游标准头并**保留原有版权行**、**C 第三方/生成**（58）**不盖章**而
+  是在白名单登记其自身许可。自审过程中**拦下 50 个会被错误标注为 GPL 的
+  第三方文件**（LGPL-2.1 的 hq2x/hq3x/nes_ntsc、MIT 的 emufile 与 TAS Editor、
+  BSD-3 的 gwavi/avi、Unicode Inc. 的 ConvertUTF.h 及其伴生头）——按其自身条款
+  登记才是正确处置。emu2413 的原始许可经联机取证（三期宽松许可，最现行 MIT
+  覆盖 2001–2019）后登记。
+- **门禁**：新增 `scripts/license_headers/check.py`（纯标准库）并接入 CI
+  （Checkout 之后第一步）——任何新文件漏头即红；配套 `classify.py` /
+  `stamp.py`（字节级前置插入，保留 BOM 与行尾）留作可复现工具。
+- **Rust 侧**：workspace 与 7 个 crate 补 `license = "GPL-2.0-or-later"` 元数据；
+  vendor 的 `gba-core` **保持 MIT 不动**。
+
+### Fixed — CI 的 ctest 路径注入漏项导致测试静默挂死 25 分钟
+
+- **症状**：`sram_flush_test` 自加入起，CI 的 CTest 步骤每次都跑满 1500 秒
+  超时被杀，**且日志零输出**（进程根本没进 main）。本地始终全绿。
+- **根因**：`tests/CMakeLists.txt` 给 ctest 注入 vcpkg 运行时 PATH 的方式是
+  **按测试名单手工维护**，新测试不在名单里 ⇒ CI 上该 exe 运行时 PATH 无 vcpkg
+  目录 ⇒ 它导入的 `SDL2.dll` / `Qt6*.dll` 解析不到 ⇒ **Windows 加载器弹出
+  「找不到 DLL」对话框** ⇒ **runner 无交互桌面 ⇒ 对话框永久阻塞**。本地是
+  POSIX loader，故直接报错退出——同一根因两种表现。
+- **修法**：改为对**全部**测试注入 PATH（`get_property(TESTS)` +
+  `set_tests_properties`），不再依赖手工名单；`ci.yml` 与 `f11qa.yml` 的 ctest
+  步骤另加 PATH 前置作为双保险；f11qa 的 `continue-on-error` 保留，但失败测试
+  名改为以注解形式显式可见（此前同一挂死被它静默吞掉）。
+- **旁证修复**：CI 的 check-run `output.summary` 镜像通道实测从未生效（连成功
+  的 run 也为空），改由**注解**承载失败信息——该通道已验证对无 admin 权限者
+  可读。
+
+### Changed — 用户可感知的行为变化
+
+- **运行中的 `.sav` 文件 mtime 会周期更新**（默认每 30 秒一次）。这是上面
+  「周期落盘」的直接结果；`SDL.SRAMFlushInterval=0` 可关闭，关闭时行为与
+  改前逐字相同。**NES 侧没有 GBA 那样的脏标志**（GBA 有
+  `gba_battery_take_dirty`）⇒ 即便游戏没写存档也会定期写一次盘（8 KB 量级，
+  开销可忽略但不是零写）。要消除需给 CartInfo 加脏标记，属长尾。
+- **崩溃后会在 base 目录或 exe 目录留下 `crashes/`**（minidump + 摘要）。
+  ⚠️ **转储含用户 ROM 数据 ⇒ 属本地敏感文件，绝不自动上传**；不提交进版本库
+  （`.gitignore` 已排除）。
+
+### Known limitations（本批次新增登记）
+
+- 崩溃转储**没有保留策略**：长期使用会累积 `.dmp` 文件（当前每次崩溃一个，
+  约数十 KB～数 MB），需手工清理。
+- 崩溃摘要里的版本号取自 `src/version.h`（v2.0.8 发布前仍显示旧版本号，
+  发布时自动带出）。
+- **CI 仍无 cargo 环节** ⇒ 全部 Rust 锁测试（formats / GBA / debug / media /
+  utils / lua / f11qa）**只在本地跑，不在 CI 跑**。本批次新增的原子写锁同此。
+  建议单独立项补一条 cargo 门禁步骤。
+
 ## [2.0.7] — 2026-11-21
 
 ### Removed — GBA 游戏画面的 BETA 水印（初步认可兼容性；BETA 状态本身不变）

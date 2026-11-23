@@ -435,3 +435,18 @@
     CI 读数未人工复核（本机无 gh CLI，Actions 页可看：e0ff625 起首次跑
     `sram_flush_test` + License header check 第二次）。逐阶段细节见批 2 专项文档
     r1–r6。
+- **r6（2026-11-23）批 2 收口（P5 完成）**：批 2 的 P1–P5 全部落地并推送——
+  **P1** `e0ff625`（`GI_SAVESRAM` 分发 + `FCEU_FlushGameSave` + `sram_flush_test`）、
+  **P2** `c5b2a8a`（cart.rs `atomic_write_file` 原子写 + formats 锁）、
+  **P3** `5994dab`（周期 tick + `SDL.SRAMFlushInterval` + `sram_flush_tick_test`）、
+  **P4** `cb2cd7c`（本地 minidump 崩溃报告 + `crash_dump_test`）、
+  **P5**（C3 验证收尾 + CHANGELOG `[Unreleased]` 段 + AGENTS.md 登记 + 全表收口）。
+  ⇒ **批 2 收口**。**收口读数**：全量构建 BUILD_EXIT=0 · `ctest -LE perf`
+  **52/52** · `check.py` EXIT=0（660 扫描 / 58 白名单）· Rust 八条全绿
+  （**303+20i / 249 / 94 / 52 / 160 / 51 / 54 / 184**）· CI：P3/P4 两提交
+  **build-windows + f11qa 均 success**。
+  **CHANGELOG 口径**：本批**未发布** ⇒ 变更写在 `## [Unreleased] — v2.0.8 批次
+  进行中`；**版本号提升 / `## [2.0.8]` 定稿 / tag / release.yml dispatch 属发布
+  动作，等业主明示**（本批未擅自改 `src/version.h`）。
+  **下一步**：批 3（观测能力：`msgLogBuf_t` 落盘升级 + 诊断对话框 + Diagnostics
+  二级菜单）。

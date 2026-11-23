@@ -33,7 +33,7 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 | `docs/history/plans/FCEUX11-v2.0.5_音视频异常缓慢-稳定性审计报告-2026-11-19.md` | **已收口归档（2026-11-19，随阶段 3 收口；内容冻结）**：「音视频异常缓慢」的全量审计——静态 8 条候选（A1–A8）+ 13 组实测矩阵 + 否定证清单。**A1 机制钉死 + 触发门槛量化**（探测 >≈455 ms 才可达）；§十一 三处结论更正（A6 复用分支可达 / §5.4 可达 / 覆盖面收窄）；r3 追记 **A5 实测裁决 = 登记不修**（LQ ≈0.15% / HQ ≈1.1% 帧时间，用户不可感）。取证素材（脚本/截图）在 `.zcode/soundprobe/`（gitignored） |
 | `docs/history/plans/FCEUX11-v2.0.5_A1音频探测线程修复-构建计划.md` | **已收口归档（2026-11-19，r6；内容冻结）**：审计报告 §9.2 建议的修复线，业主逐阶段开工——**阶段 1** A1+A2（`audio_probe_gate.{h,cpp}`，窗口冻结 13 981 ms → 0 ms 实测消除）、**阶段 2** 停排空自旋（`audio_sink_wait.h`，0.5 fps → 60 fps 实测消除）、**阶段 3** A3（`SDL_AUDIODRIVER` 作用域化 + sticky，`audio_driver_fallback.h`）+ GBA 节流残留（翻转检测移出 GBA 分支，NES 不再被钉 59.7275 fps）+ A5 实测登记 + §5.4 登记不改。诊断开关：`FCEUX11_AUDIO_TRACE` / `FCEUX11_TEST_AUDIO_OPEN_DELAY_MS` / `FCEUX11_TEST_AUDIO_STALL`。门禁 `ctest -LE perf` 47 → 49 |
 | `docs/plans/FCEUX11-v2.0.8_许可证合规与崩溃韧性-构建计划.md` | **在途（2026-11-22 立项，r1–r4；批 1 已落地推送 29560c7）**：第三方调研报告三条主张的承接线——**批 1 许可证头**（341 个 C/C++ 文件实测无 GPL 文本，分 A 项目自建 / B 上游继承 / C 真第三方三桶，C 桶不盖章；盖章脚本保 BOM/CRLF + `check.py` 进 CI；Rust 侧只补 Cargo.toml 元数据，gba-core 保持 MIT）/ **批 2 崩溃韧性**（专项文档见下行；SRAM 周期落盘根治「崩溃丢电池存档」——`FCEU_SaveGameSave` 此前仅 GI_CLOSE 调用；本地 minidump 崩溃转储，业主裁决 D1 不接 Sentry）/ **批 3 观测**（msgLogBuf_t 落盘升级——既有 `%TEMP%\fceux.log` sink 三缺陷 + addLine 无锁竞争；诊断对话框；D2 裁决 Advanced 下新增 Diagnostics 二级菜单）。⚠️ 报告本身有事实偏差，**§一 实测事实底座与 §六 偏差附录为准，别照报告抄**；批 1 成果记录见 COPYRIGHT_AUDIT.md §6 |
-| `docs/plans/FCEUX11-v2.0.8-批2-崩溃韧性-构建计划.md` | **在途（2026-11-22 立项 r1，主计划 r4）**：批 2 专项细化——**C1** SRAM 周期落盘五步链路（`GI_SAVESRAM=5` 枚举 → iNESGI/UNIFGI case → `FCEU_FlushGameSave` → fceuWrapper.cpp 驱动层 tick（steady_clock + `SDL.SRAMFlushInterval` 默认 30/0=关，emu 线程锁内、暂停不刷、墙钟限频）→ cart.rs `atomic_write_file` tmp+rename 原子写）/ **C2** `crash_handler.{h,cpp}`（SEH filter + CRT 补丁族 → `MiniDumpWriteDump` → `FCEUMKF_CRASH`=`crashes/` + crash_log.txt + 探针 `FCEUX11_TEST_CRASH=1`，main.cpp:332 安装）/ **C3** **已证实存在**（`fceu11_gba_flush_battery` gba_load.cpp:241——脏标志+限频+每帧+关闭强刷 ⇒ 转验证项零新代码）。变异腿 M1–M7；门禁 ctest 49→51、formats 158→160；阶段编排 P1–P5；**GI 分发器五路全貌**（iNESGI/UNIFGI 有电池面）在其 §一 |
+| `docs/plans/FCEUX11-v2.0.8-批2-崩溃韧性-构建计划.md` | **在途（2026-11-22 立项 r1 → 2026-11-23 批 2 收口 r15；主计划 r4/r6）**：批 2 专项细化——**C1** SRAM 周期落盘五步链路（`GI_SAVESRAM=5` 枚举 → iNESGI/UNIFGI case → `FCEU_FlushGameSave` → fceuWrapper.cpp 驱动层 tick（steady_clock + `SDL.SRAMFlushInterval` 默认 30/0=关，emu 线程锁内、暂停不刷、墙钟限频）→ cart.rs `atomic_write_file` tmp+rename 原子写）/ **C2** `crash_handler.{h,cpp}`（SEH filter + CRT 补丁族 → `MiniDumpWriteDump` → `<base>/crashes/` + crash_log.txt + 探针 `FCEUX11_TEST_CRASH=1`，main.cpp 安装，**零外发 D1 口径**）/ **C3** **已证实存在**（`fceu11_gba_flush_battery` gba_load.cpp:241——脏标志+1 秒限频+每帧+关闭强刷 ⇒ **验证项零代码**，P5 复核通过）。**落地读数**：P1 `e0ff625` / P2 `c5b2a8a` / P3 `5994dab` / P4 `cb2cd7c` 全部已推；门禁 **ctest 49→52**、**formats 158→160**；CI 事故（ctest PATH 注入手工名单漏项 ⇒ 缺 DLL ⇒ Windows 弹框 ⇒ runner 永久阻塞）已在 `a8096cc` 修复并定谳（build-windows=success）；**GI 分发器五路全貌**（iNESGI/UNIFGI 有电池面）在其 §一 |
 | `src/rust/crates/gba-core/ATTRIBUTION.md` | 上游出处、本地补丁集**逐处**说明、重新 vendor 流程 |
 | `COPYRIGHT_AUDIT.md` §5 | Rust vendor 树在 `src/` C/C++ 扫描范围之外的归属声明 |
 
@@ -259,8 +259,11 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 > **已于 2026-11-12 由 CI 复核通过**（`main` 发布提交 `45fec33` 上 CI #320 / F11QA #95 全绿）。
 
 > ⚠️ **不变式 1 的判据是 F11QA 矩阵 `108P/12F`**，本机跑的是它的**本地近似**
-> `ctest`。**本地确定性门禁 = `ctest -LE perf`（49 项，须全绿；计数随新增测试增长，
-> 以 `ctest -N -LE perf` 的 `Total Tests` 为准）**（v2.0.5 音视频线收口起为 49 项：47（A1 与
+> `ctest`。**本地确定性门禁 = `ctest -LE perf`（52 项，须全绿；计数随新增测试增长，
+> 以 `ctest -N -LE perf` 的 `Total Tests` 为准）**（v2.0.8 批 2 收口起为 52 项：49 +
+> `sram_flush_test`（电池存档周期落盘的分发语义）+ `sram_flush_tick_test`（周期决策）
+> + `crash_dump_test`（本地 minidump 崩溃报告）——三项均带**双向变异验证**；
+> v2.0.5 音视频线收口起为 49 项：47（A1 与
 > 阶段 2 之后）+ 本阶段 audio_driver_fallback_test（A3）+ gba_throttle_reset_guard_test（GBA 节流复位守卫）；
 > r15 起曾为 41 项：新增
 > `lua_runner_rejects_failed_script`（脚本带 Lua 错误 ⇒ runner 必须非零退出）与
@@ -272,6 +275,11 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 > 漂移 +23% —— 同一构建热采 132.9 / 套件内 ~145 / 套件后 ~163 ms，2.5/5/10%
 > 容差都实测假红过；基线随全量重链重采，读数只用来追大幅持续回退，历史真回归
 > 量级是 +100%）。跑 ctest 时仍不要与构建/测试任务并行（并行会污染测量，r54 ②）。
+> ⚠️ **ctest 的 PATH 注入已改为覆盖全部测试**（v2.0.8 r9）：此前是手工名单，
+> 新测试漏项 ⇒ CI 上 exe 缺 `SDL2.dll`/`Qt6*.dll` ⇒ **Windows 加载器弹框**
+> ⇒ 无桌面 runner 永久阻塞（**静默挂死 1500 s 且零输出**，本地因 POSIX
+> loader 报错退出而假绿）。**新增测试不必再手工登记名单**，但仍须确认
+> `ctest --show-only=json-v1` 里它的 `ENVIRONMENT_MODIFICATION` 在列。
 >
 > ⚠️ **GBA 的「画面与声音是否真的对」无法穷尽验证。** 现有资产是 MKSC 与 SMA4
 > 两张商业卡带（S4 已用于实测）；差分参照 mGBA 0.10.5 在 `Research_only/`
@@ -520,8 +528,10 @@ cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo tes
 cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p fceux11-media"
 # **FC loader/formats crate（r8 补录，2026-11-10）**：此前的门禁清单漏了它——
 # `fceux11-formats` 的 150 项测试**一次都没被任何命令跑过**（纪律 10 的活例）。
-# v2.0.3 S4（FC 侧修复批次）要动 iNES loader，这条是它的门禁；基线 **153 项全绿**
-# （r9 加 1 条 S4 锁 + r11 加 2 条 S5 锁；r12 V20 再加 1 条 = 154）。
+# v2.0.3 S4（FC 侧修复批次）要动 iNES loader，这条是它的门禁；基线 **160 项全绿**
+# （r9 加 1 条 S4 锁 + r11 加 2 条 S5 锁；r12 V20 再加 1 条 = 154；v2.0.8 批 2
+# P2 原子写锁 +2 = 156/158，末次实测 **160/0**）。
+# ⚠️ **该 crate 的锁不在 CI 跑**（CI 无 cargo 环节）——只在本地生效，见门禁节说明。
 cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p fceux11-formats --lib"
 # **utils crate（r8 补录）**：V24 的 5 条锁在此；基线 **51 项全绿**。
 cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p fceux11-utils --lib"
