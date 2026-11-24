@@ -10,7 +10,13 @@
 #   preflight  -> version from src/version.h, all 12 web pages already carry
 #                 that version, CHANGELOG has the section, both notes sources
 #                 parse, the tag does not already exist.
-#   gate-ci    -> CI, F11QA and Deploy Pages must all be green for this commit.
+#   gate-ci    -> F11QA and Deploy Pages must both be green for this commit.
+#                 (v2.0.9: the separate "CI" workflow was removed and all of
+#                 its checks were folded into F11QA, which is therefore the
+#                 single build+test gate. The gate script's
+#                 BUILD_TEST_WORKFLOWS list was updated to match -- leaving
+#                 "CI" in it would have made every release wait for a
+#                 workflow that no longer exists.)
 #   build      -> full Release build + ctest -LE perf (the artifact we ship is
 #                 built here, not reused from another run).
 #   package    -> scripts/copy_dependencies.ps1 -> v2.0.5-style layout ->
