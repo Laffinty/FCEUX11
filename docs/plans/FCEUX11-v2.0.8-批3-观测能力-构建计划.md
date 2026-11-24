@@ -316,3 +316,28 @@
     ⇒ O1d2 红；还原后 26 腿全绿。
   - **测试规模**：`log_sink_test` 15 → **26 腿**（O1a 路径 7 + O1b 并发 7 +
     O1c 轮转 5 + O1d 开关 4）。
+- **r6（2026-11-24）P3 开工**（O2 报告数据组装 + 对话框 + O2a 锁）。
+- **r7（2026-11-24）P3 完成**：
+  - **落地四件**：`src/drivers/Qt/diagnostics_report.{h,cpp}`（**Qt-free** 的
+    数据组装：`DiagnosticsReport` 结构 + `gather_diagnostics()` + `to_text()`）、
+    `src/drivers/Qt/DiagnosticsDialog.{h,cpp}`（`QDialog` + `Q_OBJECT` +
+    `changeEvent(LanguageChange)` 重译，照 `MsgLogViewDialog_t` 形制；四个按钮：
+    复制报告 / 打开日志目录 / 打开崩溃目录 / 关闭；**目录不存在则按钮置灰**）、
+    `src/CMakeLists.txt`（三个新 TU 入 `SRC_DRIVERS_QT`）、
+    `tests/f11qa/diagnostics_report_test.cpp`（**12 腿** O2a）+ CMake 注册。
+  - **数据面零新增埋点**（§1.2 的结论兑现）：帧计数 = `nes_shm->render_count`/
+    `blit_count`；音频欠载 = `nes_shm->sndBuf.starveCounter`；ROM 名/路径/MD5 =
+    `GameInfo`（GBA 会话为 null ⇒ 报告如实显示「无 ROM」）；mapper/CRC32 =
+    `currCartInfo`；标称帧率 = `getBaseFrameRate()`；日志文件 =
+    `LogSink::current_path()` + 尺寸；崩溃留痕 = `crash_dump_dir()` 下 `.dmp`
+    计数 + 最新一份（复用批 2 的目录约定，无重复实现）。
+  - **变异腿闭合**：报告组装去掉版本串 ⇒ **O2a1 红**；还原后 12 腿全绿。
+  - **实施期两处修正**：① 首版 O2a2 断言「base 目录非空」红——查证为**环境事实**
+    （headless 下 `InitConfig()` 从不运行 ⇒ base 本就空），改为**测试自设 base
+    再断言报告等于它**（这才是有牙的验证：证明报告读的是 base 目录而非工作目录）；
+    ② `cart.h` 的 include 顺序坑再次命中（`DECLFR/DECLFW` 由 `fceu.h` 定义）
+    ——**同一坑在 P1 与 P3 各踩一次，已在两处文档留档**。
+  - **门禁**：全量构建 EXIT=0 + `ctest -LE perf` **54/54** + check.py EXIT=0。
+  - **人工项（业主侧）**：三态各开一次对话框（无游戏 / NES 会话 / GBA 会话）——
+    界面无乱码、数值合理；「打开日志目录」「打开崩溃目录」在目录存在/不存在两种
+    情形下行为正确（不存在时按钮置灰）。**P3 的对话框尚未接入菜单**（那是 P4）。

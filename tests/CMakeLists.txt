@@ -125,6 +125,15 @@ if(FCEUX11_BUILD_TESTS)
     add_test(NAME log_sink_test COMMAND fceux11_log_sink_test)
     set_tests_properties(log_sink_test PROPERTIES TIMEOUT 180)
 
+    # v2.0.8 C2/C3 O2 (P3) — diagnostics report assembly (leg O2a): must be
+    # gatherable with no game loaded and must carry the version/base dir.
+    fceux11_add_test_executable(fceux11_diagnostics_report_test
+        f11qa/diagnostics_report_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME diagnostics_report_test COMMAND fceux11_diagnostics_report_test)
+    set_tests_properties(diagnostics_report_test PROPERTIES TIMEOUT 180)
+
     # Mapper regression tests (Task 1.1)
     fceux11_add_test_executable(fceux11_mapper_load_test
         f11qa/boards/mapper_load_test.cpp
