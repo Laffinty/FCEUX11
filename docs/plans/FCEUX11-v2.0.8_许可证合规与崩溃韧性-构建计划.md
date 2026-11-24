@@ -449,8 +449,7 @@
   进行中`；**版本号提升 / `## [2.0.8]` 定稿 / tag / release.yml dispatch 属发布
   动作，等业主明示**（本批未擅自改 `src/version.h`）。
   **下一步**：批 3（观测能力：`msgLogBuf_t` 落盘升级 + 诊断对话框 + Diagnostics
-  二级菜单）。
-- **r7（2026-11-23）批 3 独立建档**：业主指示参照批 2 模式立专项文档——
+  二级菜单）。- **r7（2026-11-23）批 3 独立建档**：业主指示参照批 2 模式立专项文档——
   `docs/plans/FCEUX11-v2.0.8-批3-观测能力-构建计划.md`（r1）。只读调查钉死三组坐标：
   ① **日志 sink 四缺陷**（`MsgLogViewer.cpp`）：`%TEMP%\fceux.log` 不可寻（`:56`）、
   `"w+"` 每次启动截断（`:69`）、`addLine` **无锁**（`:99`；`FCEUD_Message` 确来自
@@ -465,3 +464,21 @@
   `i18n_coverage.ps1`（zh_CN/zh_TW ≥95%、其余 ≥90%）+ `check_simp_trad.ps1`；
   **i18n 源串冻结规则** ⇒ O3 的约 5–9 个新源串**必须走 `[i18n-string-add]` 全流程**。
   阶段编排 P1–P5（O1 两段 + O2 + O3 + 收口），门禁预期 ctest 52 → 55。
+- **r8（2026-11-23 夜）批 3 落地（P1–P4）**：P1 `7557afa`（日志 sink：路径/延迟
+  开/互斥量/追加不截断，15 腿）· P2 `78d329c`（轮转 + `SDL.LogToFile` 开关 +
+  环形缓冲改内存持有 + 错误级 urgent，26 腿）· P3 `807f572`（诊断对话框：
+  `diagnostics_report` 数据组装 Qt-free + `DiagnosticsDialog`，12 腿）·
+  P4 `7c23b2a` + `3cb06dd`（Advanced → **Diagnostics 二级菜单** + **i18n 全
+  流程**：14 源串 × 12 语言手写 .ts，本机无 lupdate；三个脚本门禁全绿）。
+  **过程中三次踩「哑弹腿/误判」并当场纠正**（去锁仍全绿⇒MSVC stdio 自带每-FILE
+  锁；80 KB exe 误判为 LTCG 病态；base 目录断言把环境事实当实现错）——细节见
+  批 3 专项文档 r3/r5/r7/r9。
+- **r9（2026-11-24）v2.0.8 收口（P5）**：**三批全部完成**。版本口径提升
+  （`version.h` PATCH 7→8 ⇒ NUMERIC 20008；CHANGELOG `## [2.0.8]` 定稿；
+  readme 徽章 v2.0.8 + 功能表新增「可靠性与观测」行 + 日志/崩溃留痕位置说明；
+  AGENTS.md 治理表两行 + 门禁节计数 52→54）。
+  ⚠️ **明确未做（等业主指令）：未打 tag、未 dispatch release.yml、未打包发布
+  zip**。**收口门禁**：全量构建 EXIT=0 · `ctest -LE perf` **54/54** · Rust 八条
+  全绿 · `check.py` EXIT=0 · 三脚本门禁全绿。
+  **下一步**：发布动作（tag + dispatch + zip）待业主明示；批 3 的**人工三项**
+  （对话框三态、两个「打开目录」按钮、Diagnostics 菜单四项）仍待业主侧过一遍。

@@ -5,11 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — v2.0.8 批次进行中
+## [2.0.8] — 2026-11-24
 
-> 本节收录 **v2.0.8 批次**（许可证合规 + 崩溃韧性）已落地但**尚未发布**的变更。
-> 发布时由维护者改写为 `## [2.0.8]` 并同步 `src/version.h`；**tag 与发布流水线
-> dispatch 不在本批次范围内**。
+> **发布动作待业主指令**：本节内容已冻结、`src/version.h` 已提升到 2.0.8
+> （NUMERIC 20008）；**尚未打 tag、未触发发布流水线、未打包**。
+>
+> 本版主题：**许可证合规 + 崩溃韧性 + 观测能力**（承接第三方调研报告的三条
+> P0/P1 主张；报告本身的数字与结论已逐条核验，见各节与 `docs/plans/`）。
+
+### Added — 观测能力：日志落盘升级 + 诊断对话框 + Diagnostics 菜单
+
+- **消息日志落盘**（`src/drivers/Qt/log_sink.{h,cpp}`，**零 Qt 依赖的独立库**，
+  GUI 与无头测试跑同一份代码）：落点从上游的 `%TEMP%\fceux.log` 迁到
+  **`<base>/logs/fceux11_log.txt`**；**打开模式 `"w+"` → `"a"`（重启不再截断）**；
+  文件打开时机**延迟到 base 目录就绪之后**（此前是静态初始化期就打开，那时
+  base 目录还不存在）⇒ 启动早期消息先进内存缓冲、随后一次性刷入，
+  **全程只有一个日志文件**；**并发写加锁**（此前模拟线程与 GUI 线程共用同一个
+  `FILE*` 与环形偏移而无锁）；**轮转**（5 MB 阈值，保留 3 个轮转代
+  `.1/.2/.3`，先关句柄再改名——Windows 上打开的文件不能改名）；
+  **错误级即时落盘**；配置项 **`SDL.LogToFile`**（默认开，关闭后日志视图仍可用
+  ——环形缓冲改为内存持有，视图不再依赖文件）。
+- **诊断对话框**（`DiagnosticsDialog.{h,cpp}` + `diagnostics_report.{h,cpp}`）：
+  一屏汇总**版本 / 构建串 / base 目录 / 当前 ROM（名·路径·mapper·CRC32·MD5）/
+  帧计数 / 标称帧率 / 音频欠载计数 / 日志文件与大小 / 崩溃转储数量与最新一份**；
+  按钮：复制报告到剪贴板 / 打开日志目录 / 打开崩溃目录（目录不存在则置灰）。
+  **零新增埋点**——所有计数器都是既有原子量。
+- **Advanced → Diagnostics 二级菜单**（D2 裁决）：诊断信息… / 打开日志目录 /
+  打开崩溃目录 / 日志写入文件（勾选即改 `SDL.LogToFile`）。
+  **i18n 全流程**：14 个新源串 × **12 种语言**全部补译（zh_CN/zh_TW 走词表与
+  简繁分离规则，其余按仓库既有做法）；`check_menu_slots.py` /
+  `i18n_coverage.ps1` / `check_simp_trad.ps1` 三个门禁全绿。
 
 ### Added — 本地崩溃报告：崩溃后留下 minidump 与摘要行（零外发）
 
@@ -107,11 +132,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - 崩溃转储**没有保留策略**：长期使用会累积 `.dmp` 文件（当前每次崩溃一个，
   约数十 KB～数 MB），需手工清理。
-- 崩溃摘要里的版本号取自 `src/version.h`（v2.0.8 发布前仍显示旧版本号，
-  发布时自动带出）。
 - **CI 仍无 cargo 环节** ⇒ 全部 Rust 锁测试（formats / GBA / debug / media /
   utils / lua / f11qa）**只在本地跑，不在 CI 跑**。本批次新增的原子写锁同此。
   建议单独立项补一条 cargo 门禁步骤。
+- NES 电池存档的周期落盘**没有脏标志**（GBA 侧有 `gba_battery_take_dirty`）
+  ⇒ 即便游戏没写存档也会定期写一次盘（8 KB 量级，开销可忽略但不是零写）；
+  消除它需给 CartInfo 加脏标记，属长尾。
+- 消息日志**每次崩溃/异常退出后仍保留旧内容**（追加模式）⇒ 日志会跨多次运行
+  累积，靠轮转（5 MB × 3 代）控制体量。
 
 ## [2.0.7] — 2026-11-21
 

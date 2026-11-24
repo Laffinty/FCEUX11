@@ -2,7 +2,7 @@
 
 # FCEUX11
 
-[![Version](https://img.shields.io/badge/version-v2.0.7-blue)](https://github.com/Laffinty/FCEUX11/releases)
+[![Version](https://img.shields.io/badge/version-v2.0.8-blue)](https://github.com/Laffinty/FCEUX11/releases)
 [![License](https://img.shields.io/badge/license-GPL--v2-green)](COPYING)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?logo=windows)](https://www.microsoft.com/windows/windows-11)
 [![Qt](https://img.shields.io/badge/Qt-6.8%20LTS-41CD52?logo=qt)](https://www.qt.io)
@@ -29,6 +29,7 @@
 | **精确模拟**：完整支持 NES、Famicom 及各类 Mapper 扩展芯片，画面与音效高度还原。 | **Accurate Emulation**: Full NES / Famicom / mapper support with faithful graphics and audio. |
 | **实验性 GBA 模拟 (BETA)**：支持 ROM 加载、BIOS SWI 系统调用、音频输出、电池存档（`.srm`）、即时存档、手柄输入、整数倍画面缩放；内置诊断探针用于硬件行为定位。 | **Experimental GBA Emulation (BETA)**: ROM loading, BIOS SWI system calls, audio output, battery saves (`.srm`), save states, controller input, and integer-scaled display; a built-in diagnostic probe helps pinpoint hardware behaviour. |
 | **调试工具**：内置 CPU/PPU 调试器、十六进制编辑器、内存搜索与监视、代码/数据日志。 | **Debugging Tools**: CPU/PPU debugger, hex editor, RAM search/watch, code/data logger. |
+| **可靠性与观测**：电池存档周期落盘（崩溃不丢存档，写盘原子化）、崩溃时留下本地 minidump 与摘要、消息日志落盘到 `<base>/logs/`（带轮转），并提供 **Advanced → Diagnostics** 一键查看诊断报告。 | **Reliability & Observability**: periodic, atomic battery-save writes (a crash no longer loses the save), a local minidump plus a summary line after a crash, the message log written to `<base>/logs/` with rotation, and a one-click **Advanced → Diagnostics** report. |
 | **TAS 编辑器**：逐帧录制并精确编辑按键输入，轻松制作工具辅助速通（TAS）录像。 | **TAS Editor**: Frame-by-frame recording and precise input editing for Tool-Assisted Speedruns. |
 | **Lua 脚本**：通过 Lua 接口编写脚本，实现自定义屏幕叠加显示、自动化操作、内存数据读取等高级玩法。 | **Lua Scripting**: Custom on-screen displays, automation, and memory access via Lua. |
 | **录像回放**：录制完整游戏过程并支持回放，可导出为 AVI 视频。 | **Movie Recording**: Record and replay playthroughs, export to AVI. |
@@ -73,6 +74,14 @@ Precompiled binaries are available on the **[GitHub Releases](https://github.com
 
 > **注意**：首次运行时，请确保目标目录具有**写入权限**，以便程序保存配置与存档文件。
 > Ensure the target directory has **write permissions** on first run so the program can save configuration and save-state files.
+
+> **日志与崩溃留痕**：消息日志写在 `<程序目录>/logs/fceux11_log.txt`（自动轮转）；
+> 若程序崩溃，同目录的 `crashes/` 会留下 minidump（`.dmp`）与一行摘要（`crash_log.txt`）。
+> 两者**只写本地、不上传**，可用 **Advanced → Diagnostics** 一键查看诊断报告。
+> The message log is written to `<app dir>/logs/fceux11_log.txt` (with rotation); if the
+> program crashes, `crashes/` in the same directory keeps a minidump (`.dmp`) and a
+> one-line summary (`crash_log.txt`). Both stay **on the machine** — nothing is
+> uploaded — and **Advanced → Diagnostics** shows a one-screen report.
 
 ---
 
