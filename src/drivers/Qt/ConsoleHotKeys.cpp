@@ -21,12 +21,19 @@
 #include <QDesktopServices>
 #include <QMessageBox>
 
+#include <filesystem>
+
 #include "Qt/ConsoleWindow.h"
 #include "Qt/input.h"
 #include "Qt/fceuWrapper.h"
 #include "Qt/AboutWindow.h"
 #include "Qt/MsgLogViewer.h"
 #include "Qt/HelpPages.h"
+// v2.0.8 C2/C3 O3: the diagnostics dialog, the log sink and the crash dump
+// directory (all Qt-free headers).
+#include "Qt/DiagnosticsDialog.h"
+#include "Qt/log_sink.h"
+#include "crash_handler.h"
 
 void consoleWin_t::initHotKeys(void)
 {
@@ -116,12 +123,44 @@ void consoleWin_t::aboutQt(void)
 void consoleWin_t::openMsgLogWin(void)
 {
 	MsgLogViewDialog_t *msgLogWin;
-	
+
 	msgLogWin = new MsgLogViewDialog_t(this);
 
 	msgLogWin->show();
 
 	return;
+}
+
+// v2.0.8 C2/C3 O3 -- the Advanced -> Diagnostics entries.
+void consoleWin_t::openDiagnosticsDialog(void)
+{
+	DiagnosticsDialog_t* diagWin = new DiagnosticsDialog_t(this);
+	diagWin->show();
+}
+
+void consoleWin_t::openLogDirectory(void)
+{
+	const std::string path = fceux11::LogSink::instance().current_path();
+	if (path.empty())
+		return;
+	const std::filesystem::path parent = std::filesystem::path(path).parent_path();
+	if (parent.empty())
+		return;
+	QDesktopServices::openUrl(QUrl::fromLocalFile(QString::fromStdString(parent.string())));
+}
+
+void consoleWin_t::openCrashDirectory(void)
+{
+	const std::string dir = fceux11::crash_dump_dir();
+	if (dir.empty())
+		return;
+	QDesktopServices::openUrl(QUrl::fromLocalFile(QString::fromStdString(dir)));
+}
+
+void consoleWin_t::setLogToFile(bool on)
+{
+	fceux11::LogSink::instance().set_enabled(on);
+	g_config->setOption("SDL.LogToFile", on ? 1 : 0);
 }
 
 void consoleWin_t::openOnlineDocs(void)

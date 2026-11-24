@@ -57,7 +57,9 @@ enum class AdvancedSub : int {
     Memory     = 3,  // cheats / RAM search / RAM watch
     Misc       = 4,  // frame timing / palette editor / avi riff / tas editor
     Settings   = 5,  // input / gamepad / hotkey / palette / timing / stateRec / movieOpt / autoResume
-    COUNT      = 6,
+    // v2.0.8 C2/C3 O3: diagnostics report / log directory / crash dumps.
+    Diagnostics = 6,
+    COUNT      = 7,
 };
 
 /// Returns the localized title for a top-level menu (used by retranslateUi
@@ -83,6 +85,7 @@ inline QString advancedSubTitle(AdvancedSub s)
         case AdvancedSub::Memory:    return QObject::tr("&Memory Tools");
         case AdvancedSub::Misc:      return QObject::tr("&Misc Tools");
         case AdvancedSub::Settings:  return QObject::tr("&Advanced Settings");
+        case AdvancedSub::Diagnostics: return QObject::tr("&Diagnostics");
         default:                     return QString();
     }
 }

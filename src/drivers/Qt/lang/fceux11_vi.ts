@@ -5778,6 +5778,11 @@ Replace file?</source>
         <source>Loading TAS Project</source>
         <translation>Tải dự án TAS</translation>
     </message>
+    <message>
+        <location filename="../MenuCatalog.h" line="86"/>
+        <source>&amp;Diagnostics</source>
+        <translation>&amp;Chẩn đoán</translation>
+    </message>
 </context>
 <context>
     <name>QPianoRoll</name>
@@ -9766,6 +9771,46 @@ Do you wish to save/apply the new settings?</source>
         <source>&amp;Clear Recent ROM List</source>
         <translation>&amp;Xóa danh sách ROM gần đây</translation>
     </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1281"/>
+        <source>&amp;Diagnostic Information...</source>
+        <translation>Thông tin &amp;chẩn đoán...</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1282"/>
+        <source>Show the diagnostics report</source>
+        <translation>Hiển thị báo cáo chẩn đoán</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1287"/>
+        <source>Open the directory that holds the message log</source>
+        <translation>Mở thư mục chứa nhật ký thông báo</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1292"/>
+        <source>Open the directory that holds crash dumps</source>
+        <translation>Mở thư mục chứa tệp sập</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1296"/>
+        <source>&amp;Log to File</source>
+        <translation>Ghi ra tệp &amp;nhật ký</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1297"/>
+        <source>Write the message log to a file</source>
+        <translation>Ghi nhật ký thông báo ra tệp</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1286"/>
+        <source>Open &amp;Log Directory</source>
+        <translation>Mở thư mục &amp;nhật ký</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1291"/>
+        <source>Open &amp;Crash Directory</source>
+        <translation>Mở thư mục &amp;sập</translation>
+    </message>
 </context>
 <context>
     <name>guiColorPickerDialog_t</name>
@@ -11079,6 +11124,34 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ppuViewerPalette.cpp" line="186"/>
         <source>.act</source>
         <translation>.act</translation>
+    </message>
+</context>
+<context>
+    <name>DiagnosticsDialog_t</name>
+    <message>
+        <location filename="../DiagnosticsDialog.cpp" line="51"/>
+        <source>Diagnostics</source>
+        <translation>Chẩn đoán</translation>
+    </message>
+    <message>
+        <location filename="../DiagnosticsDialog.cpp" line="58"/>
+        <source>&amp;Copy Report</source>
+        <translation>&amp;Sao chép báo cáo</translation>
+    </message>
+    <message>
+        <location filename="../DiagnosticsDialog.cpp" line="59"/>
+        <source>Open &amp;Log Directory</source>
+        <translation>Mở thư mục &amp;nhật ký</translation>
+    </message>
+    <message>
+        <location filename="../DiagnosticsDialog.cpp" line="60"/>
+        <source>Open &amp;Crash Directory</source>
+        <translation>Mở thư mục &amp;sập</translation>
+    </message>
+    <message>
+        <location filename="../DiagnosticsDialog.cpp" line="61"/>
+        <source>Close</source>
+        <translation>Đóng</translation>
     </message>
 </context>
 </TS>

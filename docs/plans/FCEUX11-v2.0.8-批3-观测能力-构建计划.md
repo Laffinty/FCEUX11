@@ -341,3 +341,26 @@
   - **人工项（业主侧）**：三态各开一次对话框（无游戏 / NES 会话 / GBA 会话）——
     界面无乱码、数值合理；「打开日志目录」「打开崩溃目录」在目录存在/不存在两种
     情形下行为正确（不存在时按钮置灰）。**P3 的对话框尚未接入菜单**（那是 P4）。
+- **r8（2026-11-24）P4 开工**（O3 菜单接线 + i18n 全流程）。
+- **r9（2026-11-24）P4 完成**：
+  - **落地**：`MenuCatalog.h`（`AdvancedSub::Diagnostics = 6`、`COUNT` 6→7、
+    `advancedSubTitle()` 增 case）、`ConsoleMenu.cpp`（构建 `advDiagMenu` + 四个
+    条目 + status tip）、`ConsoleWindow.h`（`advDiagMenu` 成员 + 四个
+    `QAction` 成员 + **四个 slot 落在 `public slots:` 段**——`check_menu_slots.py`
+    的硬要求）、`ConsoleWindow.cpp`（retranslateUi 补标题与条目文本）、
+    `ConsoleHotKeys.cpp`（四个 slot 实现：开对话框 / 开日志目录 / 开崩溃目录 /
+    `SDL.LogToFile` 勾选同步）。
+  - **i18n 全流程（本机无 lupdate ⇒ 手改 .ts）**：**14 个新源串 × 12 语言**
+    写入 `src/drivers/Qt/lang/*.ts`（三个 context：`DiagnosticsDialog_t`（新建）/
+    `QObject` / `consoleWin_t`）；**11 种非英语语言全部给出译文**，en 按该文件
+    既有惯例（空 translation + `type="unfinished"`）。
+    ⚠️ 顺带补齐：**P3 的对话框字符串此前从未进过 .ts**（因无 lupdate）⇒ 本次
+    一并补上。译文遵循词表硬规则（TAS/ROM/NES/mapper/CPU/PPU/APU/FPS/RAM/PRG/CHR
+    不译、`&` 助记符保留、简繁分离）。
+  - **三个脚本门禁全绿**：`check_menu_slots.py` EXIT=0（818 个 connect 的目标
+    全在 `slots:` 段内）· `i18n_coverage.ps1` 11 语言全 PASS（**失败数与基线
+    逐语言完全一致** ⇒ 新串确实全部译出，未拉低覆盖率）· `check_simp_trad.ps1`
+    PASS（zh_CN 无繁体、zh_TW 无简体）。
+  - **⚠️ 一处脚本自身的 bug（已修）**：首次注入时按**全局**检查源串是否存在，
+    导致 `Close`（已存在于 `MsgLogViewDialog_t`）被跳过 ⇒ `DiagnosticsDialog_t`
+    缺 3 条；改为**按 context 检查**后补齐，并加了逐语言逐条校验（缺失=0）。

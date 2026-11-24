@@ -5785,6 +5785,11 @@ Replace file?</source>
         <source>Loading TAS Project</source>
         <translation>正在載入 TAS 專案</translation>
     </message>
+    <message>
+        <location filename="../MenuCatalog.h" line="86"/>
+        <source>&amp;Diagnostics</source>
+        <translation>診斷(&amp;D)</translation>
+    </message>
 </context>
 <context>
     <name>QPianoRoll</name>
@@ -9776,6 +9781,46 @@ Do you wish to save/apply the new settings?</source>
         <source>&amp;Clear Recent ROM List</source>
         <translation>清除最近 ROM 清單(&amp;C)</translation>
     </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1281"/>
+        <source>&amp;Diagnostic Information...</source>
+        <translation>診斷資訊(&amp;D)...</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1282"/>
+        <source>Show the diagnostics report</source>
+        <translation>顯示診斷報告</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1287"/>
+        <source>Open the directory that holds the message log</source>
+        <translation>開啟訊息日誌所在目錄</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1292"/>
+        <source>Open the directory that holds crash dumps</source>
+        <translation>開啟崩潰傾印所在目錄</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1296"/>
+        <source>&amp;Log to File</source>
+        <translation>寫入檔案(&amp;L)</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1297"/>
+        <source>Write the message log to a file</source>
+        <translation>將訊息日誌寫入檔案</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1286"/>
+        <source>Open &amp;Log Directory</source>
+        <translation>開啟日誌目錄(&amp;L)</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1291"/>
+        <source>Open &amp;Crash Directory</source>
+        <translation>開啟崩潰目錄(&amp;C)</translation>
+    </message>
 </context>
 <context>
     <name>guiColorPickerDialog_t</name>
@@ -11089,6 +11134,34 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ppuViewerPalette.cpp" line="186"/>
         <source>.act</source>
         <translation>.act</translation>
+    </message>
+</context>
+<context>
+    <name>DiagnosticsDialog_t</name>
+    <message>
+        <location filename="../DiagnosticsDialog.cpp" line="51"/>
+        <source>Diagnostics</source>
+        <translation>診斷</translation>
+    </message>
+    <message>
+        <location filename="../DiagnosticsDialog.cpp" line="58"/>
+        <source>&amp;Copy Report</source>
+        <translation>複製報告(&amp;C)</translation>
+    </message>
+    <message>
+        <location filename="../DiagnosticsDialog.cpp" line="59"/>
+        <source>Open &amp;Log Directory</source>
+        <translation>開啟日誌目錄(&amp;L)</translation>
+    </message>
+    <message>
+        <location filename="../DiagnosticsDialog.cpp" line="60"/>
+        <source>Open &amp;Crash Directory</source>
+        <translation>開啟崩潰目錄(&amp;C)</translation>
+    </message>
+    <message>
+        <location filename="../DiagnosticsDialog.cpp" line="61"/>
+        <source>Close</source>
+        <translation>關閉</translation>
     </message>
 </context>
 </TS>

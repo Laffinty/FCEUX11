@@ -5780,6 +5780,11 @@ Replace file?</source>
         <source>Loading TAS Project</source>
         <translation>TAS प्रोजेक्ट लोड हो रहा है</translation>
     </message>
+    <message>
+        <location filename="../MenuCatalog.h" line="86"/>
+        <source>&amp;Diagnostics</source>
+        <translation>&amp;निदान</translation>
+    </message>
 </context>
 <context>
     <name>QPianoRoll</name>
@@ -9768,6 +9773,46 @@ Do you wish to save/apply the new settings?</source>
         <source>&amp;Clear Recent ROM List</source>
         <translation>हालिया ROM सूची साफ़ करें (&amp;C)</translation>
     </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1281"/>
+        <source>&amp;Diagnostic Information...</source>
+        <translation>&amp;निदान जानकारी...</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1282"/>
+        <source>Show the diagnostics report</source>
+        <translation>निदान रिपोर्ट दिखाएँ</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1287"/>
+        <source>Open the directory that holds the message log</source>
+        <translation>संदेश लॉग वाली निर्देशिका खोलें</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1292"/>
+        <source>Open the directory that holds crash dumps</source>
+        <translation>क्रैश डंप वाली निर्देशिका खोलें</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1296"/>
+        <source>&amp;Log to File</source>
+        <translation>फ़ाइल में &amp;लॉग करें</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1297"/>
+        <source>Write the message log to a file</source>
+        <translation>संदेश लॉग को फ़ाइल में लिखें</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1286"/>
+        <source>Open &amp;Log Directory</source>
+        <translation>लॉग निर्देशिका खोलें(&amp;L)</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1291"/>
+        <source>Open &amp;Crash Directory</source>
+        <translation>क्रैश निर्देशिका खोलें(&amp;C)</translation>
+    </message>
 </context>
 <context>
     <name>guiColorPickerDialog_t</name>
@@ -11081,6 +11126,34 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ppuViewerPalette.cpp" line="186"/>
         <source>.act</source>
         <translation>.act</translation>
+    </message>
+</context>
+<context>
+    <name>DiagnosticsDialog_t</name>
+    <message>
+        <location filename="../DiagnosticsDialog.cpp" line="51"/>
+        <source>Diagnostics</source>
+        <translation>निदान</translation>
+    </message>
+    <message>
+        <location filename="../DiagnosticsDialog.cpp" line="58"/>
+        <source>&amp;Copy Report</source>
+        <translation>रिपोर्ट &amp;कॉपी करें</translation>
+    </message>
+    <message>
+        <location filename="../DiagnosticsDialog.cpp" line="59"/>
+        <source>Open &amp;Log Directory</source>
+        <translation>लॉग निर्देशिका खोलें(&amp;L)</translation>
+    </message>
+    <message>
+        <location filename="../DiagnosticsDialog.cpp" line="60"/>
+        <source>Open &amp;Crash Directory</source>
+        <translation>क्रैश निर्देशिका खोलें(&amp;C)</translation>
+    </message>
+    <message>
+        <location filename="../DiagnosticsDialog.cpp" line="61"/>
+        <source>Close</source>
+        <translation>बंद करें</translation>
     </message>
 </context>
 </TS>

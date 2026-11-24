@@ -217,6 +217,7 @@ class  consoleWin_t : public QMainWindow
 		QMenu *advMemoryMenu;  // cheats / RAM search / RAM watch
 		QMenu *advMiscMenu;    // frame timing / palette editor / avi riff / tas editor
 		QMenu *advSettingsMenu; // input / gamepad / hotkey / palette / timing / stateRec / movieOpt / autoResume
+		QMenu *advDiagMenu;    // v2.0.8 O3: diagnostics report / log dir / crash dumps / log-to-file
 
 		QActionGroup *languageActionGroup;
 
@@ -254,6 +255,11 @@ class  consoleWin_t : public QMainWindow
 		QAction *aboutAct = nullptr;
 		QAction *aboutActQt = nullptr;
 		QAction *msgLogAct = nullptr;
+		// v2.0.8 C2/C3 O3: the Advanced -> Diagnostics entries.
+		QAction *diagnosticsAct = nullptr;
+		QAction *openLogDirAct = nullptr;
+		QAction *openCrashDirAct = nullptr;
+		QAction *logToFileAct = nullptr;
 		// hotfix4 D-10 added these for a Help -> Documentation submenu;
 		// the submenu was later removed per maintainer decision, but the
 		// members are kept (unused, always nullptr) so the class layout
@@ -422,6 +428,11 @@ class  consoleWin_t : public QMainWindow
 		void openOfflineDocs(void);
 		void openTasEditor(void);
 		void openMsgLogWin(void);
+		// v2.0.8 C2/C3 O3: diagnostics report / log directory / crash dumps.
+		void openDiagnosticsDialog(void);
+		void openLogDirectory(void);
+		void openCrashDirectory(void);
+		void setLogToFile(bool on);
 		void openInputConfWin(void);
 		void openGameSndConfWin(void);
 		void openGameVideoConfWin(void);

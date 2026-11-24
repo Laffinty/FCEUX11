@@ -5778,6 +5778,11 @@ Replace file?</source>
         <source>Loading TAS Project</source>
         <translation>TASプロジェクトを読み込み</translation>
     </message>
+    <message>
+        <location filename="../MenuCatalog.h" line="86"/>
+        <source>&amp;Diagnostics</source>
+        <translation>診断(&amp;D)</translation>
+    </message>
 </context>
 <context>
     <name>QPianoRoll</name>
@@ -9766,6 +9771,46 @@ Do you wish to save/apply the new settings?</source>
         <source>&amp;Clear Recent ROM List</source>
         <translation>最近の ROM リストをクリア(&amp;C)</translation>
     </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1281"/>
+        <source>&amp;Diagnostic Information...</source>
+        <translation>診断情報(&amp;D)...</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1282"/>
+        <source>Show the diagnostics report</source>
+        <translation>診断レポートを表示</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1287"/>
+        <source>Open the directory that holds the message log</source>
+        <translation>メッセージログのあるディレクトリを開く</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1292"/>
+        <source>Open the directory that holds crash dumps</source>
+        <translation>クラッシュダンプのあるディレクトリを開く</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1296"/>
+        <source>&amp;Log to File</source>
+        <translation>ファイルに書き出す(&amp;L)</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1297"/>
+        <source>Write the message log to a file</source>
+        <translation>メッセージログをファイルに書き出す</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1286"/>
+        <source>Open &amp;Log Directory</source>
+        <translation>ログディレクトリを開く(&amp;L)</translation>
+    </message>
+    <message>
+        <location filename="../ConsoleMenu.cpp" line="1291"/>
+        <source>Open &amp;Crash Directory</source>
+        <translation>クラッシュディレクトリを開く(&amp;C)</translation>
+    </message>
 </context>
 <context>
     <name>guiColorPickerDialog_t</name>
@@ -11079,6 +11124,34 @@ Do you wish to save/apply the new settings?</source>
         <location filename="../ppuViewerPalette.cpp" line="186"/>
         <source>.act</source>
         <translation>.act</translation>
+    </message>
+</context>
+<context>
+    <name>DiagnosticsDialog_t</name>
+    <message>
+        <location filename="../DiagnosticsDialog.cpp" line="51"/>
+        <source>Diagnostics</source>
+        <translation>診断</translation>
+    </message>
+    <message>
+        <location filename="../DiagnosticsDialog.cpp" line="58"/>
+        <source>&amp;Copy Report</source>
+        <translation>レポートをコピー(&amp;C)</translation>
+    </message>
+    <message>
+        <location filename="../DiagnosticsDialog.cpp" line="59"/>
+        <source>Open &amp;Log Directory</source>
+        <translation>ログディレクトリを開く(&amp;L)</translation>
+    </message>
+    <message>
+        <location filename="../DiagnosticsDialog.cpp" line="60"/>
+        <source>Open &amp;Crash Directory</source>
+        <translation>クラッシュディレクトリを開く(&amp;C)</translation>
+    </message>
+    <message>
+        <location filename="../DiagnosticsDialog.cpp" line="61"/>
+        <source>Close</source>
+        <translation>閉じる</translation>
     </message>
 </context>
 </TS>

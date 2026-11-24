@@ -808,6 +808,12 @@ void consoleWin_t::retranslateUi(void)
 	if (advMemoryMenu) advMemoryMenu->setTitle(tr("&Memory Tools"));
 	if (advMiscMenu) advMiscMenu->setTitle(tr("&Misc Tools"));
 	if (advSettingsMenu) advSettingsMenu->setTitle(tr("&Advanced Settings"));
+	// v2.0.8 C2/C3 O3: the Diagnostics sub-menu.
+	if (advDiagMenu) advDiagMenu->setTitle(tr("&Diagnostics"));
+	if (diagnosticsAct) diagnosticsAct->setText(tr("&Diagnostic Information..."));
+	if (openLogDirAct) openLogDirAct->setText(tr("Open &Log Directory"));
+	if (openCrashDirAct) openCrashDirAct->setText(tr("Open &Crash Directory"));
+	if (logToFileAct) logToFileAct->setText(tr("&Log to File"));
 	if (helpMenu) helpMenu->setTitle(tr("&Help"));
 	if (languageMenu) {
 		QString langLabel = tr("&Language");

@@ -144,6 +144,9 @@ void consoleWin_t::createMainMenu(void)
 	advMemoryMenu  = advMenu->addMenu(tr("&Memory Tools"));
 	advMiscMenu    = advMenu->addMenu(tr("&Misc Tools"));
 	advSettingsMenu = advMenu->addMenu(tr("&Advanced Settings"));
+	// v2.0.8 C2/C3 O3: the diagnostics sub-menu (report / log directory /
+	// crash dumps / the log-to-file switch).
+	advDiagMenu    = advMenu->addMenu(tr("&Diagnostics"));
 
 	// v0.3.15 PR-A: read SDL.HideAdvancedMenu (default off) and hide the
 	// Advanced top-level menu entirely if requested.
@@ -1277,6 +1280,28 @@ void consoleWin_t::createMainMenu(void)
 	connect(msgLogAct, SIGNAL(triggered()), this, SLOT(openMsgLogWin(void)) );
 	
 	helpMenu->addAction(msgLogAct);
+
+	// v2.0.8 C2/C3 O3: Advanced -> Diagnostics.
+	diagnosticsAct = new QAction(tr("&Diagnostic Information..."), this);
+	diagnosticsAct->setStatusTip(tr("Show the diagnostics report"));
+	connect(diagnosticsAct, SIGNAL(triggered()), this, SLOT(openDiagnosticsDialog(void)) );
+	advDiagMenu->addAction(diagnosticsAct);
+
+	openLogDirAct = new QAction(tr("Open &Log Directory"), this);
+	openLogDirAct->setStatusTip(tr("Open the directory that holds the message log"));
+	connect(openLogDirAct, SIGNAL(triggered()), this, SLOT(openLogDirectory(void)) );
+	advDiagMenu->addAction(openLogDirAct);
+
+	openCrashDirAct = new QAction(tr("Open &Crash Directory"), this);
+	openCrashDirAct->setStatusTip(tr("Open the directory that holds crash dumps"));
+	connect(openCrashDirAct, SIGNAL(triggered()), this, SLOT(openCrashDirectory(void)) );
+	advDiagMenu->addAction(openCrashDirAct);
+
+	logToFileAct = new QAction(tr("&Log to File"), this);
+	logToFileAct->setStatusTip(tr("Write the message log to a file"));
+	logToFileAct->setCheckable(true);
+	connect(logToFileAct, SIGNAL(triggered(bool)), this, SLOT(setLogToFile(bool)) );
+	advDiagMenu->addAction(logToFileAct);
 
 	// Load saved language preference (must be after all actions are created)
 	// v0.3.15.x PHASE-4: TypedConfig<QString> replaces bare QSettings.
