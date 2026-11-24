@@ -7,11 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.8] — 2026-11-24
 
-> **发布动作待业主指令**：本节内容已冻结、`src/version.h` 已提升到 2.0.8
-> （NUMERIC 20008）；**尚未打 tag、未触发发布流水线、未打包**。
+> **已发布（2026-11-24）**：`src/version.h` 提升到 2.0.8（NUMERIC 20008），
+> 发布流水线全绿后创建 tag `v2.0.8` 并发布 GitHub Release
+> （附件 `fceux11-v2.0.8-windows-amd64.zip`；二进制同时在 SourceForge 与
+> GitHub Releases 双渠道，源码包在 SourceForge）。
 >
 > 本版主题：**许可证合规 + 崩溃韧性 + 观测能力**（承接第三方调研报告的三条
-> P0/P1 主张；报告本身的数字与结论已逐条核验，见各节与 `docs/plans/`）。
+> P0/P1 主张；报告本身的数字与结论已逐条核验，**开发团队的逐项复核与申诉见
+> 报告开头的「开发团队复核与回应」一节**——报告有 2 处不实、2 处过时（另有
+> 1 条我方申诉在发布核验后自行撤回，见该节的「申诉的自我更正」），其中
+> 「统一补 GPL2 头」若照做会给 50 个第三方文件**错误标注许可**，详见该节）。
+>
+> **文档归档**：本版的三份构建计划（总计划 + 批 2 / 批 3 专项）已随收口移入
+> `docs/history/plans/` ⇒ `docs/plans/` 再次清空。
 
 ### Added — 观测能力：日志落盘升级 + 诊断对话框 + Diagnostics 菜单
 

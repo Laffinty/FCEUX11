@@ -168,13 +168,29 @@ CI 的既有约束。
 3. **崩溃转储没有保留策略**，长期使用会累积 `.dmp` 文件（本批已登记为已知
    限制）。
 
+### 申诉的自我更正：发布渠道一条，我们自己撤回了
+
+我们最初把「预编译版本发布于 SourceForge」记为**报告不实**（依据是 README 的下载段
+只写 GitHub Releases、`release.yml` 也只发布到 GitHub Releases）。**这一判断是错的，
+现予撤回**：2026-11-24 的 v2.0.8 发布完成后核验，SourceForge 项目
+（`sourceforge.net/projects/fceux11/`）不仅托管各版本的**源码包**，也已存放
+`fceux11-v2.0.8-windows-amd64.zip` **二进制**；发布流水线生成的 Release notes 也
+按既有惯例附带指向 SourceForge 的下载徽章（`scripts/extract_release_notes.py`
+的注释明写「该徽章由别处产生」）。⇒ **准确表述是：二进制双渠道（GitHub Releases
++ SourceForge），源码包在 SourceForge**；报告的这条主张**属实**。
+
+留此记录不为好看，而是因为**申诉本身也要经得起核验**：我们据以判断的那两份文件
+（README 下载段、`release.yml`）确实只写了 GitHub Releases，但**不足以否证另一个
+发布渠道的存在**——这与我们在同一份回应里批评报告「只凭局部证据下结论」是同一种
+错误。**教训：否证性结论需要覆盖性证据。**
+
 ### 附：事实核对表（报告原述 vs 实测）
 
 | 报告原述 | 实测（2026-11-24） | 结论 |
 |---|---|---|
 | 318 个文件标注为 GPLv2+，332 个未经标注 | 669 个 C/C++ 文件中 611 个含 GPL 文本，58 个在白名单 | 数字过时，现已闭合 |
 | CI 包含 CodeQL 静态分析 | `.github/workflows/` 仅 `ci` / `f11qa` / `pages` / `release` | **报告不实** |
-| 预编译版本发布于 SourceForge | README 与 `release.yml` 均指向 **GitHub Releases** | **报告不实** |
+| 预编译版本发布于 SourceForge | **双渠道属实**：二进制同时在 **GitHub Releases**（`release.yml` 自动发布）与 **SourceForge**（`fceux11-v2.0.8-windows-amd64.zip` + 源码包）；README 的下载段只写了 GitHub Releases | **报告属实**（我方此前的一次回应把它记为「报告不实」，经 2026-11-24 发布核验后**撤回该判断**，见下方「申诉的自我更正」） |
 | 项目自成立以来已有 1000+ 次提交 | 1178 | 大致属实 |
 | 「几乎无内置日志」 | 消息日志视图 + 文件 sink 早已存在 | **报告失实** |
 | 「未实现健壮的错误处理机制」 | GBA `catch_unwind` 恢复、错误码去重日志早已存在 | **报告失实** |
