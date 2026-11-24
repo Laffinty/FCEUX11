@@ -1,6 +1,6 @@
 # FCEUX11 v2.0.8 — 许可证合规 + 崩溃韧性 + 观测能力 · 构建计划
 
-> **STATUS: 在途**（2026-11-22 立项，r1）。
+> **STATUS: 已收口归档**（2026-11-22 立项，r1）。
 > 本文件是**构建计划**，不是盘点报告：回答「v2.0.8 做什么、怎么做、怎么验、什么不做」。
 > 立项来源 = 第三方调研报告
 > `docs/third_party_report/FCEUX11模拟器深度调研报告_基于v2.0.7_2026‑11‑22.md`
@@ -410,7 +410,7 @@
     `third_party_whitelist.json` + `manifest.json`（manifest 为生成物，不入库与
     否随业主）；COPYRIGHT_AUDIT.md §6；AGENTS.md 门禁节补录 + 治理表行更新。
 - **r4（2026-11-22）批 2 独立建档 + C3 前提作废**：业主指示批 2 相对复杂、独立
-  立项——专项文档 = `docs/plans/FCEUX11-v2.0.8-批2-崩溃韧性-构建计划.md`（r1）。
+  立项——专项文档 = `docs/history/plans/FCEUX11-v2.0.8-批2-崩溃韧性-构建计划.md`（r1）。
   **§三 C3 的「另行实现」前提被调查作废**：`fceu11_gba_flush_battery`
   （`gba_load.cpp:241`）已实现脏标志 + 限频 + 每帧调用 + 关闭强刷 ⇒ C3 转验证项
   （零新代码）。C1 设计定型为五步链路（GI_SAVESRAM 枚举 → iNESGI/UNIFGI case →
@@ -450,7 +450,7 @@
   动作，等业主明示**（本批未擅自改 `src/version.h`）。
   **下一步**：批 3（观测能力：`msgLogBuf_t` 落盘升级 + 诊断对话框 + Diagnostics
   二级菜单）。- **r7（2026-11-23）批 3 独立建档**：业主指示参照批 2 模式立专项文档——
-  `docs/plans/FCEUX11-v2.0.8-批3-观测能力-构建计划.md`（r1）。只读调查钉死三组坐标：
+  `docs/history/plans/FCEUX11-v2.0.8-批3-观测能力-构建计划.md`（r1）。只读调查钉死三组坐标：
   ① **日志 sink 四缺陷**（`MsgLogViewer.cpp`）：`%TEMP%\fceux.log` 不可寻（`:56`）、
   `"w+"` 每次启动截断（`:69`）、`addLine` **无锁**（`:99`；`FCEUD_Message` 确来自
   模拟线程与 GUI 线程 ⇒ 竞争真实）、环形 256 行与文件无限增长脱节；**关键约束**：
