@@ -139,12 +139,13 @@
 // 从不拒绝比对（信息性字段）⇒ 旧存档/录像仍可读。
 inline constexpr int FCEU_VERSION_MAJOR = 2;
 inline constexpr int FCEU_VERSION_MINOR = 0;
-// v2.0.8 (2026-11-24): the compliance + crash-resilience + observability
-// batch. NUMERIC follows the whole-version convention (20005 -> 20006 ->
-// 20008). It is an informational field in the FCSX movie header and the
-// recording header -- the readers never reject on it, so old saves and
-// movies stay readable.
-inline constexpr int FCEU_VERSION_PATCH = 8;
+// v2.0.9 (2026-11-25): the third-party audit V2 remediation batch --
+// one-shot crash reporting, the restored diagnostic backtrace, and the CI
+// consolidation (the Rust lock tests now run in CI). NUMERIC follows the
+// whole-version convention (20005 -> 20006 -> 20008 -> 20009). It is an
+// informational field in the FCSX movie header and the recording header --
+// the readers never reject on it, so old saves and movies stay readable.
+inline constexpr int FCEU_VERSION_PATCH = 9;
 inline constexpr int FCEU_VERSION_TWEAK = 0;	// hotfix 计数；**不参与** NUMERIC
 
 inline constexpr int FCEU_VERSION_NUMERIC = (FCEU_VERSION_MAJOR * 10000) + (FCEU_VERSION_MINOR * 100) + FCEU_VERSION_PATCH;
@@ -152,7 +153,7 @@ inline constexpr int FCEU_VERSION_MAJOR_DECODE(int x) { return x / 10000; }
 inline constexpr int FCEU_VERSION_MINOR_DECODE(int x) { return (x / 100) % 100; }
 inline constexpr int FCEU_VERSION_PATCH_DECODE(int x) { return x % 100; }
 
-// v2.0.8 is a whole-version release => no hotfix suffix (the hotfix
+// v2.0.9 is a whole-version release => no hotfix suffix (the hotfix
 // counter convention is unchanged: only FCEU_HOTFIX_TAG carries it, and it
 // never enters FCEU_VERSION_NUMERIC).
 #define FCEU_HOTFIX_TAG ""
@@ -161,12 +162,12 @@ inline constexpr int FCEU_VERSION_PATCH_DECODE(int x) { return x % 100; }
 // (AviRecord.cpp) -- it is NOT the savestate/movie format version (that is
 // FCEU_VERSION_NUMERIC). It had drifted to "2.0.6" since the v2.0.7 cycle;
 // it is brought back in line with the version constants here.
-#define FCEU_VERSION_STRING "2.0.8" FCEU_HOTFIX_TAG " " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
+#define FCEU_VERSION_STRING "2.0.9" FCEU_HOTFIX_TAG " " FCEU_SUBVERSION_STRING FCEU_FEATURE_STRING FCEU_COMPILER
 // ⚠️ This one is a HARDCODED string -- it does NOT follow
 // FCEU_VERSION_PATCH automatically. Bumping the patch constant alone leaves
 // the binary reporting the previous version (verified: the v2.0.8 bump
 // initially produced a binary still saying "v2.0.7").
-#define FCEU_DISPLAY_VERSION "v2.0.8" FCEU_HOTFIX_TAG
+#define FCEU_DISPLAY_VERSION "v2.0.9" FCEU_HOTFIX_TAG
 #define FCEU_NAME_AND_VERSION FCEU_NAME " " FCEU_DISPLAY_VERSION
 
 // FCEUX11 Contributors — Derivative work based on FCEUX

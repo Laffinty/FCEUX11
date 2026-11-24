@@ -5,6 +5,119 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.9] — 2026-11-25
+
+> **未发布**：本版已完成实现与门禁验收，**tag / GitHub Release / push 须业主另行
+> 明确指示**（沿用 v2.0.2_hotfix1 起的口径：本地 commit 照做，发布动作等指示）。
+>
+> 本版主题：**第三方二次审计 V2 的两项未关闭发现 + 一条核实中新发现的回归 +
+> CI 收敛**。触发源 = `docs/third_party_report/FCEUX11二次审计报告V2_2026-11-24.md`。
+> 报告的两项（P1 Rust 单测缺失 / P2 崩溃报告重复）**逐条核实为属实**；核实过程中
+> 另发现**第三条报告未提的缺陷**（v2.0.8 静默废掉了既有的 C++ 崩溃符号化背迹）。
+> 全部结论以**实测**为准（探针脚本在 `Research_only/audit_v2_probe/`，gitignored），
+> 逐条记入 `docs/plans/FCEUX11-v2.0.9_第三方审计V2整改与CI收敛-构建计划.md` §一。
+
+### Fixed — 崩溃报告：一次崩溃事件只出一份转储、一行摘要（P2）
+
+- **缺陷**：`src/crash_handler.cpp` 的重入标志是**普通 `bool`**，且只在 SEH filter
+  与 `write_crash_dump` 里置位 ⇒ **`report()` 本身没有任何保护**。而一次崩溃事件
+  可能两次走到 `report()`：`std::terminate` → `report("terminate")` → `abort()` →
+  SIGABRT → `report("abort")`（实测：MSVC 的 `abort()` **确实**调用已注册的
+  SIGABRT 处理器，sig=22）。
+  **实测后果**：`std::terminate()` 那条路径一次崩溃留下 **2 行** `crash_log.txt`
+  摘要，且两次写盘**同名**（秒级时间戳 + PID，`CREATE_ALWAYS`）⇒ **第一份转储被
+  静默覆盖**。
+- **修法**：一次性标志下沉进 `report()`，改为 `std::atomic<bool>` +
+  `exchange(true)`（**跨线程、覆盖全部崩溃路径的唯一赢家**），且**在写盘之前**
+  置位 ⇒ `MiniDumpWriteDump` 自身崩溃也不会递归。`write_crash_dump()` 是公开且
+  **可重复**调用的 API，**不消费**该标志，只与报告路径共用一把锁。
+- **转储文件名不再互相覆盖**：新增 `open_unique_dump()`，用 `CREATE_NEW` 创建；
+  同名已存在时追加 `_2` / `_3` … ⇒ **绝不覆盖既有转储**（文档化基名
+  `fceux11_<yyyymmdd_hhmmss>_<pid>.dmp` 保持不变，常见情况即它）。
+- **新门禁** `crash_once_test`（ctest 54 → **55**）：父进程 spawn 自己，逐条驱动
+  真实崩溃处理器的 terminate / abort / SEH 三条路径，断言**恰好 1 个非空 .dmp +
+  恰好 1 行摘要**；另断言同秒两次 `write_crash_dump()` 产出**两个不同名**的转储。
+  **三条变异腿逐条实测可红**（去一次性标志 ⇒ 红；`CREATE_NEW` 改回 `CREATE_ALWAYS`
+  ⇒ 红；`report()` 连写两次 ⇒ 红）。
+
+### Fixed — 恢复 C++ 崩溃的符号化背迹（核实中新发现，报告未提）
+
+- **缺陷**：v2.0.8 引入崩溃处理器时，`install_crash_handler()` 里的
+  `std::set_terminate` **顶掉**了 `main.cpp` 里既有的 `fceux_diag` 终止处理器
+  （`std::set_terminate` 只有**一个槽**）⇒ 自 v2.0.8 起，**未捕获 C++ 异常的
+  符号化背迹 `fceux_diag.log` 不再由 C++ 侧写入**。引入者 `cb2cd7c`；批 2 计划
+  §3.1 明写「安装（`fceux_diag::install()` 之后…）」⇒ **是计划本身造成的**。
+- **更深一层（实测路由表）**：装了 SEH filter 之后，**SEH filter 会抢在
+  `std::terminate` 之前**——main 内逃逸的 C++ 异常（0xE06D7363）根本**不进**
+  terminate；线程内逃逸的异常则**直接走 SIGABRT**。⇒ 光把 terminate handler
+  串起来**不足以**恢复背迹（最常见的两条路径都不经过它）。
+- **修法**：新增 **pre-report hook**（`set_crash_pre_hook()`）——由
+  `report()` 在写盘前调用一次，**这是所有崩溃路径共享的唯一入口**；驱动层把
+  `fceux_diag` 的背迹写入注册为该 hook。同时把 terminate handler 改为**链式**
+  （`std::set_terminate` 返回前一个 handler 并调用它），并把安装顺序调整为
+  **先崩溃处理器、后 `fceux_diag`**。
+- **人工探针扩展**：`FCEUX11_TEST_CRASH=1` 语义不变（受控 SEH 崩溃），
+  新增 `FCEUX11_TEST_CRASH=terminate`（显式 `std::terminate()`）以手测链式路径。
+
+### Changed — CI 收敛：每次 push 从两次全量构建变一次，Rust 锁测试进 CI（P1 / P4）
+
+- **重复面**：`.github/workflows/ci.yml` 与 `.github/workflows/f11qa.yml` 在
+  `main` 上**各自**做了一遍「CMake configure → 全量构建（62 个测试 exe，Release
+  全开 LTCG）→ 跑同一条 `ctest -LE perf`」。**测试内容零重复**（ci 独有的是
+  license / 漂移检查 / ROM 回归 / bench；f11qa 独有的是 blargg / 迁移矩阵 / R4
+  发布门禁），重复的是**同一份构建做两遍** ⇒ 翻倍的是 CI 分钟。
+- **处置**：**删除 `.github/workflows/ci.yml`**，把它独有的检查**移植**进
+  `f11qa.yml` 的现有 job：license header 检查、blargg ROM 缓存、golden savestate
+  漂移检查 / golden layout compare、bus dispatch / hot-path alias / board-file
+  三个漂移检查、ROM Regression Test、Benchmark (smoke)、Bench tolerance gate。
+  vcpkg 缓存 key 与旧 workflow **逐字相同** ⇒ **缓存不丢**。
+- **CTest 语义只变严**：f11qa 原来的 ctest 步带 `continue-on-error: true`
+  （**吞掉所有失败**）⇒ 换成严格版：失败即 job 失败，并保留 step summary 镜像 +
+  `::error::FAILED-TEST` 注解（v2.0.8 r9/r14 的「无 admin 权限也能诊断」设计）。
+- **Rust 锁测试进 CI**（P1）：此前**整个 workspace 的 Rust 锁测试（约 1197 项）
+  从未在 CI 跑过**，只在本地跑——这正是 AGENTS.md 纪律 10 的活例（已记两次：
+  gba-core 的 242 项因 vendoring 丢 `[dev-dependencies]` 而**根本编不过**；
+  `fceux11-debug` / `fceux11-media` 不在任何门禁命令里）。现在 job 末尾跑
+  `cargo test`，覆盖 **10 个 crate**（含此前不在任何门禁的 `fceux11-core` 33 项
+  与 `fceux11-rom-tests` 2 项，以及 `f11qa` 的 15 项集成测试）。
+  **用 dev（默认）profile，不是 `--release`** —— 这是实测结论：gba-core 有 4 条
+  `#[should_panic]` 断在 `debug_assert!` 边界检查上（`bitwise.rs:18/25/32`、
+  `arm7tdmi.rs:1933`），release profile 下 `debug_assertions` 关闭 ⇒ 根本不 panic ⇒
+  那 4 条会**恒红**。这四条在它们被写出来的 profile 里是对的；改 vendor 树会改变
+  发布二进制的边界检查行为，本批不做。
+- **顺带修一处缓存失效**：`Cache Rust` 步骤缓存的是 `src/rust/target`，而 CMake 的
+  cargo 构建用的是 `build/src/rust/target` ⇒ **缓存从未覆盖到它** ⇒ 每次 CI 都在从零
+  重编整个 Rust 依赖图（gba-core 一家 22K 行）。⇒ 把 `build/src/rust/target` 加进
+  缓存路径。
+- **发布门禁同步**：`scripts/check_release_gates.py` 原本要求「本次提交有一个
+  **CI** workflow 的绿 run」——删掉 ci.yml 后永远不会有 ⇒ **每次发版都会被卡到超时**。
+  ⇒ 该脚本改为只等 F11QA（唯一的构建+测试 workflow），`release.yml` 的
+  job / step 名与输入描述同步更新。
+- **触发分支收窄**：f11qa 的 `[main, wip1.8, wip2.0, wip203, wip204]` → `[main]`
+  （`git ls-remote --heads origin` 实测只剩 `refs/heads/main`）。
+- ⚠️ **给仓库属主的提醒**：required check 的名字会从 `CI / build-windows` 变成
+  `F11QA / f11qa`。若分支保护里登记的是旧名字，PR 会一直卡住，需在仓库设置里
+  改名或重建 required check。
+
+### Changed — 版本口径
+
+- `src/version.h`：`FCEU_VERSION_PATCH` 8 → 9 ⇒ `FCEU_VERSION_NUMERIC` **20009**；
+  `FCEU_DISPLAY_VERSION` 是**硬编码串**，同步改为 `v2.0.9`。
+  ⚠️ 该数值进 FCSX 电影模式存档头与录像头，但读取侧**从不拒绝比对**（信息性字段）
+  ⇒ 旧存档 / 录像仍可读。
+- `CMakeLists.txt` 的 `project(FCEUX11 VERSION 2.0.7)` **不动**（v2.0.8 也没动；
+  CMake 的 VERSION 只作信息性元数据）。
+
+### Known limitations（本批次登记）
+
+- **分支保护的 required check 名**需要业主在 GitHub 仓库设置里改名（见上）。
+- 崩溃转储**仍无保留策略**：长期使用会累积 `.dmp`（每次崩溃一个，数十 KB～数 MB），
+  需手工清理。
+- **gba-core 的 4 条 `#[should_panic]` 锁测试只在 dev profile 下成立**（它们断的是
+  `debug_assert!` 边界检查）⇒ 若将来有人想让 Rust 门禁跑 release profile，必须先处理
+  这 4 条；本批按「门禁 = 本地门禁同款命令」的口径用 dev profile。
+- GBA 侧仍为 Alpha（见 [2.0.8] 与更早各版的登记），本批次**零 GBA 改动**。
+
 ## [2.0.8] — 2026-11-24
 
 > **已发布（2026-11-24）**：`src/version.h` 提升到 2.0.8（NUMERIC 20008），

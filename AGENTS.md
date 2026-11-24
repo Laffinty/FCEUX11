@@ -35,6 +35,7 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 | `docs/history/plans/FCEUX11-v2.0.8_许可证合规与崩溃韧性-构建计划.md` | **已收口归档（2026-11-22 立项 r1 → 2026-11-24 v2.0.8 收口 r8/r9；批 1 `29560c7`、批 2 `d9effa1`、批 3 `7c23b2a`；2026-11-24 移入本目录）**：第三方调研报告三条主张的承接线——**批 1 许可证头**（341 个 C/C++ 文件实测无 GPL 文本，分 A 项目自建 / B 上游继承 / C 真第三方三桶，C 桶不盖章；盖章脚本保 BOM/CRLF + `check.py` 进 CI；Rust 侧只补 Cargo.toml 元数据，gba-core 保持 MIT）/ **批 2 崩溃韧性**（专项文档见下行；SRAM 周期落盘根治「崩溃丢电池存档」——`FCEU_SaveGameSave` 此前仅 GI_CLOSE 调用；本地 minidump 崩溃转储，业主裁决 D1 不接 Sentry）/ **批 3 观测**（专项文档见下行；日志 sink 升级 + 诊断对话框 + D2 裁决的 Diagnostics 二级菜单）。⚠️ 报告本身有事实偏差，**§一 实测事实底座与 §六 偏差附录为准，别照报告抄**；批 1 成果记录见 COPYRIGHT_AUDIT.md §6。**v2.0.8 已发布（2026-11-24）**：版本口径提升（`version.h` PATCH=8 ⇒ NUMERIC 20008、CHANGELOG `## [2.0.8]` 定稿、readme 徽章 v2.0.8、站点 12 语言页同步）⇒ 发布流水线四 job 全绿 ⇒ **tag `v2.0.8` + GitHub Release**（附件 `fceux11-v2.0.8-windows-amd64.zip`；二进制双渠道 GitHub Releases + SourceForge，源码包在 SourceForge） |
 | `docs/history/plans/FCEUX11-v2.0.8-批2-崩溃韧性-构建计划.md` | **已收口归档（2026-11-22 立项 r1 → 2026-11-23 批 2 收口 r15；主计划 r4/r6；2026-11-24 移入本目录）**：批 2 专项细化——**C1** SRAM 周期落盘五步链路（`GI_SAVESRAM=5` 枚举 → iNESGI/UNIFGI case → `FCEU_FlushGameSave` → fceuWrapper.cpp 驱动层 tick（steady_clock + `SDL.SRAMFlushInterval` 默认 30/0=关，emu 线程锁内、暂停不刷、墙钟限频）→ cart.rs `atomic_write_file` tmp+rename 原子写）/ **C2** `crash_handler.{h,cpp}`（SEH filter + CRT 补丁族 → `MiniDumpWriteDump` → `<base>/crashes/` + crash_log.txt + 探针 `FCEUX11_TEST_CRASH=1`，main.cpp 安装，**零外发 D1 口径**）/ **C3** **已证实存在**（`fceu11_gba_flush_battery` gba_load.cpp:241——脏标志+1 秒限频+每帧+关闭强刷 ⇒ **验证项零代码**，P5 复核通过）。**落地读数**：P1 `e0ff625` / P2 `c5b2a8a` / P3 `5994dab` / P4 `cb2cd7c` 全部已推；门禁 **ctest 49→52**、**formats 158→160**；CI 事故（ctest PATH 注入手工名单漏项 ⇒ 缺 DLL ⇒ Windows 弹框 ⇒ runner 永久阻塞）已在 `a8096cc` 修复并定谳（build-windows=success）；**GI 分发器五路全貌**（iNESGI/UNIFGI 有电池面）在其 §一 |
 | `docs/history/plans/FCEUX11-v2.0.8-批3-观测能力-构建计划.md` | **已收口归档（2026-11-23 立项 r1 → 2026-11-24 批 3 收口 r10/r11；主计划 r8/r9；2026-11-24 移入本目录）**：批 3 专项细化（观测能力）——**O1** 日志 sink 升级（`log_sink.{h,cpp}` **零 Qt 依赖独立库**：路径迁 `<base>/logs/fceux11_log.txt`、`"w+"`→`"a"` 不截断、**延迟打开+InitConfig 后重定向**、互斥量、轮转 5 MB×3 代、错误级 urgent、`SDL.LogToFile` 开关；**环形缓冲改内存持有**⇒关文件后 log 视图仍可用）/ **O2** 诊断对话框（`diagnostics_report.{h,cpp}` 数据组装 Qt-free + `DiagnosticsDialog.{h,cpp}`；**计数器全部已存在**⇒零新增埋点）/ **O3** Advanced 下新增 **Diagnostics 二级菜单**（D2 裁决；`AdvancedSub`/`advancedSubTitle` 各 +1；**i18n 全流程**：14 源串×12 语言手写 .ts（本机无 lupdate）；三门禁 `check_menu_slots`/`i18n_coverage`/`check_simp_trad` 全绿）。**落地读数**：P1 `7557afa` / P2 `78d329c` / P3 `807f572` / P4 `7c23b2a`+`3cb06dd` 全部已推；门禁 **ctest 52→54**、`log_sink_test` 26 腿 + `diagnostics_report_test` 12 腿（**变异腿全闭合**） |
+| `docs/plans/FCEUX11-v2.0.9_第三方审计V2整改与CI收敛-构建计划.md` | **在途**（2026-11-25 立项 r1）：第三方二次审计 V2 的整改线——**P1** Rust crate 锁测试进 CI（此前 CI **完全没有 cargo 环节**，约 1197 项锁测试只在本地跑）、**P2** 崩溃报告一次性化（一次崩溃 ⇒ 恰好 1 个 dump + 1 行摘要；转储文件名不再互相覆盖）、**P3**（核实中新发现，报告未提）v2.0.8 静默废掉 `fceux_diag` 背迹（`std::set_terminate` 单槽被顶替；且实测证明 SEH filter 抢在 terminate 之前 ⇒ 单靠串联不够，须走 **pre-report hook**）、**P4** CI 收敛（**删除 `ci.yml`**，独有检查移植进 `f11qa.yml`；ctest 换严格版——旧的带 `continue-on-error` 会吞掉所有失败）。⚠️ **required check 名会从 `CI / build-windows` 变成 `F11QA / f11qa`**，分支保护须由业主改名。全部结论以**实测**为准，探针脚本在 `Research_only/audit_v2_probe/`（gitignored） |
 | `src/rust/crates/gba-core/ATTRIBUTION.md` | 上游出处、本地补丁集**逐处**说明、重新 vendor 流程 |
 | `COPYRIGHT_AUDIT.md` §5 | Rust vendor 树在 `src/` C/C++ 扫描范围之外的归属声明 |
 
@@ -260,8 +261,12 @@ FCEUX11 是 NES 模拟器。`wip2.0` 分支上并行着 **GBAEUX11 v2.0**：把�
 > **已于 2026-11-12 由 CI 复核通过**（`main` 发布提交 `45fec33` 上 CI #320 / F11QA #95 全绿）。
 
 > ⚠️ **不变式 1 的判据是 F11QA 矩阵 `108P/12F`**，本机跑的是它的**本地近似**
-> `ctest`。**本地确定性门禁 = `ctest -LE perf`（54 项，须全绿；计数随新增测试增长，
-> 以 `ctest -N -LE perf` 的 `Total Tests` 为准）**（v2.0.8 批 3 收口起为 54 项：52 +
+> `ctest`。**本地确定性门禁 = `ctest -LE perf`（55 项，须全绿；计数随新增测试增长，
+> 以 `ctest -N -LE perf` 的 `Total Tests` 为准）**（**v2.0.9 起为 55 项**：54 +
+> `crash_once_test`（崩溃报告一次性化：terminate / abort / SEH 三条路径各须
+> **恰好 1 个非空 dump + 1 行摘要**；同秒两次 `write_crash_dump` 须产出**两个不同名**
+> 的转储——三条变异腿逐条实测可红）；
+> v2.0.8 批 3 收口起为 54 项：52 +
 > `log_sink_test`（日志 sink：路径推导 / 并发写 / 轮转 / 开关，26 腿）+
 > `diagnostics_report_test`（诊断报告组装，12 腿）——两项均带**双向变异验证**；
 > v2.0.8 批 2 收口起为 52 项：49 +
@@ -535,17 +540,35 @@ cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo tes
 # v2.0.3 S4（FC 侧修复批次）要动 iNES loader，这条是它的门禁；基线 **160 项全绿**
 # （r9 加 1 条 S4 锁 + r11 加 2 条 S5 锁；r12 V20 再加 1 条 = 154；v2.0.8 批 2
 # P2 原子写锁 +2 = 156/158，末次实测 **160/0**）。
-# ⚠️ **该 crate 的锁不在 CI 跑**（CI 无 cargo 环节）——只在本地生效，见门禁节说明。
+# ✅ **v2.0.9 起该 crate 的锁也在 CI 跑**（此前 CI 无 cargo 环节，见门禁节）。
 cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p fceux11-formats --lib"
 # **utils crate（r8 补录）**：V24 的 5 条锁在此；基线 **51 项全绿**。
 cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p fceux11-utils --lib"
 # **Lua 绑定 crate（r11 补录，2026-11-14）**：V25/V22 之前 `fceux11-lua` 的测试**不在任何门禁里**
 # （纪律 10 又一例）；V25/V22 落地时基线 49 → **54 项全绿**（+5 锁 +4 迁移）。动该 crate 必跑。
 cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p fceux11-lua --lib"
+# **v2.0.9 补录三个此前不在任何门禁里的 crate**（纪律 10 第三例，也是本次审计报告 P1 的
+# 直接后果）：① `fceux11-core` **33 项**（savestate 序列化 sformat/state_file + 总线）
+#   —— 它是根 crate 的依赖、每天都被编译，却**没有任何一条门禁命令跑过它的测试**；
+#   ② `f11qa` **199 项**（184 lib + **15 项集成测试**：`crates/f11qa/tests/{config_store,
+#   pixbuf_pool,state_facade}.rs`）—— 注意 `--lib` **不跑集成测试**，故这一条**不能加
+#   `--lib`**；③ `fceux11-rom-tests` **2 项**（孤儿 workspace 成员，仓内无消费者）。
+cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p fceux11-core --lib"
+cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p f11qa"
+cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo test -p fceux11-rom-tests"
+# ⚠️ **v2.0.9：以上十条 Rust 门禁现在也在 CI 跑**（`.github/workflows/f11qa.yml` 的
+# "Rust crate lock tests" 两步，job 末尾）。此前 CI **完全没有 cargo 环节** ⇒ 整个
+# workspace 约 1197 项锁测试只在本地跑——这正是纪律 10 的活例（已记三次）。
+# CI 侧用 **dev（默认）profile**，与上面的本地命令逐字一致。
+# ⚠️ **不要改成 `--release`**：gba-core 有 4 条 `#[should_panic]` 断在
+# `debug_assert!` 边界检查上（`crates/gba-core/src/bitwise.rs:18/25/32`、
+# `cpu/arm7tdmi.rs:1933`）⇒ release profile 下 `debug_assertions` 关闭、根本不 panic
+# ⇒ 那 4 条**恒红**（实测：release 245 passed/4 failed，dev 249/0）。
 
 # **许可证头门禁（v2.0.8 批 1 补录，2026-11-22）**：src/ 下所有 C/C++ 必须含 GPL 文本或在
-# 白名单（第三方/生成文件）⇒ 期望 EXIT=0，红时逐文件点名。CI 在 Checkout 后同步执行
-# （ci.yml "License header check"）。白名单登记表 =
+# 白名单（第三方/生成文件）⇒ 期望 EXIT=0，红时逐文件点名。CI 在 Setup Python 之后同步执行
+# （v2.0.9 起在 `f11qa.yml` 的 "License header check"；此前在已删除的 `ci.yml`）。
+# 白名单登记表 =
 # scripts/license_headers/third_party_whitelist.json（58 条，逐族依据见 COPYRIGHT_AUDIT.md §6.3）。
 # ⚠️ 新增源文件没带头 → 本地与 CI 都红；**新 vendor 第三方代码必须登记进白名单，绝不盖章**。
 python scripts/license_headers/check.py
@@ -559,6 +582,47 @@ cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11 && cmake --build buil
 $env:PATH="D:\Project\FCEUX11\vcpkg_installed\x64-windows\bin;$env:PATH"
 & "D:\Program Files\CMake\bin\ctest.exe" --test-dir D:\Project\FCEUX11\build -j 4
 ```
+
+### v2.0.9 变更登记（第三方审计 V2 整改 + CI 收敛）
+
+**崩溃报告器的契约变了**（`src/crash_handler.{h,cpp}`）：
+
+1. **一次崩溃事件 = 一份转储 + 一行摘要**。一次性标志（`std::atomic<bool>` +
+   `exchange`）下沉进 `report()`，覆盖全部路径且跨线程唯一；它在**写盘之前**置位 ⇒
+   转储过程自身崩溃也不会递归。
+2. **转储文件名绝不互相覆盖**：同名时追加 `_2` / `_3` …（`CREATE_NEW`）。
+3. **`FCEUX11_CRASH_DIR` 环境变量**可强制转储目录（测试隔离 + 人工探针），优先级
+   高于 base 目录 / exe 目录 / 临时目录。
+4. **新增 pre-report hook**（`set_crash_pre_hook()`）：由 `report()` 在写盘前调用一次，
+   是**所有崩溃路径共享的唯一入口**。驱动层用它把 `fceux_diag` 的符号化背迹挂上去。
+   ⚠️ **为什么不能只串联 terminate handler**：实测路由表显示，装了 SEH filter 之后
+   —— main 内逃逸的 C++ 异常（0xE06D7363）**根本不进 terminate**（SEH filter 抢在
+   前面）；线程内逃逸的异常**直接走 SIGABRT**。⇒ 最常见的两条路径都不经过 terminate。
+
+**CI 结构变了**（`.github/workflows/`）：
+
+5. **`.github/workflows/ci.yml` 已删除**。它与 `f11qa.yml` 在 `main` 上各自做了一遍
+   「configure → 全量构建（62 个测试 exe，Release 全开 LTCG）→ 同一条 `ctest -LE perf`」
+   ⇒ 每次 push 付两次全量构建。它独有的检查（license header / blargg 缓存 / 5 个
+   PR-only 漂移检查 / ROM Regression / bench ×2）已**移植**进 `f11qa.yml`。
+6. **ctest 步换严格版**：f11qa 原来的那一步带 `continue-on-error: true`
+   （**吞掉所有失败**）⇒ 现在失败即 job 失败，并保留 step summary 镜像 +
+   `::error::FAILED-TEST` 注解（无 admin 权限也能诊断）。
+7. **Rust 锁测试进 CI**：job 末尾两步 `cargo test`（10 个 crate，约 1197 项），用
+   **dev（默认）profile**（与本地门禁逐字一致）。⚠️ **不要用 `--release`**：gba-core
+   有 4 条 `#[should_panic]` 断在 `debug_assert!` 上 ⇒ release 下恒红（实测
+   245/4 failed vs dev 249/0）。
+8. ⚠️ **发布门禁同步改了**：`scripts/check_release_gates.py` 原本要求「本次提交有一个
+   **CI** workflow 的绿 run」⇒ 删掉 ci.yml 后**永远不会有** ⇒ 每次发版都会卡到超时。
+   ⇒ 改为只等 F11QA（`BUILD_TEST_WORKFLOWS` 列表），`release.yml` 的 job/step 名同步。
+9. **顺带修了一处缓存失效**：`Cache Rust` 缓存的是 `src/rust/target`，而 CMake 的
+   cargo 构建用的是 `build/src/rust/target`（`src/rust/CMakeLists.txt:34`）⇒ 缓存从未
+   覆盖到它 ⇒ 每次 CI 从零重编整个 Rust 依赖图。⇒ 已把 `build/src/rust/target` 加进
+   缓存路径。
+10. ⚠️ **required check 名从 `CI / build-windows` 变成 `F11QA / f11qa`** —— 分支保护
+    须由业主在 GitHub 设置里改名，否则 PR 会永久卡住。
+11. **f11qa.yml 的触发分支收窄为 `[main]`**（其余四个远端分支已不存在，实测
+    `git ls-remote --heads origin` 只回 `refs/heads/main`）。
 
 ### 十五个坑
 

@@ -2,7 +2,7 @@
 
 # FCEUX11
 
-[![Version](https://img.shields.io/badge/version-v2.0.8-blue)](https://github.com/Laffinty/FCEUX11/releases)
+[![Version](https://img.shields.io/badge/version-v2.0.9-blue)](https://github.com/Laffinty/FCEUX11/releases)
 [![License](https://img.shields.io/badge/license-GPL--v2-green)](COPYING)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D4?logo=windows)](https://www.microsoft.com/windows/windows-11)
 [![Qt](https://img.shields.io/badge/Qt-6.8%20LTS-41CD52?logo=qt)](https://www.qt.io)
@@ -29,7 +29,7 @@
 | **精确模拟**：完整支持 NES、Famicom 及各类 Mapper 扩展芯片，画面与音效高度还原。 | **Accurate Emulation**: Full NES / Famicom / mapper support with faithful graphics and audio. |
 | **实验性 GBA 模拟 (BETA)**：支持 ROM 加载、BIOS SWI 系统调用、音频输出、电池存档（`.srm`）、即时存档、手柄输入、整数倍画面缩放；内置诊断探针用于硬件行为定位。 | **Experimental GBA Emulation (BETA)**: ROM loading, BIOS SWI system calls, audio output, battery saves (`.srm`), save states, controller input, and integer-scaled display; a built-in diagnostic probe helps pinpoint hardware behaviour. |
 | **调试工具**：内置 CPU/PPU 调试器、十六进制编辑器、内存搜索与监视、代码/数据日志。 | **Debugging Tools**: CPU/PPU debugger, hex editor, RAM search/watch, code/data logger. |
-| **可靠性与观测**：电池存档周期落盘（崩溃不丢存档，写盘原子化）、崩溃时留下本地 minidump 与摘要、消息日志落盘到 `<base>/logs/`（带轮转），并提供 **Advanced → Diagnostics** 一键查看诊断报告。 | **Reliability & Observability**: periodic, atomic battery-save writes (a crash no longer loses the save), a local minidump plus a summary line after a crash, the message log written to `<base>/logs/` with rotation, and a one-click **Advanced → Diagnostics** report. |
+| **可靠性与观测**：电池存档周期落盘（崩溃不丢存档，写盘原子化）、崩溃时留下**唯一一份**本地 minidump 与**一行**摘要（不重复、不覆盖既有转储）、C++ 崩溃附带符号化调用栈、消息日志落盘到 `<base>/logs/`（带轮转），并提供 **Advanced → Diagnostics** 一键查看诊断报告。 | **Reliability & Observability**: periodic, atomic battery-save writes (a crash no longer loses the save), exactly **one** local minidump and **one** summary line after a crash (never duplicated, never overwriting an earlier dump), a symbolised call stack for C++ crashes, the message log written to `<base>/logs/` with rotation, and a one-click **Advanced → Diagnostics** report. |
 | **TAS 编辑器**：逐帧录制并精确编辑按键输入，轻松制作工具辅助速通（TAS）录像。 | **TAS Editor**: Frame-by-frame recording and precise input editing for Tool-Assisted Speedruns. |
 | **Lua 脚本**：通过 Lua 接口编写脚本，实现自定义屏幕叠加显示、自动化操作、内存数据读取等高级玩法。 | **Lua Scripting**: Custom on-screen displays, automation, and memory access via Lua. |
 | **录像回放**：录制完整游戏过程并支持回放，可导出为 AVI 视频。 | **Movie Recording**: Record and replay playthroughs, export to AVI. |
@@ -51,7 +51,7 @@
 
 ### 自行编译 / Build from Source
 
-需要 **Visual Studio 2022 Community**（勾选「使用 C++ 的桌面开发」）与 **Rust**（[rustup](https://rustup.rs) 默认安装）。CI 锁定 **Rust 1.100.0**，本地建议同版本，以免「本机绿、CI 红」。详见 [`docs/BuildGuide.md`](docs/BuildGuide.md)。
+需要 **Visual Studio 2022 Community**（勾选「使用 C++ 的桌面开发」）与 **Rust**（[rustup](https://rustup.rs) 默认安装）。CI 锁定 **Rust 1.100.0**，本地建议同版本，以免「本机绿、CI 红」。CI 每次 push 都会跑**全部 Rust crate 的锁测试**（约 1197 项）。详见 [`docs/BuildGuide.md`](docs/BuildGuide.md)。
 
 ```powershell
 git clone https://github.com/Laffinty/FCEUX11.git
@@ -76,11 +76,12 @@ Precompiled binaries are available on the **[GitHub Releases](https://github.com
 > Ensure the target directory has **write permissions** on first run so the program can save configuration and save-state files.
 
 > **日志与崩溃留痕**：消息日志写在 `<程序目录>/logs/fceux11_log.txt`（自动轮转）；
-> 若程序崩溃，同目录的 `crashes/` 会留下 minidump（`.dmp`）与一行摘要（`crash_log.txt`）。
+> 若程序崩溃，同目录的 `crashes/` 会留下 minidump（`.dmp`）与一行摘要（`crash_log.txt`）——**一次崩溃只留一份**，同名转储不会被覆盖。
 > 两者**只写本地、不上传**，可用 **Advanced → Diagnostics** 一键查看诊断报告。
 > The message log is written to `<app dir>/logs/fceux11_log.txt` (with rotation); if the
 > program crashes, `crashes/` in the same directory keeps a minidump (`.dmp`) and a
-> one-line summary (`crash_log.txt`). Both stay **on the machine** — nothing is
+> one-line summary (`crash_log.txt`) — **one crash, one dump**, and an existing dump is
+> never overwritten. Both stay **on the machine** — nothing is
 > uploaded — and **Advanced → Diagnostics** shows a one-screen report.
 
 ---
