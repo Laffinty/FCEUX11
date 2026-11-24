@@ -289,13 +289,38 @@ namespace fceux_diag
 		}
 	}
 
-	void terminate_handler()
+	// v2.0.9 -- the terminate handler that was installed before the crash
+	// reporter's own.
+	//
+	// `std::set_terminate` has a single slot, so the crash reporter has to
+	// be installed FIRST and this handler has to chain to it. In v2.0.8 the
+	// order was the other way round: the reporter's `set_terminate` call
+	// silently replaced this handler, and the diagnostic backtrace stopped
+	// being written for every uncaught C++ exception.
+	std::terminate_handler g_prev_terminate = nullptr;
+
+	// v2.0.9 -- the crash reporter's pre-report hook.
+	//
+	// It runs once per crash event, inside the crash context, just before
+	// the minidump is written. This is the only point every crash path
+	// passes through: the SEH filter -- not std::terminate -- is what sees
+	// an escaping C++ exception on the main thread, and an exception
+	// escaping a thread goes straight to SIGABRT. A terminate handler
+	// alone would miss both of the most common paths.
+	void write_crash_context(const char* source, unsigned long code, unsigned long address)
 	{
-		char head[128];
-		std::snprintf(head, sizeof(head), "\r\n=== C++ std::terminate  thread %lu ===\r\n",
+		char head[192];
+		std::snprintf(head, sizeof(head),
+			"\r\n=== FCEUX11 crash  source=%s  code=0x%08lX  address=0x%08lX  thread %lu ===\r\n",
+			source ? source : "unknown", code, address,
 			(unsigned long)GetCurrentThreadId());
 		append(head);
 
+		write_backtrace();
+	}
+
+	void terminate_handler()
+	{
 		// Re-throwing inside the handler is legal and is the only way to learn
 		// *what* was in flight: the handler is called with the exception
 		// already active, and rethrow_exception is the documented way to reach
@@ -318,16 +343,32 @@ namespace fceux_diag
 			append("  exception: (not derived from std::exception)\r\n");
 		}
 
-		write_backtrace();
+		// The stack itself is written by the crash reporter's pre-hook: that
+		// hook is the only place every crash path goes through, so writing
+		// the backtrace here would miss the SEH and SIGABRT paths.
 		append("  (no message on stderr => not an uncaught C++ exception; see notes)\r\n");
-		std::abort();
+
+		// Hand over to the crash reporter: it writes the minidump and the
+		// summary line, then abort()s.
+		if (g_prev_terminate)
+			g_prev_terminate();
+		else
+			std::abort();
 	}
 
 	void install()
 	{
 		// The Rust half reads this to find the same file.
 		SetEnvironmentVariableA("FCEUX11_DIAG_LOG", log_path().c_str());
-		std::set_terminate(terminate_handler);
+
+		// v2.0.9: the crash reporter writes the backtrace through this hook,
+		// so the diagnostic survives on every crash path -- not only on the
+		// terminate one.
+		fceux11::set_crash_pre_hook(write_crash_context);
+
+		// v2.0.9: chain to the crash reporter's terminate handler. The
+		// reporter must already be installed when this runs (see main()).
+		g_prev_terminate = std::set_terminate(terminate_handler);
 	}
 }  // namespace fceux_diag
 
@@ -335,21 +376,36 @@ int main( int argc, char *argv[] )
 {
 	int retval = 0;
 
-	fceux_diag::install();
-
 	// v2.0.8 C2: install the local crash reporter before anything else can
 	// fail -- a crash during start-up is exactly the case it exists for.
 	// It writes a minidump plus a one-line summary into <base>/crashes (or
 	// the executable's directory); nothing is uploaded anywhere.
+	//
+	// v2.0.9: it has to be installed BEFORE fceux_diag::install(). Both
+	// install a terminate handler and `std::set_terminate` has one slot:
+	// the diagnostic handler chains to the reporter's handler, and the
+	// reverse order would leave the reporter replacing the diagnostic
+	// handler -- which is what v2.0.8 shipped, and it silently stopped
+	// the diagnostic backtrace from being written.
 	fceux11::install_crash_handler();
+
+	fceux_diag::install();
 
 	// v2.0.8 C2: manual acceptance probe -- FCEUX11_TEST_CRASH=1 raises a
 	// controlled, non-continuable exception right after the handler is
 	// installed, so the whole dump path can be exercised by hand.
-	if (getenv("FCEUX11_TEST_CRASH") != nullptr)
+	//
+	// v2.0.9: FCEUX11_TEST_CRASH=terminate calls std::terminate() instead,
+	// which exercises the terminate -> abort -> SIGABRT chain -- the path
+	// that used to report twice.
+	if (const char* probe = getenv("FCEUX11_TEST_CRASH"))
 	{
 		fprintf(stderr, "FCEUX11_TEST_CRASH set: raising a controlled crash\n");
 		fflush(stderr);
+		if (std::string(probe) == "terminate")
+		{
+			std::terminate();
+		}
 		fceux11::trigger_test_crash();
 	}
 

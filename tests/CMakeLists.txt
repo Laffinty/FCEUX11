@@ -116,6 +116,17 @@ if(FCEUX11_BUILD_TESTS)
     add_test(NAME crash_dump_test COMMAND fceux11_crash_dump_test)
     set_tests_properties(crash_dump_test PROPERTIES TIMEOUT 180)
 
+    # v2.0.9 -- one-shot crash reporting (legs C1-C5). Drives the real
+    # crash handler in a child process and counts the dumps and summary
+    # lines one crash event leaves behind: exactly one of each, and two
+    # write_crash_dump() calls must not overwrite each other's dump.
+    fceux11_add_test_executable(fceux11_crash_once_test
+        f11qa/crash_once_test.cpp
+        git_info_stub.cpp
+    )
+    add_test(NAME crash_once_test COMMAND fceux11_crash_once_test)
+    set_tests_properties(crash_once_test PROPERTIES TIMEOUT 180)
+
     # v2.0.8 C2/C3 O1 (P1) — message-log sink: path derivation and
     # concurrent-write safety (legs O1a/O1b).
     fceux11_add_test_executable(fceux11_log_sink_test
