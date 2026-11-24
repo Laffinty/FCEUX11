@@ -39,7 +39,7 @@ on:
         type: boolean
         default: true
       wait_timeout_minutes:
-        description: "How long to wait for CI / F11QA / Pages to finish"
+        description: "How long to wait for F11QA / Pages to finish"
         required: false
         default: "90"
 
@@ -119,7 +119,7 @@ jobs:
           fi
 
   gate-ci:
-    name: Gate (CI + F11QA + Pages green for this commit)
+    name: Gate (F11QA + Pages green for this commit)
     needs: preflight
     runs-on: ubuntu-latest
     steps:
@@ -131,7 +131,13 @@ jobs:
       # Actions API, and for Pages it falls back to "what is deployed equals
       # this commit's web/" when the commit itself did not touch web/ (that is
       # the case for any release that is not also a site update).
-      - name: Wait for CI / F11QA / Pages
+      #
+      # v2.0.9: the separate "CI" workflow was removed -- every check it had was
+      # folded into the F11QA workflow, which is now the single build+test gate.
+      # The script's BUILD_TEST_WORKFLOWS list was updated accordingly; leaving
+      # "CI" in it would have made this gate wait forever for a workflow that no
+      # longer exists.
+      - name: Wait for F11QA / Pages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

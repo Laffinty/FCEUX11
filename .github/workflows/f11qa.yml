@@ -15,9 +15,12 @@
 # jsmolka suite covered it, and there is no jsmolka step in this file):
 #   * YES: it compiles. `gba` is in Cargo.toml's `default` features, so the
 #     CMake-driven staticlib build compiles the vendored core and src/gba/ on a
-#     clean machine. That is a real signal, and it is the only one.
-#   * NO: none of the GBA lock tests run here. There is no `cargo test` step,
-#     so the SWI suite (currently 60 tests) is never executed in CI.
+#     clean machine.
+#   * YES (v2.0.9): the Rust lock tests run here too. The two "Rust crate
+#     lock tests" steps at the end of this job execute `cargo test` over the
+#     whole workspace (10 crates, ~1197 tests), so the GBA SWI suite, the
+#     vendored core's timing tests and the root crate's fixture locks are no
+#     longer local-only.
 #   * NO: no jsmolka, no GBA accuracy matrix. The v1.8 NES gates below
 #     (ctest, blargg, the migration matrix, the R4 gate) test NES only.
 #
@@ -25,6 +28,25 @@
 # project's own tests plus whatever external reading went into the plan. That
 # gap is what the S1b-c / S1d-a reversals (r12, r13, r17) kept falling into.
 # The first true external GBA signal is jsmolka `memory.gba`, scheduled for S2.
+#
+# v2.0.9 -- CI consolidation. This workflow used to be one of two, and both
+# configured CMake, built the whole tree (57 test executables, Release with
+# whole-program optimisation) and ran the same `ctest -LE perf`. The other
+# one (`.github/workflows/ci.yml`) has been removed and its unique checks
+# moved in here:
+#   * license header check (scripts/license_headers/check.py)
+#   * blargg ROM cache
+#   * golden savestate drift check / golden layout compare (PR only)
+#   * bus dispatch / hot-path alias / board-file drift checks (PR only)
+#   * ROM regression test, benchmark smoke, bench tolerance gate
+# and the ctest step was replaced by the strict version: the old one here
+# carried `continue-on-error: true`, which swallowed every ctest failure.
+# Two builds per push became one.
+#
+# NOTE for the repository owner: the required-check name changes from
+# "CI / build-windows" to "F11QA / f11qa". If branch protection lists the old
+# name, PRs will block forever until the required check is renamed in the
+# repository settings.
 #
 # v1.8 changes (commit WIP, Phase 7 R4 gate upgrade):
 #   * Trigger branches: wip_1.16 → wip1.8
@@ -41,10 +63,19 @@
 name: F11QA
 
 on:
+  # v2.0.9: the branch list is narrowed to `main` because the other four are
+  # gone from the remote (`git ls-remote --heads origin` returns only
+  # refs/heads/main -- wip2.0 and wip203 were merged and deleted in
+  # 2026-11). They were dead weight: a trigger on a branch that no longer
+  # exists never fires.
+  #
+  # v2.0.9 also consolidated the separate `CI` workflow into this one (see
+  # the "CI consolidation" note at the top of this file) -- the two
+  # workflows were building the same tree twice per run.
   push:
-    branches: [main, wip1.8, wip2.0, wip203, wip204]
+    branches: [main]
   pull_request:
-    branches: [main, wip1.8, wip2.0, wip203, wip204]
+    branches: [main]
   workflow_dispatch:  # allow manual trigger
 
 jobs:
@@ -113,6 +144,19 @@ jobs:
           python-version: '3.12'
 
       # -----------------------------------------------------------------------
+      # License header gate (moved here from the retired CI workflow)
+      # -----------------------------------------------------------------------
+      # v2.0.8 batch1: every C/C++ file under src/ must carry GPL text or be
+      # whitelisted (third-party/generated). Fails fast, before the vcpkg
+      # restore. Registry: scripts/license_headers/third_party_whitelist.json
+      # Plan: docs/history/plans/FCEUX11-v2.0.8_*.md section 2 (batch 1)
+      #
+      # v2.0.9: this check used to live in the CI workflow, which is now
+      # retired -- this workflow is the only one that builds and tests.
+      - name: License header check
+        run: python scripts/license_headers/check.py
+
+      # -----------------------------------------------------------------------
       # Cache
       # -----------------------------------------------------------------------
       # R4-0 (2026-07-31) — the previous cache configuration never produced a
@@ -149,11 +193,21 @@ jobs:
       # v2.0.4 r17: the toolchain version is part of the key — cargo's target
       # dir is not reusable across compilers, and sharing one cache between
       # two toolchain versions only makes both of them rebuild.
+      #
+      # v2.0.9: `build/src/rust/target` joins the list. The CMake-driven
+      # cargo build does NOT use `src/rust/target` — src/rust/CMakeLists.txt:34
+      # sets CARGO_TARGET_DIR to ${CMAKE_CURRENT_BINARY_DIR}/target, i.e.
+      # build/src/rust/target — so the cache never covered it and every CI
+      # run recompiled the whole Rust dependency graph (gba-core alone is
+      # 22K lines) from scratch. With it cached, the CMake Rust build becomes
+      # incremental and the "Rust crate lock tests" steps below reuse the same
+      # dependency artifacts.
       - name: Cache Rust
         uses: actions/cache@v4
         with:
           path: |
             src/rust/target
+            build/src/rust/target
             ~/.cargo/registry
             ~/.cargo/git
           key: rust-f11qa-${{ env.RUST_TOOLCHAIN }}-${{ hashFiles('src/rust/Cargo.lock') }}
@@ -273,6 +327,17 @@ jobs:
       # （apu_01_len_ctr.nes）；f11qa-rom-mirror 里的同套件是另一套命名
       # （apu_test_1-len_ctr.nes），basename 仅 14/177 重合。硬件一致性检测 必须用
       # download_blargg_roms.ps1 落盘的目录树，否则 LoadGame 全挂 0xFE。
+      # v2.0.9: migrated from the retired CI workflow, which cached the
+      # blargg ROM tree before downloading it. The cache key is unchanged,
+      # so the entry the old workflow produced is still reused.
+      - name: Cache blargg ROMs
+        id: cache-blargg
+        uses: actions/cache@v4
+        with:
+          path: tests/fixtures/blargg
+          key: blargg-roms-${{ hashFiles('scripts/download_blargg_roms.ps1') }}
+          restore-keys: blargg-roms-
+
       - name: Download blargg suite ROMs (Hardware Consistency Check fixtures)
         shell: pwsh
         run: |
@@ -298,25 +363,278 @@ jobs:
       # -----------------------------------------------------------------------
       # Internal Logic Check — CTest regression suite
       # -----------------------------------------------------------------------
+      # v2.0.9: this step replaces the previous one, which carried
+      # `continue-on-error: true` and therefore swallowed every ctest
+      # failure. It now uses the strict version from the retired CI workflow:
+      # a failing test fails the job.
+      #
+      # The ctest output is ALSO mirrored into the job summary. The job log
+      # can only be downloaded with admin rights ("Must have admin rights to
+      # Repository"), so until now a failing ctest was visible to nobody
+      # without repo admin access: the only symptom was "Process completed
+      # with exit code 1". The step summary is readable through the public
+      # check-runs API (output.summary), so this makes a CI failure
+      # diagnosable without admin rights.
+      #
+      # v2.0.8 r9: prepend the vcpkg runtime dir so the test exes can
+      # resolve SDL2.dll / Qt6*.dll. Without it the Windows loader raises
+      # the missing-DLL dialog, which blocks forever on a runner without an
+      # interactive desktop -- the test then dies at the ctest timeout with
+      # no output at all. ctest also injects the dir via
+      # ENVIRONMENT_MODIFICATION (all tests, since v2.0.8 r9); this line
+      # keeps the step independent of that mechanism.
+      #
+      # -LE perf excludes the "perf"-labelled bench_tolerance_test from the
+      # gating run: wall-clock benchmarks are advisory on shared runners
+      # (inter-host variance >> tolerance). It runs separately in the
+      # "Bench tolerance gate" step below with continue-on-error.
       - name: Internal Logic Check — CTest
-        # v2.0.8 r9: prepend the vcpkg runtime dir so the test exes can
-        # resolve SDL2.dll / Qt6*.dll. Without it the Windows loader raises
-        # the missing-DLL dialog, which blocks forever on a runner without
-        # an interactive desktop (the test then dies at the ctest timeout
-        # with no output) -- and `continue-on-error: true` below would
-        # swallow exactly that. ctest also injects the dir via
-        # ENVIRONMENT_MODIFICATION (all tests, since v2.0.8 r9); this line
-        # keeps the step independent of that mechanism.
         run: |
           $env:PATH = "${{ github.workspace }}/vcpkg_installed/x64-windows/bin;${{ github.workspace }}/vcpkg_installed/x64-windows/debug/bin;$env:PATH"
+          "## CTest run" | Set-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding utf8
           ctest --test-dir build --build-config Release --output-on-failure -LE perf 2>&1 | Tee-Object -FilePath ctest-output.txt
-          # v2.0.8 r9: `continue-on-error` keeps this step green, so a failed
-          # or hung test would otherwise be invisible in the job summary.
-          # Surface the failing test names as annotations (readable without
-          # repo admin rights) so the job report carries the evidence.
+          $ctestExit = $LASTEXITCODE
+          Get-Content ctest-output.txt -Tail 800 | Add-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding utf8
+          # v2.0.8: name the failing tests directly as annotations - the
+          # check-run output.summary proved unreliable in practice, but the
+          # annotations endpoint is readable without admin rights. ctest
+          # marks a failed/timed-out test line with "***" (e.g.
+          # "10/50 Test #10: name ...***Failed"). Cap at 10 annotations/step.
           Get-Content ctest-output.txt | Select-String -Pattern "\*\*\*" | Select-Object -First 5 | ForEach-Object { Write-Host ("::error::FAILED-TEST " + $_.Line) }
-          Get-Content ctest-output.txt | Select-String -Pattern "WATCHDOG|sram_flush" | Select-Object -First 12 | ForEach-Object { Write-Host ("::error::PHASE " + $_.Line) }
-        continue-on-error: true  # capture results even if some tests fail
+          Get-Content ctest-output.txt | Select-String -Pattern "movie.roundtrip|WATCHDOG|sram_flush|The following tests FAILED" | Select-Object -First 3 | ForEach-Object { Write-Host ("::error::" + $_.Line) }
+          # v2.0.8 r8: the sram_flush_test watchdog prints its phase markers
+          # on stderr; ctest captures them into the test output, so surface
+          # them as annotations too (stderr is unbuffered, so the markers
+          # survive a kill - unlike stdout, which is block-buffered).
+          Get-Content ctest-output.txt | Select-String -Pattern "sram_flush" | Select-Object -First 12 | ForEach-Object { Write-Host ("::error::PHASE " + $_.Line) }
+          $stageLog = "tests/movie_roundtrip_stages.log"
+          if (Test-Path $stageLog) {
+            Write-Host ("::error::--- {0} ---" -f $stageLog)
+            Get-Content $stageLog | Select-Object -First 2 | ForEach-Object { Write-Host ("::error::STAGE " + $_) }
+          } else {
+            Write-Host ("::error::stage log missing: {0} (test never started, or cwd differs)" -f $stageLog)
+          }
+          $lastLog = "build/Testing/Temporary/LastTest.log"
+          if (Test-Path $lastLog) {
+            Get-Content $lastLog | Select-String -Pattern "movie-roundtrip|movie_roundtrip_test" | Select-Object -First 40 | ForEach-Object { Write-Host ("::error::LASTTEST " + $_.Line) }
+          }
+          exit $ctestExit
+
+
+      # -----------------------------------------------------------------------
+      # Static drift checks + ROM regression + benchmarks
+      # -----------------------------------------------------------------------
+      # v2.0.9: migrated from the retired CI workflow. That workflow built
+      # the same tree this one builds and ran the same ctest command, so
+      # every push paid for two full Release builds (LTCG: ~57 link steps
+      # each) and two ctest runs. The checks below were the only ones the
+      # retired workflow had, and they are kept verbatim.
+      #
+      # R4-1 (2026-08-07): these steps invoke the built test .exe directly
+      # (not via ctest), so they do NOT inherit the vcpkg runtime PATH that
+      # tests/CMakeLists.txt injects via ENVIRONMENT_MODIFICATION
+      # (_FCEUX11_TEST_PATH_MODIFICATIONS). fceux11_*_test.exe link against
+      # vcpkg DLLs (Qt6Core.dll, SDL2.dll, z.dll, ...); without the vcpkg
+      # bin dir on PATH the exe fails at startup with STATUS_DLL_NOT_FOUND
+      # (0xC0000135). Prepend the vcpkg install tree -- which configure
+      # pins to ${{ github.workspace }}/vcpkg_installed via
+      # -DVCPKG_INSTALLED_DIR.
+
+      # v1.3 Legion Phase 7.2: Golden savestate drift check.
+      # If any of the SFORMAT-emitting sources have changed, the golden
+      # .fc0 files in tests/fixtures/golden/ may now be stale. We do NOT
+      # regenerate on CI (that would mask real regressions by overwriting
+      # the committed baseline); instead we surface the diff to the PR
+      # author so they can run --generate locally and commit the new
+      # .fc0 files alongside the source change.
+      - name: Golden savestate drift check
+        if: github.event_name == 'pull_request'
+        working-directory: ${{ github.workspace }}
+        shell: pwsh
+        run: |
+          $changed = git diff --name-only origin/${{ github.base_ref }}...HEAD | Where-Object {
+              $_ -match '^src/state\.cpp$' -or
+              $_ -match '^src/x6502\.cpp$' -or
+              $_ -match '^src/ppu\.cpp$' -or
+              $_ -match '^src/sound\.cpp$' -or
+              $_ -match '^src/cpu\.cpp$' -or
+              $_ -match '^src/cpu\.h$' -or
+              $_ -match '^tests/fixtures/golden/golden_savestate_test\.cpp$'
+          }
+          if ($changed) {
+              Write-Host "::warning::Golden-regenerating files changed:"
+              $changed | ForEach-Object { Write-Host "  - $_" }
+              Write-Host "::warning::The golden .fc0 files in tests/fixtures/golden/ may now be stale."
+              Write-Host "::warning::Please run locally on a Release build and commit the result:"
+              Write-Host "::warning::  cd tests"
+              Write-Host "::warning::  ../build/tests/fceux11_golden_savestate_test.exe --generate"
+              Write-Host "::warning::Then push the updated .fc0 files and golden_index.json."
+          } else {
+              Write-Host "No SFORMAT-emitting sources changed; golden is in sync."
+          }
+
+      # v1.3 Legion Phase 7.2 (optional): --compare-layout diagnostic.
+      # Runs the layout comparison as an advisory step. The exit code is
+      # captured but the workflow does not fail on layout drift here
+      # (that's what the dedicated golden_savestate_test ctest is for);
+      # the value of this step is the per-chunk diff output that pinpoints
+      # the source of any drift.
+      - name: Golden layout compare (advisory)
+        if: github.event_name == 'pull_request'
+        working-directory: ${{ github.workspace }}/tests
+        shell: pwsh
+        run: |
+          $exe = "../build/tests/fceux11_golden_savestate_test.exe"
+          if (Test-Path $exe) {
+              & $exe --compare-layout | Out-File -FilePath golden_compare_layout.log
+              Write-Host "Layout compare output saved to golden_compare_layout.log"
+              Get-Content golden_compare_layout.log | Select-Object -Last 20
+          } else {
+              Write-Host "::warning::$exe not built; skipping layout compare."
+          }
+
+      # v1.4 Gateway Phase 7.4: Bus dispatch site drift check.
+      # If any of the bus-surface sources have changed, mapper_core_test
+      # regression coverage is the canary. We surface the changed files
+      # to the PR author so they remember to verify mapper_core_test.
+      - name: Bus dispatch site drift check
+        if: github.event_name == 'pull_request'
+        working-directory: ${{ github.workspace }}
+        shell: pwsh
+        run: |
+          $changed = git diff --name-only origin/${{ github.base_ref }}...HEAD | Where-Object {
+              $_ -match '^src/boards/.*\.cpp$' -or
+              $_ -match '^src/bus\.(cpp|h)$' -or
+              $_ -match '^src/cart\.(cpp|h)$'
+          }
+          if ($changed) {
+              Write-Host "::warning::Bus-relevant files changed; verify mapper_core_test stays green."
+              Write-Host "::warning::Changed files:"
+              $changed | ForEach-Object { Write-Host "  - $_" }
+              Write-Host "::warning::Run locally:"
+              Write-Host "::warning::  ctest --test-dir build -C Release -R mapper_core_test"
+          } else {
+              Write-Host "No bus-surface sources changed; coverage still applies."
+          }
+
+      # v1.4 Gateway Phase 7.4: hot-path reference-alias drift check.
+      # Phase 3 committed to keeping ARead[] / BWrite[] / VPage[] /
+      # MMC5SPRVPage[] / MMC5BGVVPage[] direct indexing out of the hot-
+      # path files. The ppu.cpp VPage[] / MMC5SPRVPage[] retention and
+      # the fceu.cpp handler-registration retention are documented
+      # exceptions (§5.1.5 and §5.3.3 of v1.4_Gateway_Build_Plan.md).
+      # Any new direct indexing outside those exceptions is a
+      # regression of the Phase 3 hot-path migration and should fail the
+      # build.
+      - name: Hot-path reference-alias drift check
+        if: github.event_name == 'pull_request'
+        working-directory: ${{ github.workspace }}/src
+        shell: pwsh
+        run: |
+          $hits = git grep -n "ARead\[\|BWrite\[\|VPage\[\|MMC5SPRVPage\[\|MMC5BGVPage\[" -- x6502.cpp ppu.cpp cart.cpp cheat.cpp debug.cpp nsf.cpp lua-engine.cpp 2>$null
+          if ($hits) {
+              # Documented exceptions (per plan §5.3.4 + §5.1.5):
+              # - fceu.cpp (cold-path handler registration)
+              # - ppu.cpp VPage[] / MMC5SPRVPage[] (Phase 3 §5.1.5 retention:
+              #   MSVC did not inline g_bus.vpage() to the same RIP-relative
+              #   machine code as the reference-alias; +6-8% bench regression
+              #   caused migration to be rolled back)
+              # - ppu.cpp ARead[x]/BWrite[x] lines 1756-1773: PPU register
+              #   init (cold path, runs once on Power())
+              $hotHits = $hits | Where-Object {
+                  $_ -notmatch 'fceu\.cpp' -and
+                  -not ($_ -match 'ppu\.cpp' -and $_ -match 'VPage\[|MMC5SPRVPage\[') -and
+                  -not ($_ -match 'ppu\.cpp:17[5-7]\d:' -and $_ -match 'ARead\[|BWrite\[')
+              }
+              if ($hotHits) {
+                  Write-Host "::error::Direct reference-alias indexing in hot-path files (must use g_bus.):"
+                  $hotHits | ForEach-Object { Write-Host "  $_" }
+                  exit 1
+              } else {
+                  Write-Host "Only documented exceptions present (fceu.cpp cold path + ppu.cpp VPage/MMC5SPRVPage hot-path retention + ppu.cpp PPU-register-init handler registration)."
+              }
+          } else {
+              Write-Host "No direct ARead[] / BWrite[] / VPage[] / MMC5SPRVPage[] / MMC5BGVPage[] indexing in hot-path files."
+          }
+
+      # v1.4 Gateway Phase 7.4: board-file direct-array drift check.
+      # All 175 board files should route through Bus (inline forwarders
+      # or g_bus. direct access). Direct ARead[] / BWrite[] / Page[] /
+      # VPage[] / VPageG[] / PRGptr[] / CHRptr[] / MMC5SPRVPage[] /
+      # MMC5BGVVPage[] / VPageR[] indexing in board files is a
+      # regression of the Phase 4 / Phase 5 board migration batches.
+      - name: Board-file direct-array drift check
+        if: github.event_name == 'pull_request'
+        working-directory: ${{ github.workspace }}/src
+        shell: pwsh
+        run: |
+          $hits = git grep -n "ARead\[\|BWrite\[\|Page\[\|VPage\[\|VPageG\[\|PRGptr\[\|CHRptr\[\|MMC5SPRVPage\[\|MMC5BGVPage\[\|VPageR\[" -- boards/ 2>$null
+          if ($hits) {
+              # Documented exceptions:
+              # - boards/datalatch.cpp VPageR (rule 3 preserved uint8_t** alias)
+              # - boards/fns.cpp commented-out PRGptr/CHRptr (lines 207/210 are //)
+              # - boards/n106.cpp NTAPage (local static array, not global)
+              $boardHits = $hits | Where-Object {
+                  $_ -notmatch 'boards/datalatch\.cpp' -and
+                  $_ -notmatch 'boards/fns\.cpp:20[78]:' -and
+                  $_ -notmatch 'boards/fns\.cpp:21[08]:' -and
+                  $_ -notmatch 'boards/n106\.cpp.*NTAPage\['
+              }
+              if ($boardHits) {
+                  Write-Host "::error::Direct array indexing in board files (must use g_bus.):"
+                  $boardHits | ForEach-Object { Write-Host "  $_" }
+                  exit 1
+              } else {
+                  Write-Host "Only documented exceptions present (datalatch VPageR / fns comments / n106 NTAPage)."
+              }
+          } else {
+              Write-Host "No direct array indexing in board files."
+          }
+
+      - name: ROM Regression Test
+        working-directory: ${{ github.workspace }}/tests
+        run: |
+          $env:PATH = "${{ github.workspace }}/vcpkg_installed/x64-windows/bin;${{ github.workspace }}/vcpkg_installed/x64-windows/debug/bin;$env:PATH"
+          # v1.17 Task1-C2: Rust rom_regression runner replaces the C++
+          # fceux11_rom_regression_test.exe (parity verified; Rust also
+          # fixes the C++ first-entry parser miss - nrom is now checked).
+          $regTest = "../build/tests/f11qa_rom_regression_runner.exe"
+          if (-not (Test-Path "fixtures/golden_hashes.json")) {
+            & $regTest --generate
+          }
+          & $regTest
+        shell: pwsh
+
+      - name: Benchmark (smoke)
+        working-directory: ${{ github.workspace }}/tests
+        run: |
+          $env:PATH = "${{ github.workspace }}/vcpkg_installed/x64-windows/bin;${{ github.workspace }}/vcpkg_installed/x64-windows/debug/bin;$env:PATH"
+          $benchDir = "../build/tests"
+          & "$benchDir/fceux11_bench_ppu_render.exe"
+          & "$benchDir/fceux11_bench_x6502_exec.exe"
+          & "$benchDir/fceux11_bench_apu_mix.exe"
+        shell: pwsh
+
+      # v1.3 Legion Phase 7.3: performance baseline gate.
+      # Uses the committed v1.3 baseline (tests/fixtures/bench_baseline.json)
+      # which is regenerated by maintainers on a dedicated runner. The
+      # 2.5% tolerance is the practical floor; tighten to 1% only after
+      # moving to a dedicated runner with no other workloads.
+      - name: Bench tolerance gate
+        # Advisory only: GitHub Actions runner hardware variance routinely
+        # exceeds the 2.5% tolerance, so a failure here is not actionable as
+        # a code regression. The step still runs and surfaces the numbers
+        # (and FAIL line) in the log for visibility.
+        continue-on-error: true
+        working-directory: ${{ github.workspace }}/tests
+        run: |
+          if (Test-Path "../build/tests/fceux11_bench_tolerance_test.exe") {
+              $env:FCEUX11_BENCH_BASELINE = "fixtures/bench_baseline.json"
+              & "../build/tests/fceux11_bench_tolerance_test.exe"
+          } else {
+              Write-Host "::warning::fceux11_bench_tolerance_test.exe not built; skipping."
+          }
+        shell: pwsh
 
       # -----------------------------------------------------------------------
       # Hardware Consistency Check — Blargg $6000 test ROM suite (180 ROM batch)
@@ -623,3 +941,62 @@ jobs:
           }
 
           Write-Host "R4 gate passed: git_rev=$gitRev, total=$($m.summary.total), passed=$($m.summary.passed), failed=$($m.summary.failed), grade=$grade, pass_to_fail=$p2fCount, fail_to_pass=$f2pCount, new_test=$newTestCount, vendor_state={v=$($vs.vendored) a=$($vs.advisory) p=$($vs.pending_vendor)} [OK]"
+
+      # -----------------------------------------------------------------------
+      # Rust crate lock tests (v2.0.9)
+      # -----------------------------------------------------------------------
+      # Before v2.0.9 no `cargo test` ran in CI at all: the workspace's
+      # ~1197 Rust lock tests only ran on a maintainer's machine. That is
+      # exactly the "a test that never runs is not a test" case AGENTS.md
+      # discipline 10 records, and it has bitten this repo twice already:
+      # gba-core's 242 tests were UNREACHABLE rather than failing (the
+      # vendoring dropped their [dev-dependencies], so they did not even
+      # compile), and fceux11-debug / fceux11-media were in no gate command
+      # at all.
+      #
+      # These steps run at the END of the job on purpose. The root crate has
+      # to be tested with different features than the CMake build uses -- the
+      # `direct-adapter` feature references C++ symbols that only exist in
+      # the emulator executable, so the test binary would not link
+      # (AGENTS.md pit 2) -- and that recompiles the root crate with `gba`
+      # only, rewriting the shared
+      # build/src/rust/target/.../release/fceux11_rust.lib and regenerating
+      # src/rust/fceux11_rust.h. Nothing compiles C++ after this point, so
+      # that has no effect; running it earlier would.
+      #
+      # PROFILE: the default (test/dev) profile, NOT --release -- and that is
+      # measured, not preferred. Four gba-core lock tests are
+      # `#[should_panic]` on `debug_assert!` bounds checks
+      # (crates/gba-core/src/bitwise.rs:18/25/32 and
+      # cpu/arm7tdmi.rs:1933): in a release build `debug_assertions` is off,
+      # nothing panics, and those four tests fail ("test did not panic as
+      # expected"). Running the gate with --release would make CI
+      # permanently red on four tests that are correct in the profile they
+      # were written for. The same commands as the local gate (AGENTS.md
+      # 门禁 section) are used here, and their output directory
+      # (src/rust/target) is already covered by the "Cache Rust" step.
+      #
+      # `shell: bash` gives GitHub's default `-e -o pipefail`, so a failing
+      # test fails the job (the report's acceptance criterion).
+      - name: Rust crate lock tests (dependency crates)
+        shell: bash
+        working-directory: ${{ github.workspace }}/src/rust
+        run: |
+          set -euo pipefail
+          cargo test \
+            -p gba-core \
+            -p fceux11-core \
+            -p fceux11-formats \
+            -p fceux11-media \
+            -p fceux11-debug \
+            -p fceux11-utils \
+            -p fceux11-lua \
+            -p f11qa \
+            -p fceux11-rom-tests
+
+      - name: Rust crate lock tests (root crate)
+        shell: bash
+        working-directory: ${{ github.workspace }}/src/rust
+        run: |
+          set -euo pipefail
+          cargo test -p fceux11-rust --no-default-features --features gba

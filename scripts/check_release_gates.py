@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Release gate: CI, F11QA and Pages must be green for the commit being released.
+"""Release gate: F11QA and Pages must be green for the commit being released.
 
 Called by .github/workflows/release.yml, but runnable by hand for debugging:
 
@@ -13,8 +13,13 @@ a heredoc terminator must start at column zero).
 
 Gate semantics
 --------------
-* CI and F11QA: the latest run of that workflow for this exact SHA must be
-  completed and successful.
+* F11QA: the latest run of that workflow for this exact SHA must be completed
+  and successful. It is the only build+test workflow left: the separate "CI"
+  workflow was removed in v2.0.9 and every check it had was folded into the
+  F11QA workflow (build, ctest, licence headers, drift checks, ROM
+  regression, benchmarks and the Rust crate lock tests). Leaving "CI" in this
+  list would make the release gate wait forever for a workflow that no longer
+  exists.
 * Deploy Pages: pages.yml only runs when web/** changes, so a release commit
   that does not touch web/ has no Pages run of its own. That is not a failure:
   the gate then requires (a) the most recent successful Pages run, and (b) that
@@ -33,8 +38,11 @@ import time
 import urllib.error
 import urllib.request
 
-CI_WORKFLOW = "CI"
-F11QA_WORKFLOW = "F11QA"
+# The build+test workflows whose latest run for this exact SHA must be
+# green. v2.0.9: the former "CI" workflow is gone (its checks were folded
+# into F11QA), so this list has exactly one entry -- adding a workflow back
+# means adding its display name here.
+BUILD_TEST_WORKFLOWS = ["F11QA"]
 PAGES_WORKFLOW = "Deploy Pages"
 
 TERMINAL_BAD = {"failure", "cancelled", "timed_out", "action_required", "startup_failure"}
@@ -117,7 +125,7 @@ def pages_verdict(repo, sha, token, page_run, web_dir):
 
 
 def main(argv):
-    ap = argparse.ArgumentParser(description="CI/F11QA/Pages gate for a release")
+    ap = argparse.ArgumentParser(description="F11QA/Pages gate for a release")
     ap.add_argument("--repo", required=True, help="owner/name")
     ap.add_argument("--sha", required=True, help="commit being released")
     ap.add_argument("--timeout-min", type=int, default=90)
@@ -136,26 +144,28 @@ def main(argv):
 
     while True:
         attempt += 1
-        ci = verdict(latest_run_for_sha(args.repo, args.sha, CI_WORKFLOW, token))
-        f11 = verdict(latest_run_for_sha(args.repo, args.sha, F11QA_WORKFLOW, token))
+        gates = {
+            name: verdict(latest_run_for_sha(args.repo, args.sha, name, token))
+            for name in BUILD_TEST_WORKFLOWS
+        }
         page_run = latest_run_for_sha(args.repo, args.sha, PAGES_WORKFLOW, token)
         pages = pages_verdict(args.repo, args.sha, token, page_run, args.web_dir)
 
-        print("[%d] CI=%s F11QA=%s Pages=%s" % (attempt, ci, f11, pages), flush=True)
+        shown = " ".join("%s=%s" % (name, gates[name]) for name in BUILD_TEST_WORKFLOWS)
+        print("[%d] %s Pages=%s" % (attempt, shown, pages), flush=True)
 
         pages_ok = pages in ("pages-ok", "pages-ok-via-diff")
-        if ci == "ok" and f11 == "ok" and pages_ok:
+        if all(v == "ok" for v in gates.values()) and pages_ok:
             print("All gates green.")
             return 0
 
         bad = (
-            ci.startswith("failed")
-            or f11.startswith("failed")
+            any(v.startswith("failed") for v in gates.values())
             or pages in ("pages-failed", "pages-stale")
         )
         if bad:
             print(
-                "ERROR: a required gate is red (CI=%s F11QA=%s Pages=%s)" % (ci, f11, pages),
+                "ERROR: a required gate is red (%s Pages=%s)" % (shown, pages),
                 file=sys.stderr,
             )
             return 1
@@ -165,8 +175,8 @@ def main(argv):
             return 1
         if time.time() >= deadline:
             print(
-                "ERROR: timed out after %d min (CI=%s F11QA=%s Pages=%s)"
-                % (args.timeout_min, ci, f11, pages),
+                "ERROR: timed out after %d min (%s Pages=%s)"
+                % (args.timeout_min, shown, pages),
                 file=sys.stderr,
             )
             return 1
