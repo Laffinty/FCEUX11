@@ -1084,7 +1084,7 @@ the upstream terms continue to apply to the vendored files they are applied to.
 ## 6. 2026-11-22 Stamp Record (v2.0.8 Batch 1)
 
 > Trigger: third-party research report P0 finding (332 stale count -> 341 re-scanned
-> on 2026-11-22). Plan: `docs/plans/FCEUX11-v2.0.8_许可证合规与崩溃韧性-构建计划.md`
+> on 2026-11-22). Plan: `docs/history/plans/FCEUX11-v2.0.8_许可证合规与崩溃韧性-构建计划.md`
 > §二 (r1/r2). Owner decisions D1-D4 recorded there (§〇).
 
 ### 6.1 What was done
