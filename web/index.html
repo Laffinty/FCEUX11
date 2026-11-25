@@ -209,14 +209,21 @@
     <div class="whatsnew-head reveal">
       <div class="kicker">What's new</div>
       <h2>v2.0.9</h2>
-      <div class="sub">2026-11-25 release · One crash, one dump: no duplicated crash reports, a symbolised call stack for C++ crashes, and every Rust lock test now runs in CI</div>
+      <div class="sub">2026-11-25 release · Crash reports that keep everything, and the full lock test suite in front of every release</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3>One crash, one dump — and the whole Rust test suite in CI</h3>
-          <p>A single crash used to leave two summary lines and silently overwrite its own minidump; the crash reporter now writes exactly one dump and one summary line, and never overwrites an earlier one. C++ crashes additionally leave a symbolised call stack beside the dump. On the build side, the project no longer compiles the whole tree twice per push, and all roughly 1197 Rust lock tests now run on every CI run, so a broken lock can no longer sit unnoticed until the next release.</p>
+          <h3>Crash reporting mechanism, reworked</h3>
+          <p>Under the previous logic, a single crash produced two summary records and overwrote the existing minidump; an uncaught C++ exception produced no call stack at all. The crash collection component has now been fixed: every crash event produces exactly one dump file and one summary record, and never overwrites an earlier dump; every crash — C++ exceptions included — comes with a symbolised call stack. The scene of the crash is now preserved in full, with nothing missing, and the related data is kept on the local machine and never uploaded automatically.</p>
+        </div>
+      </div>
+      <div class="wn-item">
+        <div class="wn-num">02</div>
+        <div class="wn-text">
+          <h3>Lock test process, changed</h3>
+          <p>The emulator's Rust core has roughly 1197 automated lock tests in total. Previously this set only ran locally on the maintainer's machine, so lock-related problems could go unnoticed until a release was published; it has now been changed to run in full on every CI run, and the project no longer performs two full builds for a single commit. The complete set of lock tests is now verified before an official release, instead of relying on verification in the maintainer's local environment.</p>
         </div>
       </div>
 <div class="wn-cta reveal">

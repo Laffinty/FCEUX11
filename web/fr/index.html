@@ -209,14 +209,21 @@
     <div class="whatsnew-head reveal">
       <div class="kicker">Nouveautés</div>
       <h2>v2.0.9</h2>
-      <div class="sub">2026-11-25 · Un plantage, un vidage : plus de rapports de plantage en double, une pile d'appels symbolisée pour les plantages C++, et tous les tests de verrouillage Rust exécutés en CI</div>
+      <div class="sub">2026-11-25 · Des rapports de plantage sans perte et toute la batterie de tests de verrouillage avant chaque publication</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3>Un plantage, un vidage — et toute la suite de tests Rust en CI</h3>
-          <p>Un seul plantage laissait jusqu'ici deux lignes de résumé et écrasait silencieusement son propre minidump ; le rapporteur de plantage écrit désormais exactement un vidage et une ligne de résumé, sans jamais écraser un vidage antérieur. Les plantages C++ laissent en plus une pile d'appels symbolisée à côté du vidage. Côté build, le projet ne compile plus l'arborescence entière deux fois par push, et les quelque 1197 tests de verrouillage Rust s'exécutent désormais à chaque exécution de CI : un test cassé ne peut plus passer inaperçu jusqu'à la prochaine version.</p>
+          <h3>Mécanisme de rapport de plantage, amélioré</h3>
+          <p>Avec la logique précédente, un seul plantage produisait deux lignes de résumé et écrasait le minidump existant ; une exception C++ non rattrapée ne produisait aucune pile d'appels. Le composant de collecte des plantages est désormais corrigé : chaque événement de plantage produit exactement un fichier de vidage et une ligne de résumé, et n'écrase jamais un vidage antérieur ; tous les plantages — exceptions C++ comprises — sont accompagnés d'une pile d'appels symbolisée. La scène du plantage est désormais conservée dans son intégralité, sans rien manquer, et les données associées restent sur la machine locale, sans jamais être téléversées automatiquement.</p>
+        </div>
+      </div>
+      <div class="wn-item">
+        <div class="wn-num">02</div>
+        <div class="wn-text">
+          <h3>Processus des tests de verrouillage, modifié</h3>
+          <p>Le cœur Rust de l'émulateur est protégé par environ 1197 tests de verrouillage automatisés. Jusqu'ici, cet ensemble ne s'exécutait que sur la machine du mainteneur : les problèmes liés aux verrous pouvaient donc passer inaperçus jusqu'à la publication. Il s'exécute désormais intégralement à chaque exécution de CI, et le projet ne fait plus deux compilations complètes pour un même commit. L'ensemble complet des tests de verrouillage est ainsi vérifié avant une publication officielle, au lieu de reposer sur la vérification dans l'environnement local du mainteneur.</p>
         </div>
       </div>
 <div class="wn-cta reveal">

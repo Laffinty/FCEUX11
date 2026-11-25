@@ -209,14 +209,21 @@
     <div class="whatsnew-head reveal">
       <div class="kicker">Was ist neu</div>
       <h2>v2.0.9</h2>
-      <div class="sub">2026-11-25 Release · Ein Absturz, ein Dump: keine doppelten Absturzberichte, ein symbolisierter Aufrufstack für C++-Abstürze und alle Rust-Locktests laufen jetzt in der CI</div>
+      <div class="sub">2026-11-25 Release · Absturzberichte ohne Verluste und der komplette Lock-Test-Satz vor jeder Veröffentlichung</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3>Ein Absturz, ein Dump — und die gesamten Rust-Tests in der CI</h3>
-          <p>Ein einziger Absturz hinterließ bisher zwei Zusammenfassungszeilen und überschrieb sein eigenes Minidump stillschweigend; der Absturzberichterstatter schreibt jetzt genau einen Dump und eine Zusammenfassungszeile und überschreibt nie einen älteren. C++-Abstürze hinterlassen zusätzlich einen symbolisierten Aufrufstack. Auf der Build-Seite wird der Projektbaum pro Push nicht mehr doppelt kompiliert, und alle rund 1197 Rust-Locktests laufen jetzt bei jedem CI-Lauf — ein kaputter Lock kann nicht mehr bis zum nächsten Release unbemerkt bleiben.</p>
+          <h3>Mechanismus der Absturzberichterstattung verbessert</h3>
+          <p>Nach der bisherigen Logik erzeugte ein einzelner Absturz zwei Zusammenfassungszeilen und überschrieb den vorhandenen Mindump; eine nicht abgefangene C++-Ausnahme erzeugte überhaupt keinen Aufrufstapel. Die Absturzerfassung ist jetzt korrigiert: Jedes Absturzereignis erzeugt genau eine Dump-Datei und eine Zusammenfassungszeile und überschreibt niemals einen älteren Dump; jeder Absturz — C++-Ausnahmen eingeschlossen — bringt einen symbolisierten Aufrufstapel mit. Die Umgebung des Absturzes wird damit vollständig erhalten, ohne Lücken, und die zugehörigen Daten bleiben ausschließlich lokal und werden nicht automatisch hochgeladen.</p>
+        </div>
+      </div>
+      <div class="wn-item">
+        <div class="wn-num">02</div>
+        <div class="wn-text">
+          <h3>Ablauf der Lock-Tests geändert</h3>
+          <p>Der Rust-Kern des Emulators wird von rund 1197 automatisierten Lock-Tests abgesichert. Bisher lief diese Menge nur lokal auf dem Rechner der Maintainer, sodass lockbezogene Probleme bis zur Veröffentlichung unbemerkt bleiben konnten; jetzt läuft sie bei jedem CI-Lauf vollständig, und das Projekt führt für einen einzelnen Commit nicht mehr zwei vollständige Builds aus. Vor einer offiziellen Veröffentlichung wird damit der komplette Satz der Lock-Tests geprüft, statt sich auf die Verifikation in der lokalen Umgebung des Maintainers zu verlassen.</p>
         </div>
       </div>
 <div class="wn-cta reveal">

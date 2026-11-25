@@ -209,14 +209,21 @@
     <div class="whatsnew-head reveal">
       <div class="kicker">Novedades</div>
       <h2>v2.0.9</h2>
-      <div class="sub">2026-11-25 · Un fallo, un volcado: sin informes de fallo duplicados, con pila de llamadas simbolizada para fallos de C++ y con todas las pruebas de bloqueo de Rust en CI</div>
+      <div class="sub">2026-11-25 · Informes de fallos sin pérdidas y toda la batería de pruebas de bloqueo antes de cada publicación</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3>Un fallo, un volcado — y todas las pruebas de Rust en CI</h3>
-          <p>Un solo fallo dejaba antes dos líneas de resumen y sobrescribía en silencio su propio minivolcado; el informe de fallos escribe ahora exactamente un volcado y una línea de resumen, y nunca sobrescribe uno anterior. Los fallos de C++ dejan además una pila de llamadas simbolizada junto al volcado. En la parte de compilación, el proyecto ya no compila el árbol entero dos veces por push, y las cerca de 1197 pruebas de bloqueo de Rust se ejecutan ahora en cada pasada de CI, de modo que una prueba rota ya no puede pasar inadvertida hasta la próxima versión.</p>
+          <h3>Mecanismo de informe de fallos, mejorado</h3>
+          <p>Con la lógica anterior, un solo fallo generaba dos líneas de resumen y sobrescribía el minidump existente; una excepción de C++ no capturada no generaba ninguna pila de llamadas. El componente de recogida de fallos ya está corregido: cada evento de fallo genera exactamente un archivo de volcado y una línea de resumen, y nunca sobrescribe un volcado anterior; todos los fallos — incluidas las excepciones de C++ — incluyen una pila de llamadas simbolizada. La escena del fallo se conserva ahora completa, sin que falte nada, y los datos relacionados permanecen solo en el equipo local y nunca se suben de forma automática.</p>
+        </div>
+      </div>
+      <div class="wn-item">
+        <div class="wn-num">02</div>
+        <div class="wn-text">
+          <h3>Proceso de las pruebas de bloqueo, cambiado</h3>
+          <p>El núcleo Rust del emulador está protegido por unas 1197 pruebas de bloqueo automatizadas. Hasta ahora ese conjunto solo se ejecutaba en el equipo del mantenedor, por lo que los problemas relacionados con los bloqueos podían pasar inadvertidos hasta la publicación; ahora se ejecuta por completo en cada pasada de CI y el proyecto ya no realiza dos compilaciones completas para un mismo commit. Antes de una publicación oficial se verifica así el conjunto completo de pruebas de bloqueo, en lugar de depender de la verificación en el entorno local del mantenedor.</p>
         </div>
       </div>
 <div class="wn-cta reveal">

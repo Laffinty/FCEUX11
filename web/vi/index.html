@@ -209,14 +209,21 @@
     <div class="whatsnew-head reveal">
       <div class="kicker">Có gì mới</div>
       <h2>v2.0.9</h2>
-      <div class="sub">2026-11-25 · Một sự cố, một tệp dump: không còn báo cáo sự cố trùng lặp, có call stack được ký hiệu hóa cho sự cố C++, và toàn bộ bộ kiểm thử khóa Rust chạy trong CI</div>
+      <div class="sub">2026-11-25 · Báo cáo sập không còn thiếu thông tin, và toàn bộ bộ kiểm thử khóa chạy trước mỗi bản phát hành</div>
     </div>
     <div class="whatsnew-list reveal">
       <div class="wn-item">
         <div class="wn-num">01</div>
         <div class="wn-text">
-          <h3>Một sự cố, một tệp dump — và toàn bộ bộ kiểm thử Rust trong CI</h3>
-          <p>Trước đây một sự cố duy nhất để lại hai dòng tóm tắt và âm thầm ghi đè chính minidump của nó; báo cáo sự cố nay ghi đúng một tệp dump và đúng một dòng tóm tắt, và không bao giờ ghi đè tệp dump cũ. Sự cố C++ còn để lại call stack được ký hiệu hóa bên cạnh tệp dump. Về phía build, dự án không còn biên dịch toàn bộ cây hai lần cho mỗi lần push, và khoảng 1.197 bài kiểm thử khóa Rust nay chạy trong mỗi lần CI, nên một bài kiểm thử hỏng không thể lọt qua im lặng cho tới bản phát hành kế tiếp.</p>
+          <h3>Cải thiện cơ chế báo cáo sập</h3>
+          <p>Dưới logic cũ, một lần sập sẽ tạo ra hai dòng tóm tắt và ghi đè minidump đã có; ngoại lệ C++ không được bắt sẽ không in ra call stack nào cả. Thành phần thu thập sập đã được sửa: mỗi sự kiện sập chỉ tạo đúng một tệp dump và một dòng tóm tắt, và không bao giờ ghi đè các dump trước đó; mọi sự cố — kể cả ngoại lệ C++ — đều kèm theo call stack đã được ký hiệu hóa. Những thông tin của hiện trường sập giờ được lưu giữ đầy đủ, không còn thiếu mục nào, và dữ liệu liên quan chỉ nằm trên máy cục bộ, không tự động tải lên.</p>
+        </div>
+      </div>
+      <div class="wn-item">
+        <div class="wn-num">02</div>
+        <div class="wn-text">
+          <h3>Đổi quy trình kiểm thử khóa</h3>
+          <p>Lõi Rust của trình giả lập được bảo vệ bởi khoảng 1197 bài kiểm thử khóa tự động. Trước đây nhóm kiểm thử này chỉ chạy cục bộ trên máy của người duy trì, nên các vấn đề liên quan đến khóa có thể không bị phát hiện cho tới khi phát hành; nay toàn bộ đã chạy đầy đủ trong mỗi lần CI, và dự án không còn biên dịch toàn bộ cây hai lần cho cùng một commit. Trước khi một bản phát hành chính thức, toàn bộ bộ kiểm thử khóa đã được kiểm chứng, thay vì phụ thuộc vào việc kiểm tra trong môi trường cục bộ của người duy trì.</p>
         </div>
       </div>
 <div class="wn-cta reveal">
