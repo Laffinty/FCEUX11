@@ -976,27 +976,42 @@ jobs:
       # 门禁 section) are used here, and their output directory
       # (src/rust/target) is already covered by the "Cache Rust" step.
       #
-      # `shell: bash` gives GitHub's default `-e -o pipefail`, so a failing
-      # test fails the job (the report's acceptance criterion).
+      # ⚠️ **SHELL: use the default (pwsh), NOT `shell: bash`** ⚠️
+      #
+      # The first version of these two steps used `shell: bash` and the
+      # whole gate failed on the first CI run with exit code 101:
+      #
+      #   note: /usr/bin/link: extra operand '...build_script_build...rcgu.o'
+      #   error: could not compile `proc-macro2` (build script)
+      #
+      # Cause (reproduced locally): under `shell: bash` the runner's PATH
+      # puts `C:\Program Files\Git\usr\bin` ahead of MSVC's bin dir, and
+      # **Git's `usr\bin\link.exe` is the MSYS `ln`**, not Microsoft's
+      # linker. cargo invokes `link.exe` by name, so it got the wrong one
+      # and every crate with a build script failed to link. With MSVC's
+      # bin dir first (which is what the default pwsh shell and the
+      # working "Build f11qa-runner" step above have) the same command
+      # succeeds.
+      #
+      # A failing cargo test still fails the step: pwsh propagates
+      # $LASTEXITCODE as the step's exit code (observed: the failed step
+      # reported 101 = cargo's own exit code).
+      #
+      # `--all-targets` = unit tests + integration tests, WITHOUT doctests.
+      # Plain `cargo test` also runs doctests, and the vendored gba-core's
+      # doc examples do not compile in this tree -- they are upstream's and
+      # reference an `emu::` module that the vendored layout does not have:
+      #   error[E0433]: cannot find module or crate `emu` in this scope
+      #   error: doctest failed, to rerun pass `-p gba-core --doc`
+      # The vendor tree is not to be edited for that, so the doctests are
+      # excluded here. No coverage is lost: gba-core is the only crate in
+      # this group that has any doc examples at all.
       - name: Rust crate lock tests (dependency crates)
-        shell: bash
         working-directory: ${{ github.workspace }}/src/rust
-        run: |
-          set -euo pipefail
-          cargo test \
-            -p gba-core \
-            -p fceux11-core \
-            -p fceux11-formats \
-            -p fceux11-media \
-            -p fceux11-debug \
-            -p fceux11-utils \
-            -p fceux11-lua \
-            -p f11qa \
-            -p fceux11-rom-tests
+        run: cargo test --all-targets -p gba-core -p fceux11-core -p fceux11-formats -p fceux11-media -p fceux11-debug -p fceux11-utils -p fceux11-lua -p f11qa -p fceux11-rom-tests
 
+      # The root crate is ours (not vendored) and its doctests pass, so they
+      # are left in.
       - name: Rust crate lock tests (root crate)
-        shell: bash
         working-directory: ${{ github.workspace }}/src/rust
-        run: |
-          set -euo pipefail
-          cargo test -p fceux11-rust --no-default-features --features gba
+        run: cargo test -p fceux11-rust --no-default-features --features gba

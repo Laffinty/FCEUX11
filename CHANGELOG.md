@@ -85,6 +85,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `arm7tdmi.rs:1933`），release profile 下 `debug_assertions` 关闭 ⇒ 根本不 panic ⇒
   那 4 条会**恒红**。这四条在它们被写出来的 profile 里是对的；改 vendor 树会改变
   发布二进制的边界检查行为，本批不做。
+  CI 侧用 `--all-targets`（单元 + 集成测试，**不含 doctest**）：vendor 树
+  gba-core 的 doc 示例是上游的，引用了 vendored 布局里不存在的 `emu::` 模块 ⇒
+  `error[E0433]: cannot find module or crate 'emu'` ⇒ doctest 编不过。这组 crate
+  里只有 gba-core 有 doc 示例 ⇒ 排除 doctest 无覆盖损失。
+- **CI 的 Rust 步骤用默认 shell（pwsh），不用 `shell: bash`**：bash 会把
+  `C:\Program Files\Git\usr\bin` 放到 MSVC 的 bin 目录前面，而 Git 的
+  `usr\bin\link.exe` 是 **MSYS 的 `ln`**（不是链接器）⇒ cargo 按名字调 `link.exe`
+  ⇒ 每个带 build script 的 crate 链接失败（`note: /usr/bin/link: extra operand …`
+  ⇒ exit 101）。**首次 CI 运行整条流水线只红在这一步**（ctest 55/55、R4 gate、
+  迁移矩阵、blargg 全绿）⇒ 已改回默认 shell，本地按同样的 PATH 顺序复现并验证过。
 - **顺带修一处缓存失效**：`Cache Rust` 步骤缓存的是 `src/rust/target`，而 CMake 的
   cargo 构建用的是 `build/src/rust/target` ⇒ **缓存从未覆盖到它** ⇒ 每次 CI 都在从零
   重编整个 Rust 依赖图（gba-core 一家 22K 行）。⇒ 把 `build/src/rust/target` 加进

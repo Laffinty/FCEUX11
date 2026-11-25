@@ -559,11 +559,23 @@ cmd /c "call `"$vc`" >nul 2>&1 && cd /d D:\Project\FCEUX11\src\rust && cargo tes
 # ⚠️ **v2.0.9：以上十条 Rust 门禁现在也在 CI 跑**（`.github/workflows/f11qa.yml` 的
 # "Rust crate lock tests" 两步，job 末尾）。此前 CI **完全没有 cargo 环节** ⇒ 整个
 # workspace 约 1197 项锁测试只在本地跑——这正是纪律 10 的活例（已记三次）。
-# CI 侧用 **dev（默认）profile**，与上面的本地命令逐字一致。
+# CI 侧用 **dev（默认）profile**。
 # ⚠️ **不要改成 `--release`**：gba-core 有 4 条 `#[should_panic]` 断在
 # `debug_assert!` 边界检查上（`crates/gba-core/src/bitwise.rs:18/25/32`、
 # `cpu/arm7tdmi.rs:1933`）⇒ release profile 下 `debug_assertions` 关闭、根本不 panic
 # ⇒ 那 4 条**恒红**（实测：release 245 passed/4 failed，dev 249/0）。
+# ⚠️ **CI 侧用 `--all-targets`（本地侧不需要）**：CI 的那一步跑
+# `cargo test --all-targets …`（单元 + 集成测试，**不含 doctest**）。原因：vendor 树
+# gba-core 的 doc 示例是上游的，引用了 vendored 布局里不存在的 `emu::` 模块 ⇒
+# `error[E0433]: cannot find module or crate 'emu'` ⇒ doctest 编不过 ⇒ exit 101。
+# vendor 树不改 ⇒ CI 排除 doctest（这组 crate 里只有 gba-core 有 doc 示例，无覆盖损失）。
+# ⚠️ **CI 的 Rust 步骤必须用默认 shell（pwsh），不要用 `shell: bash`**：`shell: bash`
+# 会把 `C:\Program Files\Git\usr\bin` 放到 MSVC 的 bin 目录**前面**，而 Git 的
+# `usr\bin\link.exe` 是 **MSYS 的 `ln`**（不是微软的链接器）⇒ cargo 按名字调
+# `link.exe` ⇒ 每个带 build script 的 crate 链接失败：
+# `note: /usr/bin/link: extra operand '…build_script_build…rcgu.o'` ⇒ exit 101。
+# （本地已复现：把 Git 的 usr/bin 放在 PATH 前面即复现同一条错误。）
+# 同族坑：`shutdown.exe` 被 MSYS 吞参数（见下方「坑 17」）。
 
 # **许可证头门禁（v2.0.8 批 1 补录，2026-11-22）**：src/ 下所有 C/C++ 必须含 GPL 文本或在
 # 白名单（第三方/生成文件）⇒ 期望 EXIT=0，红时逐文件点名。CI 在 Setup Python 之后同步执行
@@ -624,7 +636,7 @@ $env:PATH="D:\Project\FCEUX11\vcpkg_installed\x64-windows\bin;$env:PATH"
 11. **f11qa.yml 的触发分支收窄为 `[main]`**（其余四个远端分支已不存在，实测
     `git ls-remote --heads origin` 只回 `refs/heads/main`）。
 
-### 十五个坑
+### 十七个坑
 
 1. **不加载 MSVC 环境就连标准库头都找不到**（`cl.exe` 在，`INCLUDE` 不在）。先 `call vcvars64.bat`。
 2. **`cargo test -p fceux11-rust` 必须加 `--no-default-features --features gba`**。默认 feature
@@ -760,6 +772,30 @@ $env:PATH="D:\Project\FCEUX11\vcpkg_installed\x64-windows\bin;$env:PATH"
       （21:03:01→21:37:38Z，34m37s）：Build C++ / CTest / Blargg 套件 / 迁移矩阵 /
       **R4 gate** 全部 success —— 这是 v2.0.4 线**第一次**拿到 F11QA 矩阵读数
       （此前 #97、#98 都死在同一个链接错误上）。
+17. **Windows 上「跑在 Git Bash 里」的工具会遮蔽同名 Windows 工具 —— `link.exe`
+    是其中最贵的一个。**
+    - **症状**：GitHub Actions 的 Windows runner 上，`shell: bash` 会让
+      `C:\Program Files\Git\usr\bin` 排在 MSVC 的 bin 目录**前面**。而 Git 的
+      `usr\bin\link.exe` **不是链接器**——它是 MSYS 的 `ln`（`ln` 的硬链接），
+      用法是 `link FILE1 FILE2`（建链接）。cargo 按名字调 `link.exe` ⇒ 拿到它 ⇒
+      每个**带 build script 的 crate**（proc-macro2 / quote / crc32fast / getrandom …）
+      链接失败：
+      ```
+      note: /usr/bin/link: extra operand '…\build_script_build…rcgu.o'
+      error: could not compile `proc-macro2` (build script)
+      ##[error]Process completed with exit code 101.
+      ```
+      2026-11-25 实测：v2.0.9 新加的 Rust 门禁第一步就是这个错，**整条流水线
+      只红在这一步**（ctest 55/55、R4 gate、迁移矩阵、blargg 全绿）。
+    - **判据**：报错里出现 `/usr/bin/link:` ⇒ 是 MSYS 的 link，不是微软的。
+      `where link.exe` 在 runner 上会看到 Git 的那个排第一。
+    - **修法**：**用默认 shell（pwsh）**，别用 `shell: bash`；MSVC 的 bin 目录在前时
+      同一条命令正常。本地复现姿势（`Research_only/link_probe/`）：把
+      `C:\Program Files\Git\usr\bin` 放到 PATH 最前 ⇒ 复现**逐字相同**的错误；
+      把 MSVC 的 bin 放前面 ⇒ `Finished test profile`。
+    - **同族**：坑 15 记的 `shutdown.exe` 被 MSYS 吞掉 `/s /t /c`；
+      同理还有 `find` / `sort` / `link` / `tar` 等同名工具。**凡是要调用 Windows
+      编译链的步骤，shell 一律用默认（pwsh）**。
 
 ## 纪律（这几条都是被违反过之后写下来的）
 
