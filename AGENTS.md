@@ -631,10 +631,39 @@ $env:PATH="D:\Project\FCEUX11\vcpkg_installed\x64-windows\bin;$env:PATH"
    cargo 构建用的是 `build/src/rust/target`（`src/rust/CMakeLists.txt:34`）⇒ 缓存从未
    覆盖到它 ⇒ 每次 CI 从零重编整个 Rust 依赖图。⇒ 已把 `build/src/rust/target` 加进
    缓存路径。
-10. ⚠️ **required check 名从 `CI / build-windows` 变成 `F11QA / f11qa`** —— 分支保护
-    须由业主在 GitHub 设置里改名，否则 PR 会永久卡住。
+10. ⚠️ **required check 名从 `CI / build-windows` 变成 `F11QA / f11qa`** —— 若将来建了
+    规则集/分支保护，**必须用新名字**（旧名字已无 workflow 产出它 ⇒ 会被永远判
+    "Expected"）。**当前本仓没有任何规则集/分支保护**（业主 2026-11-25 裁决：单人
+    仓库不设）⇒ 这一条现在**没有实际影响**，门槛改由发版流水线自己承担，见下节。
 11. **f11qa.yml 的触发分支收窄为 `[main]`**（其余四个远端分支已不存在，实测
     `git ls-remote --heads origin` 只回 `refs/heads/main`）。
+
+### 发版门槛（本仓**没有**分支保护 —— 门槛写在 `release.yml` 里）
+
+> **业主裁决（2026-11-25）**：本仓是单人仓库，**不设** GitHub 规则集 / 分支保护
+> （Rulesets 与 Branch protection rules 都是空的）。门槛不靠 GitHub 的保护规则，
+> 而靠发版流水线自身的依赖链。
+
+`release.yml` 的 job 依赖链（`continue-on-error` 计数 **0** ⇒ 没有一步能被软失败）：
+
+```
+preflight ──► gate-ci ──► build ──► release (Tag + Release)
+                │            │          └── 建 tag + GitHub Release + 附 zip
+                │            └── 从零重跑 Release 构建 + ctest -LE perf（exit $ctestExit）
+                └── scripts/check_release_gates.py --sha ${{ github.sha }}
+                      ⇒ 要求「dispatch 时那个确切 commit」的 F11QA run 已完成且成功
+                        + Pages 绿；红 ⇒ 立即 exit 1；还没跑 ⇒ 轮询到超时 ⇒ exit 1
+```
+
+⇒ **fail-closed**：F11QA 不绿 ⇒ `gate-ci` 失败 ⇒ `build`/`release` 被跳过 ⇒ **既不产生
+tag，也不产生 Release**；tag 由 `release` job 用 GitHub API 的 `tag_name` 创建 ⇒ 不可能
+先有 tag 再补 CI。`build` 还会**从零重编 + 重跑 ctest** ⇒ 出货二进制是独立验过的。
+
+**唯一绕过点**：手工 `git tag` + `git push --tags`（或 `git push --follow-tags`）能造出
+CI 之外的 tag —— 单人仓库属**纪律**问题，机制拦不住。
+
+⚠️ **推论**：`main` 上的 F11QA 一旦红，**v2.0.9 这类发版就会被这条门禁挡住**
+（2026-11-25 首次 CI 就红在新增的 Rust 门禁那一步 ⇒ 修完才谈得上发版）。
 
 ### 十七个坑
 
