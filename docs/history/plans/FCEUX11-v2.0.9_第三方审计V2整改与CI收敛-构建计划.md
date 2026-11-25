@@ -1,6 +1,7 @@
 # FCEUX11 v2.0.9 — 第三方二次审计 V2 整改 + CI 收敛 · 构建计划
 
-> **STATUS: 在途**（2026-11-25 立项，r1）。收口即移 `docs/history/plans/`。
+> **STATUS: 已收口归档**（2026-11-25 立项 r1 → 同日 r4 收口；随 v2.0.9 发布归档，
+> **内容冻结**）。立项时在 `docs/plans/`，收口后移入 `docs/history/plans/`。
 > **触发源**：`docs/third_party_report/FCEUX11二次审计报告V2_2026-11-24.md`（未入库的第三方报告）。
 > **坐标口径**：以 `main` @ `efedd83`（v2.0.8 发布提交）实测为准；**过期以源码为准**。
 > **业主裁决（2026-11-25）**：① 核实报告问题，确实存在且值得整改的则整改；
@@ -340,3 +341,59 @@ cargo 构建用的是 `build/src/rust/target`（`src/rust/CMakeLists.txt:34` 把
 | **r1** | 2026-11-25 | 立项。§一 事实底座全部为实测（探针脚本在 `Research_only/audit_v2_probe/`，gitignored）；业主裁决 D1–D5 记入 §二；**R1 设计修订**（阶段 2 由「串 terminate」改为「pre-hook + 串 terminate」，依据 §1.3 的路由表）。 |
 | **r2** | 2026-11-25 | 实施 + 验收完成。**实施期新发现两条**（已并入阶段 4/5）：① **发布门禁会连带失效**——`scripts/check_release_gates.py` 的 `CI_WORKFLOW="CI"` 是 `release.yml` 的 `gate-ci` job 的轮询对象，删掉 ci.yml 后每次发版都会卡到超时 ⇒ 已改为只等 F11QA；② **Rust 门禁不能用 `--release`**——gba-core 有 4 条 `#[should_panic]` 断在 `debug_assert!` 边界检查上，release profile 下 `debug_assertions` 关闭 ⇒ 恒红（实测 245/4 failed vs dev 249/0）⇒ 改用 dev profile（与本地门禁逐字一致）。另修 `Cache Rust` 的缓存失效（缓存的是 `src/rust/target`，而 CMake 的 cargo 构建用 `build/src/rust/target`）。**验收读数见 §四**（ctest 55/55、crash_once_test 16/16、Rust 1197/0 失败、两态 check EXIT=0、license EXIT=0、产物 v2.0.9、两个探针各 1 dump + 1 摘要 + 背迹、三条变异腿各红后复绿）。**提交**：`16feab2`（fix(crash)）、`1e837f5`（ci）、docs 收口提交。**未做**：tag / GitHub Release / push（须业主另行明示）。⚠️ **给业主的两项待办**：① 分支保护的 required check 需从 `CI / build-windows` 改名为 `F11QA / f11qa`（否则 PR 永久卡住）；② `M COPYRIGHT_AUDIT.md` 与未入库的审计报告**原样保留**，未混入本批提交。 |
 | **r3** | 2026-11-25 | **首次 CI 运行后的整改**（流水线 `#…`，日志已解包存档于 `Research_only/ci_logs_123135242419/`）。**整条流水线只红在新加的 Rust 门禁一步**（exit 101）：ctest **55/55 通过**、R4 gate **通过**（grade B / 123 项 / 113P/10F / `pass_to_fail=0`）、blargg 的 28 个 FAIL **全在** known-fail 基线内（且 4 个基线项这轮反而通过）⇒ 其余步骤均为既有状态，无回归。**两个根因**（均已本地复现并修掉）：① **`shell: bash` 让 Git 的 `usr\bin\link.exe`（其实是 MSYS 的 `ln`）遮蔽了 MSVC 的链接器** ⇒ 每个带 build script 的 crate 链接失败（`note: /usr/bin/link: extra operand …`）⇒ 两步都改回**默认 pwsh shell**（本地按同样 PATH 顺序复现：Git 的 usr/bin 在前 ⇒ 逐字相同的错误；MSVC 在前 ⇒ `Finished test profile`）；② **`cargo test` 还会跑 doctest**，而 vendor 树 gba-core 的 doc 示例引用了 vendored 布局里不存在的 `emu::` 模块 ⇒ `error[E0433]` ⇒ 依赖 crate 那一步改用 **`--all-targets`**（单元 + 集成，不含 doctest；这组里只有 gba-core 有 doc 示例 ⇒ 无覆盖损失），根 crate 那步保留 doctest（它的是我们的，通过）。本地复核：依赖 crate **894 通过 / 0 失败 / 2 忽略**，根 crate **303 / 0 / 20 忽略** ⇒ 合计仍 1197。**新增 AGENTS.md 坑 17**（MSYS 同名工具遮蔽 Windows 工具，`link.exe` 是最贵的一个）。 |
+| **r4** | 2026-11-25 | **发版前复核 + 收口归档**。① **F11QA 权威性复核**（见 §八）：绿 run `45519067047`（HEAD `78737b4`）逐项取证 ⇒ **NES 侧权威性达到发版要求**，附 5 条登记项（G1–G5，均为治理/口径级，不阻塞本次发版）。② **工作区两份文件入库**：`M COPYRIGHT_AUDIT.md`（v2.0.8 计划路径修正） + 未入库的第三方二次审计报告 V2（`docs/third_party_report/`，与 v1 报告同目录）。③ **本计划移入 `docs/history/plans/`**（`docs/plans/` 再次清空），AGENTS.md 治理表同步改指归档路径。④ CHANGELOG `[2.0.9]` 由「未发布」改为「已发布」口径（沿用 v2.0.8 的先例：发布口径随发版提交一起落）。⑤ tag / GitHub Release 由业主指示后由 `release.yml` 流水线执行（`dry_run=false`），本计划不代劳推送以外的发布动作。 |
+
+---
+
+## 八、F11QA 权威性复核（发版前，2026-11-25）
+
+> 业主指示：「F11QA 已掌握全部检测能力，最后复核其权威性是否达到发版要求」。
+> 本节结论 = **NES 侧达到发版要求**；登记 5 条残留项（治理/口径级，**不阻塞本次发版**）。
+> 取证对象 = 绿 run **`45519067047`**（HEAD `78737b4`，2026-11-25T00:34Z，41m39s，
+> 36 个实质步骤全 success）+ 仓库源码实读。**不是引用文档声明。**
+
+### 8.1 覆盖面与强制力（逐项实测读数）
+
+| 通道 | 强制方式 | 本次读数 |
+|---|---|---|
+| CTest 回归套件 | **严格**（v2.0.9 起该步不再带 `continue-on-error`） | **55/55 通过** |
+| Rust crate 锁测试（10 crate） | **严格**（默认 pwsh shell + dev profile + `--all-targets`） | **1197 通过 / 0 失败 / 22 忽略**（894 + 303） |
+| F11QA 迁移矩阵 | R4 gate 机器判定 | **123 项 / 113P / 10F / skipped=0**，`grade=B`，`pass_to_fail=0`，`fail_to_pass=3`，`new_test=2`，`vendor_state={vendored 44, advisory 13, pending-vendor 22}` |
+| advisory 失败率上限 | R4 gate | **10 / 123 = 8.1% ≤ 15%** |
+| license header / ROM Regression / Bench smoke / blargg 套件 | 前三者严格；blargg 步带 `continue-on-error`（矩阵内另有 83 断言通道） | 全部 success |
+| 发版门槛 | `release.yml` 的 **preflight → gate-ci → build → tag+release** 依赖链（`continue-on-error` 计数 0） | fail-closed |
+
+**迁移矩阵的失败构成（取自产物 `f11qa_migration_matrix.json`）**：10 条失败
+= 冻结基线 13 条已知失败**减去**本轮修好的 3 条（`kgmqa-049/050/051`，bisqwit 三项
+⇒ fail_to_pass）⇒ **全部落在冻结基线内**，零回归（`pass_to_fail=0`）、
+零静默删除（`test_set_diff.removed=[]`）。
+
+### 8.2 fail-closed 性质（**源码实读**，非文档声明）
+
+| 失效模式 | 实际行为 | 出处 |
+|---|---|---|
+| 测试二进制缺失 / spawn 失败 | **记 FAIL（不是跳过）** ⇒ blocking 失败 ⇒ grade D ⇒ 门禁红 | `runner/scheduler.rs:29-38` |
+| 子进程超时 | `exit_code=-2` + `migration_note` ⇒ FAIL | `adapter/subprocess.rs:175-217` |
+| 退出码 0 但 `stdout_contains` 不匹配 | **FAIL**（不只看退出码） | `adapter/subprocess.rs:222-235` + `oracle/regression.rs` |
+| matrix 未产出 / `git_rev=unknown` | R4 gate 直接 `exit 1` | `f11qa.yml:809-822` |
+| ctest 失败 | 该步失败即 job 失败（v2.0.9 已去掉 `continue-on-error`） | `f11qa.yml:391-396` |
+| 「跑了但结论是错的」 | R4 gate 判矩阵**存在 + sane**，不是打印就过 | `f11qa.yml:802-941` |
+
+### 8.3 残留项（登记，**不阻塞本次发版**）
+
+| # | 项 | 性质与影响 | 建议 |
+|---|---|---|---|
+| **G1** | **期望值文件本身没有门禁保护**：`tests/tests.json`（`failure_means`）、`tests/fixtures/f11qa_baseline_frozen.json`（基线真值）、`tests/fixtures/blargg_known_fail.json`（已知失败）三份都可被改写 ⇒ 把基线里某条从 `true` 改成 `false`，回归就从 `pass_to_fail` 变成 `fail_to_fail` ⇒ **门禁照样绿** | 治理级（不是测试能力缺陷）。⚠️ 本仓**无分支保护**（业主 2026-11-25 裁决）⇒ 只能靠人工复核 diff 兜住。`blargg_known_fail.json` 里的「AI shall not modify expected values」目前是**约定，不是检查** | 列入发版前人工复核清单；或后续加一条「期望值文件变更必须在 CHANGELOG 说明」的门禁 |
+| **G2** | R4 gate 的 `total_min=120` 比当前 **123** 少 3 ⇒ 删掉 ≤3 条用例不会触发门禁（`vendor_state` 三态和是**自指**的：删 rom-suite 用例时两边同减） | 计数判据比实际清单松 3 条 | 把 `total_min` 提到 123，或加「用例集合与上一版逐字一致」检查 |
+| **G3** | **advisory 占比 50/123（41%）**：advisory 区的失败不改变 grade（只有 `pass_to_fail` 与 15% 上限两道网） | 「已知限制」的设计取舍，非缺陷；但对外**不得声称「F11QA 覆盖全部 NES 行为」** | 发版说明按现有口径写；长期靠「修一条降一条」收敛 |
+| **G4** | **GBA 无外部 oracle**：F11QA 全系只测 NES（workflow 头部自陈） | 不构成 NES 发版阻塞（AGENTS.md 不变式 1–7：GBA 长期 Alpha 且不入质量体系）⇒ 但**不得声称覆盖 GBA** | 口径维持 |
+| **G5** | blargg 46 条断言失败属人工维护的已知失败基线 | 已知失败越多，检出能力越低 | 随长尾逐步收敛 |
+
+### 8.4 结论
+
+**NES 侧：F11QA 的权威性达到 v2.0.9 发版要求。** 依据 = ①全部实质通道从
+「advisory / 静默吞掉」改为**机器强制**，②失败可追溯到冻结基线的**逐条**对照
+（10 条失败 = 基线 13 条 − 本轮修好的 3 条），③失效模式逐条实测为 fail-closed，
+④发版门槛本身是 fail-closed 的依赖链。**登记 G1–G5**（G1/G2 为可低成本收紧的
+治理项，G3–G5 为长期口径），**均不阻塞本次发版**。
+

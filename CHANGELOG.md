@@ -7,15 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.9] — 2026-11-25
 
-> **未发布**：本版已完成实现与门禁验收，**tag / GitHub Release / push 须业主另行
-> 明确指示**（沿用 v2.0.2_hotfix1 起的口径：本地 commit 照做，发布动作等指示）。
+> **已发布（2026-11-25）**：`src/version.h` 提升到 2.0.9（NUMERIC 20009），
+> 发布流水线（`preflight → gate-ci → build → tag+release`，`continue-on-error` 计数 0）
+> 全绿后创建 tag `v2.0.9` 并发布 GitHub Release（附件
+> `fceux11-v2.0.9-windows-amd64.zip`）。
+>
+> **文档归档**：本版构建计划（第三方审计 V2 整改 + CI 收敛）已随收口移入
+> `docs/history/plans/` ⇒ `docs/plans/` 再次清空。
+>
+> **发版前的 F11QA 权威性复核（结论：NES 侧达到发版要求）**：绿 run
+> `45519067047` 逐项取证——ctest **55/55**、Rust 锁测试 **1197 通过 / 0 失败**、
+> 迁移矩阵 **123 项 / 113P / 10F / grade B / `pass_to_fail=0`**（10 条失败 =
+> 冻结基线 13 条 − 本轮修好的 3 条，零静默删除）；失效模式（缺二进制 / 超时 /
+> `stdout_contains` 不匹配 / matrix 未产出 / `git_rev=unknown`）逐条实测为
+> **fail-closed**。**登记 5 条残留项**（期望值文件本身无门禁保护 / `total_min`
+> 比清单松 3 条 / advisory 占 41% / GBA 无外部 oracle / blargg 已知失败）⇒
+> **均不阻塞本次发版**，详见归档计划 §八。
 >
 > 本版主题：**第三方二次审计 V2 的两项未关闭发现 + 一条核实中新发现的回归 +
 > CI 收敛**。触发源 = `docs/third_party_report/FCEUX11二次审计报告V2_2026-11-24.md`。
 > 报告的两项（P1 Rust 单测缺失 / P2 崩溃报告重复）**逐条核实为属实**；核实过程中
 > 另发现**第三条报告未提的缺陷**（v2.0.8 静默废掉了既有的 C++ 崩溃符号化背迹）。
 > 全部结论以**实测**为准（探针脚本在 `Research_only/audit_v2_probe/`，gitignored），
-> 逐条记入 `docs/plans/FCEUX11-v2.0.9_第三方审计V2整改与CI收敛-构建计划.md` §一。
+> 逐条记入 `docs/history/plans/FCEUX11-v2.0.9_第三方审计V2整改与CI收敛-构建计划.md`
+> §一（事实底座）与 §八（权威性复核）。
 
 ### Fixed — 崩溃报告：一次崩溃事件只出一份转储、一行摘要（P2）
 
@@ -126,6 +141,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **gba-core 的 4 条 `#[should_panic]` 锁测试只在 dev profile 下成立**（它们断的是
   `debug_assert!` 边界检查）⇒ 若将来有人想让 Rust 门禁跑 release profile，必须先处理
   这 4 条；本批按「门禁 = 本地门禁同款命令」的口径用 dev profile。
+- **F11QA 的三份期望值文件本身没有门禁保护**：`tests/tests.json`（`failure_means`）、
+  `tests/fixtures/f11qa_baseline_frozen.json`（基线真值）、
+  `tests/fixtures/blargg_known_fail.json`（已知失败）改写即可改变门禁结论
+  （例：把基线里某条由 `true` 改成 `false`，回归就从 `pass_to_fail` 变成
+  `fail_to_fail` ⇒ 门禁照样绿）。⚠️ 本仓**无分支保护**（业主 2026-11-25 裁决）⇒
+  只能靠**人工复核 diff** 兜住；`blargg_known_fail.json` 里的
+  「AI shall not modify expected values」目前是约定，不是检查。
+- **R4 gate 的用例数下限比清单松 3 条**：`total_min=120`，而当前清单 123 项 ⇒
+  删掉 ≤3 条用例不会触发门禁（`vendor_state` 三态和是自指的：删 rom-suite 用例时
+  两边同减）。
 - GBA 侧仍为 Alpha（见 [2.0.8] 与更早各版的登记），本批次**零 GBA 改动**。
 
 ## [2.0.8] — 2026-11-24
